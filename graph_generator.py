@@ -10,12 +10,12 @@ from data_structures import (
     NodeAttributes, AccountAttributes, EdgeAttributes,
     TransactionAttributes, OwnershipAttributes
 )
-from utils import SAMPLE_GEO_LOCATIONS
+
+from utils import GEO_LOCATIONS
 
 
 class GraphGenerator:
     def __init__(self, params: Dict[str, Any]):
-
         self.params = params
         self.graph = nx.DiGraph()
         self.node_counter = 0
@@ -29,7 +29,7 @@ class GraphGenerator:
             "business_accounts_per_institution_range": (1, 6)
         })
         self.time_span = params.get("time_span", {
-            # Time span of the simulation, entities can be created before this date.
+            # Time span of the simulation, entities are created on or before the start date.
             # Format is (year, month, day, hour, minute, second)
             "start_date": datetime.datetime(2023, 1, 1, 0, 0, 0),
             "end_date": datetime.datetime(2023, 3, 15, 23, 59, 59)
