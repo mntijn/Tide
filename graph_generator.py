@@ -54,7 +54,7 @@ class GraphGenerator:
             node_type=node_type,
             creation_date=creation_date,
             geo_location=random.choice(
-                SAMPLE_GEO_LOCATIONS),
+                GEO_LOCATIONS),
             is_fraudulent=False
         ))
 
