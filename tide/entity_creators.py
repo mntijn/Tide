@@ -226,11 +226,8 @@ class AccountCreator(BaseCreator):
             print("Warning: AccountCreator initialized with no institution IDs.")
         self.all_institution_ids = all_institution_ids
 
-        # Maps institution_id -> country_code
         self.institution_countries = institution_countries
         self.account_balance_range = params.get("account_balance_range_normal")
-
-        # Use the static currency mapping from utils
         self.currency_mapping = COUNTRY_TO_CURRENCY
         self.account_categories = params.get("account_categories")
 
