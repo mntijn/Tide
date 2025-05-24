@@ -3,7 +3,7 @@ import datetime
 import yaml
 from typing import Dict, Any
 
-from graph_generator import GraphGenerator
+from tide.graph_generator import GraphGenerator
 
 if __name__ == "__main__":
     with open("config.yaml", 'r') as f:

@@ -26,20 +26,64 @@ class TransactionType(Enum):
     WITHDRAWAL = "withdrawal"
 
 
+class AccountCategory(Enum):
+    CURRENT = "current"
+    SAVINGS = "savings"
+    LOAN = "loan"
+    BUSINESS = "business"
+
+
+class AgeGroup(Enum):
+    EIGHTEEN_TO_TWENTY_FOUR = "18-24"
+    TWENTY_FIVE_TO_THIRTY_FOUR = "25-34"
+    THIRTY_FIVE_TO_FORTY_NINE = "35-49"
+    FIFTY_TO_SIXTY_FOUR = "50-64"
+    SIXTY_FIVE_PLUS = "65+"
+
+
+class Gender(Enum):
+    MALE = "male"
+    FEMALE = "female"
+
+
 @dataclass
 class NodeAttributes:
     node_type: NodeType
-    # institutions dont have a creation date
     creation_date: Optional[datetime.datetime] = None
-    geo_location: str = "UNKNOWN"
+    address: Optional[Dict[str, str]] = None
     is_fraudulent: bool = False
+
+
+@dataclass
+class IndividualAttributes:
+    name: Optional[str] = None
+    age_group: Optional[AgeGroup] = None
+    occupation: Optional[str] = None
+    gender: Optional[Gender] = None
+
+
+@dataclass
+class BusinessAttributes:
+    name: Optional[str] = None
+    business_category: Optional[str] = None
+    incorporation_year: Optional[int] = None
+    number_of_employees: Optional[int] = None
+    is_high_risk_category: bool = False
+    is_high_risk_country: bool = False
+
+
+@dataclass
+class InstitutionAttributes:
+    name: Optional[str] = None
 
 
 @dataclass
 class AccountAttributes:
     start_balance: float = 0.0
     current_balance: float = 0.0
-    institution_id: str = None
+    institution_id: Optional[str] = None
+    account_category: Optional[AccountCategory] = None
+    currency: Optional[str] = None
 
 
 @dataclass
@@ -53,6 +97,7 @@ class TransactionAttributes(EdgeAttributes):
     amount: float = field(kw_only=True)
     currency: str = "EUR"
     transaction_type: TransactionType = field(kw_only=True)
+    is_fraudulent: bool = False
     edge_type: EdgeType = EdgeType.TRANSACTION
 
 
