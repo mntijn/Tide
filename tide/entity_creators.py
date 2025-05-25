@@ -109,7 +109,7 @@ class IndividualCreator(BaseCreator):
             score += self.risk_weights.get("occupation", 0.10)
 
         entity_country = common_attrs.get("address", {}).get("country")
-        if entity_country in HIGH_RISK_COUNTRIES:  # Using existing imported list
+        if entity_country in HIGH_RISK_COUNTRIES:
             country_weight = self.risk_weights.get("country", 0.20)
             country_factor = self.risk_config.get(
                 "countries_weight_factor", 1.0)
@@ -157,21 +157,19 @@ class BusinessCreator(BaseCreator):
         score = base_risk
 
         business_category = specific_attrs.get("business_category")
-        if business_category in HIGH_RISK_BUSINESS_CATEGORIES:  # Using existing imported list
+        if business_category in HIGH_RISK_BUSINESS_CATEGORIES:
             category_weight = self.risk_weights.get("business_category", 0.25)
             category_factor = self.risk_config.get(
                 "business_categories_weight_factor", 1.0)
             score += category_weight * category_factor
 
         entity_country = common_attrs.get("address", {}).get("country")
-        if entity_country in HIGH_RISK_COUNTRIES:  # Using existing imported list
-            # Can share weight with individual or have its own
+        if entity_country in HIGH_RISK_COUNTRIES:
             country_weight = self.risk_weights.get("country", 0.20)
             country_factor = self.risk_config.get(
                 "countries_weight_factor", 1.0)
             score += country_weight * country_factor
 
-        # Add company size risk factor
         num_employees = specific_attrs.get("number_of_employees", 0)
         company_size_thresholds = self.risk_config.get(
             "company_size_thresholds", {})
@@ -179,9 +177,6 @@ class BusinessCreator(BaseCreator):
         # Very small companies (1-5 employees) can be shell companies
         if num_employees <= company_size_thresholds.get("very_small_max", 5):
             score += self.risk_weights.get("very_small_company", 0.10)
-        # Very large companies (500+ employees) might have complex structures
-        elif num_employees >= company_size_thresholds.get("very_large_min", 500):
-            score += self.risk_weights.get("very_large_company", 0.05)
 
         max_score = self.risk_weights.get("max_score", 0.9)
         return min(score, max_score)

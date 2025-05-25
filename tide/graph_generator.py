@@ -116,7 +116,7 @@ class GraphGenerator:
         print("Creating graph entities..")
         sim_start_date = self.time_span["start_date"]
 
-        # Create Institutions
+        # Create Institutions and accounts
         institutions_data = self.institution_creator.generate_institutions_data()
         institution_countries = {}
         for common_attrs, specific_attrs in institutions_data:
@@ -125,12 +125,11 @@ class GraphGenerator:
             # Store the institution's country for account creation
             institution_countries[institution_id] = common_attrs["address"]["country"]
 
-        # Initialize AccountCreator now that institutions exist
         all_institution_ids = self.all_nodes.get(NodeType.INSTITUTION, [])
         self.account_creator = AccountCreator(
             self.params, all_institution_ids, institution_countries)
 
-        # Create Individuals and their Accounts
+        # Create Individuals and accounts
         individuals_data = self.individual_creator.generate_individuals_data()
         individual_business_ownership_rate = self.params.get(
             "individual_business_ownership_rate")
