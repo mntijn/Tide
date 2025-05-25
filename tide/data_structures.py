@@ -52,6 +52,7 @@ class NodeAttributes:
     creation_date: Optional[datetime.datetime] = None
     address: Optional[Dict[str, str]] = None
     is_fraudulent: bool = False
+    risk_score: Optional[float] = None
 
 
 @dataclass

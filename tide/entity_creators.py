@@ -9,7 +9,7 @@ from .data_structures import (
     IndividualAttributes, BusinessAttributes, InstitutionAttributes,
     OwnershipAttributes, AgeGroup, Gender
 )
-from .utils import COUNTRY_CODES, generate_localized_address, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, generate_business_category, COUNTRY_TO_CURRENCY
+from .utils import COUNTRY_CODES, generate_localized_address, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_OCCUPATIONS, HIGH_RISK_AGE_GROUPS, generate_business_category, COUNTRY_TO_CURRENCY
 
 
 def get_max_age_from_group(age_group: AgeGroup) -> int:
@@ -70,6 +70,8 @@ class BaseCreator:
         self.faker = Faker()
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
+        self.risk_config = self.params.get("high_risk_config", {})
+        self.risk_weights = self.params.get("risk_weights", {})
 
 
 class InstitutionCreator(BaseCreator):
@@ -94,9 +96,31 @@ class InstitutionCreator(BaseCreator):
 
 
 class IndividualCreator(BaseCreator):
+    def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
+        """Calculates a risk score for an individual."""
+        base_risk = self.risk_weights.get("base_individual", 0.05)
+        score = base_risk
+
+        # Use high-risk age groups from utils.py instead of config
+        if specific_attrs.get("age_group").name in HIGH_RISK_AGE_GROUPS:
+            score += self.risk_weights.get("age_group", 0.15)
+
+        if specific_attrs.get("occupation") in HIGH_RISK_OCCUPATIONS:
+            score += self.risk_weights.get("occupation", 0.10)
+
+        entity_country = common_attrs.get("address", {}).get("country")
+        if entity_country in HIGH_RISK_COUNTRIES:  # Using existing imported list
+            country_weight = self.risk_weights.get("country", 0.20)
+            country_factor = self.risk_config.get(
+                "countries_weight_factor", 1.0)
+            score += country_weight * country_factor
+
+        max_score = self.risk_weights.get("max_score", 0.9)
+        return min(score, max_score)
+
     def generate_individuals_data(self) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]]:
         """
-        Generates data for individual nodes.
+        Generates data for individual nodes, including a risk score.
         """
         individuals_data = []
         num_individuals = self.graph_scale.get("individuals", 0)
@@ -108,7 +132,7 @@ class IndividualCreator(BaseCreator):
             country_code = random.choice(COUNTRY_CODES)
             common_attrs = {
                 "address": generate_localized_address(country_code),
-                "is_fraudulent": False
+                "is_fraudulent": False  # Default to False, will be updated later
             }
             specific_attrs = {
                 "name": self.faker.name(),
@@ -116,15 +140,55 @@ class IndividualCreator(BaseCreator):
                 "occupation": self.faker.job(),
                 "gender": random.choice(list(Gender)),
             }
+            # Calculate and add risk score
+            risk_score = self._calculate_risk_score(
+                specific_attrs, common_attrs)
+            common_attrs["risk_score"] = risk_score
+
             individuals_data.append(
                 (creation_date, common_attrs, specific_attrs))
         return individuals_data
 
 
 class BusinessCreator(BaseCreator):
+    def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
+        """Calculates a risk score for a business."""
+        base_risk = self.risk_weights.get("base_business", 0.1)
+        score = base_risk
+
+        business_category = specific_attrs.get("business_category")
+        if business_category in HIGH_RISK_BUSINESS_CATEGORIES:  # Using existing imported list
+            category_weight = self.risk_weights.get("business_category", 0.25)
+            category_factor = self.risk_config.get(
+                "business_categories_weight_factor", 1.0)
+            score += category_weight * category_factor
+
+        entity_country = common_attrs.get("address", {}).get("country")
+        if entity_country in HIGH_RISK_COUNTRIES:  # Using existing imported list
+            # Can share weight with individual or have its own
+            country_weight = self.risk_weights.get("country", 0.20)
+            country_factor = self.risk_config.get(
+                "countries_weight_factor", 1.0)
+            score += country_weight * country_factor
+
+        # Add company size risk factor
+        num_employees = specific_attrs.get("number_of_employees", 0)
+        company_size_thresholds = self.risk_config.get(
+            "company_size_thresholds", {})
+
+        # Very small companies (1-5 employees) can be shell companies
+        if num_employees <= company_size_thresholds.get("very_small_max", 5):
+            score += self.risk_weights.get("very_small_company", 0.10)
+        # Very large companies (500+ employees) might have complex structures
+        elif num_employees >= company_size_thresholds.get("very_large_min", 500):
+            score += self.risk_weights.get("very_large_company", 0.05)
+
+        max_score = self.risk_weights.get("max_score", 0.9)
+        return min(score, max_score)
+
     def generate_businesses_data(self) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]]:
         """
-        Generates data for business nodes.
+        Generates data for business nodes, including a risk score.
         """
         businesses_data = []
         num_businesses = self.graph_scale.get("businesses", 0)
@@ -146,8 +210,7 @@ class BusinessCreator(BaseCreator):
 
             common_attrs = {
                 "address": generate_localized_address(country_code),
-                # To be determined
-                "is_fraudulent": False
+                "is_fraudulent": False  # Default to False
             }
             specific_attrs = {
                 "name": self.faker.company(),
@@ -157,6 +220,11 @@ class BusinessCreator(BaseCreator):
                 "is_high_risk_category": is_in_high_risk_category,
                 "is_high_risk_country": is_in_high_risk_country,
             }
+            # Calculate and add risk score
+            risk_score = self._calculate_risk_score(
+                specific_attrs, common_attrs)
+            common_attrs["risk_score"] = risk_score
+
             businesses_data.append(
                 (creation_date, common_attrs, specific_attrs))
         return businesses_data
@@ -168,8 +236,7 @@ class BusinessCreator(BaseCreator):
         sim_start_date: datetime.datetime
     ) -> Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]:
         """
-        Generates a business that is consistent with the given individual's age.
-        Ensures the business was created when the individual was at least 18 years old.
+        Generates a business that is consistent with the given individual's age, including a risk score.
         """
         individual_max_age = get_max_age_from_group(individual_age_group)
 
@@ -205,7 +272,7 @@ class BusinessCreator(BaseCreator):
 
         common_attrs = {
             "address": generate_localized_address(country_code),
-            "is_fraudulent": False
+            "is_fraudulent": False  # Default to False
         }
         specific_attrs = {
             "name": self.faker.company(),
@@ -215,6 +282,9 @@ class BusinessCreator(BaseCreator):
             "is_high_risk_category": is_in_high_risk_category,
             "is_high_risk_country": is_in_high_risk_country,
         }
+        # Calculate and add risk score
+        risk_score = self._calculate_risk_score(specific_attrs, common_attrs)
+        common_attrs["risk_score"] = risk_score
 
         return (creation_date, common_attrs, specific_attrs)
 

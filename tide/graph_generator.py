@@ -25,10 +25,13 @@ class GraphGenerator:
         self.graph = nx.DiGraph()
         self.node_counter = 0
         self.all_nodes: Dict[NodeType, List[str]] = {nt: [] for nt in NodeType}
+        self.fraudulent_entities_map: Dict[NodeType, List[str]] = {
+            nt: [] for nt in NodeType}
         self.faker = Faker()
 
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
+        self.fraud_selection_config = params.get("fraud_selection_config", {})
 
         if isinstance(self.time_span.get("start_date"), str):
             self.time_span["start_date"] = datetime.datetime.fromisoformat(
@@ -56,11 +59,32 @@ class GraphGenerator:
         self.num_aml_patterns = params.get(
             "pattern_frequency", {}).get("num_illicit_patterns", 5)
 
+        self.validate_configuration()
+
     def num_of_nodes(self):
         return self.node_counter
 
     def num_of_edges(self):
         return self.graph.number_of_edges()
+
+    def validate_configuration(self):
+        """Validate that the configuration parameters make sense."""
+        total_entities = (self.graph_scale.get("individuals", 0) +
+                          self.graph_scale.get("businesses", 0))
+
+        if self.num_aml_patterns > total_entities:
+            print(
+                f"Warning: Number of AML patterns ({self.num_aml_patterns}) exceeds total entities ({total_entities})")
+            print("Consider reducing num_illicit_patterns or increasing graph scale.")
+
+        if self.graph_scale.get("institutions", 0) == 0:
+            print("Warning: No institutions configured. Accounts cannot be created.")
+
+        min_risk_threshold = self.fraud_selection_config.get(
+            "min_risk_score_for_fraud_consideration", 0.20)
+        if min_risk_threshold > 1.0 or min_risk_threshold < 0.0:
+            print(
+                f"Warning: min_risk_score_for_fraud_consideration ({min_risk_threshold}) should be between 0.0 and 1.0")
 
     def _add_node(self,
                   node_type: NodeType,
@@ -205,16 +229,40 @@ class GraphGenerator:
         print("Created entities.")
 
     def select_fraudulent_entities(self):
-        print("Selecting fraudulent entities...")
-        pass
+        print("Selecting fraudulent entities based on risk scores...")
+        min_risk_score = self.fraud_selection_config.get(
+            "min_risk_score_for_fraud_consideration", 0.20)
+        base_prob = self.fraud_selection_config.get(
+            "base_fraud_probability_if_considered", 0.10)
 
-    def inject_temporal_patterns(self):
-        print("Injecting temporal AML patterns...")
-        pass
+        fraud_candidates = 0
+        selected_fraudulent = 0
 
-    def inject_structural_patterns(self):
-        print("Injecting structural AML patterns...")
-        pass
+        # Consider Individuals and Businesses for being marked as fraudulent
+        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+            for node_id in self.all_nodes.get(node_type, []):
+                node_data = self.graph.nodes[node_id]
+                risk_score = node_data.get("risk_score", 0.0)
+
+                if risk_score >= min_risk_score:
+                    fraud_candidates += 1
+                    # Use the base probability for all entities that meet the minimum risk threshold
+                    if random.random() < base_prob:
+                        self.graph.nodes[node_id]["is_fraudulent"] = True
+                        self.fraudulent_entities_map[node_type].append(node_id)
+                        selected_fraudulent += 1
+
+        print(
+            f"Considered {fraud_candidates} entities for fraud based on risk_score >= {min_risk_score}.")
+        print(f"Selected {selected_fraudulent} entities as fraudulent.")
+        for nt, count in self.fraudulent_entities_map.items():
+            if count:  # Only print if there are fraudulent entities of this type
+                print(f"  - {len(count)} {nt.value}(s)")
+
+    def inject_aml_patterns(self):
+        """Inject combined temporal and structural AML patterns using PatternManager."""
+        print(f"Injecting up to {self.num_aml_patterns} AML patterns...")
+        return
 
     def simulate_background_activity(self):
         print("Simulating background financial activity...")
@@ -224,8 +272,7 @@ class GraphGenerator:
         print("Starting graph generation...")
         self.initialize_entities()
         self.select_fraudulent_entities()
-        self.inject_temporal_patterns()
-        self.inject_structural_patterns()
+        self.inject_aml_patterns()
         self.simulate_background_activity()
         print(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")

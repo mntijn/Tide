@@ -1,6 +1,6 @@
 graph_scale:
   individuals: 50
-  businesses: 10
+  businesses: 8
   institutions: 3
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 6]
@@ -37,3 +37,27 @@ account_categories:
   - "Savings"
   - "Loan"
   - "Business"
+
+high_risk_config:
+  countries_weight_factor: 1.0
+  business_categories_weight_factor: 1.0
+  company_size_thresholds:
+    very_small_max: 5
+    very_large_min: 500
+
+risk_weights:
+  base_individual: 0.05
+  base_business: 0.10
+  age_group: 0.15
+  occupation: 0.12
+  country: 0.2
+  business_category: 0.25
+  very_small_company: 0.10
+  very_large_company: 0.05
+  max_score: 1.0
+
+fraud_selection_config:
+  # An entity's risk_score must be >= this to even be considered for being marked fraudulent.
+  min_risk_score_for_fraud_consideration: 0.20
+  # If risk_score >= min_risk_score_for_fraud_consideration
+  base_fraud_probability_if_considered: 0.10

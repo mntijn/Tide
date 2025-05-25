@@ -80,6 +80,51 @@ HIGH_RISK_COUNTRIES = [
     "AG",  # Antigua and Barbuda
 ]
 
+HIGH_RISK_OCCUPATIONS = [
+    "Banker",
+    "Retail banker",
+    "Financial adviser",
+    "Risk analyst",
+    "Risk manager",
+    "Corporate investment banker",
+    "Investment banker, corporate",
+    "Investment banker, operational",
+    "Financial trader",
+
+    "Lawyer",
+    "Solicitor",
+    "Licensed conveyancer",
+    "Chartered accountant",
+    "Chartered certified accountant",
+    "Tax adviser",
+    "Tax inspector",
+
+    "Data processing manager",
+    "Administrator",
+    "Personal assistant",
+    "IT consultant",
+
+    "Restaurant manager",
+    "Restaurant manager, fast food",
+    "Public house manager",
+    "Retail manager",
+    "Dealer",
+
+    "Estate agent",
+    "Jewellery designer",
+
+    "Cabin crew",
+    "Tour manager",
+    "Youth worker",
+    "Community development worker",
+    "Student"
+]
+
+HIGH_RISK_AGE_GROUPS = [
+    "EIGHTEEN_TO_TWENTY_FOUR",
+    "SIXTY_FIVE_PLUS"
+]
+
 
 def generate_localized_address(country_code: str) -> Dict[str, Any]:
     """Generate an address localized to the country_code"""
