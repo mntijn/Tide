@@ -23,6 +23,8 @@ from .utils.constants import (
 from .utils.business import map_occupation_to_business_category
 from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
+from .utils.accounts import batchify, process_individual_batch, process_business_batch
+from .utils.threading import run_in_threads
 
 
 class GraphGenerator:
@@ -144,16 +146,12 @@ class GraphGenerator:
         print("Starting entity generation...")
         sim_start_date = self.time_span["start_date"]
 
-        thread_institutions = threading.Thread(
-            target=self._task_generate_institutions)
-        thread_individuals = threading.Thread(
-            target=self._task_generate_individuals)
-
-        thread_institutions.start()
-        thread_individuals.start()
-
-        thread_institutions.join()
-        thread_individuals.join()
+        # Use run_in_threads for entity data generation in parallel
+        tasks = [
+            (self._task_generate_institutions, ()),
+            (self._task_generate_individuals, ())
+        ]
+        run_in_threads(tasks)
 
         thread_results = {}
         while not self.results_queue.empty():
@@ -279,79 +277,22 @@ class GraphGenerator:
         print("All entity nodes (Institutions, Individuals, Businesses) created.")
         print("Proceeding to create accounts for all Individuals and Businesses...")
 
-        # Create accounts for all entities
-        if self.account and all_institution_ids:
-            # Accounts for Individuals
-            for ind_id in self.all_nodes.get(NodeType.INDIVIDUAL, []):
-                node_data = self.graph.nodes[ind_id]
-                ind_creation_date = node_data.get("creation_date")
-                ind_country_code = node_data.get("address", {}).get("country")
+        # Also generate accounts in parallel
+        num_threads = 4
+        lock = threading.Lock()
+        individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
+        business_ids = self.all_nodes.get(NodeType.BUSINESS, [])
+        individual_batches = batchify(individual_ids, num_threads)
+        business_batches = batchify(business_ids, num_threads)
 
-                if ind_creation_date and ind_country_code:
-                    accounts_and_ownerships = self.account.generate_accounts_and_ownership_data_for_entity(
-                        entity_node_type=NodeType.INDIVIDUAL,
-                        entity_creation_date=ind_creation_date,
-                        entity_country_code=ind_country_code,
-                        sim_start_date=sim_start_date
-                    )
-                    for acc_creation_date, acc_common, acc_specific, owner_specific in accounts_and_ownerships:
-                        acc_id = self._add_node(
-                            NodeType.ACCOUNT, acc_common, acc_specific, creation_date=acc_creation_date)
-                        ownership_instance = OwnershipAttributes(
-                            **owner_specific)
-                        self._add_edge(ind_id, acc_id, ownership_instance)
-
-                # Create a dedicated "cash" account for the individual.
-                # Used for deposits and withdrawals.
-
-                if ind_id not in self.individual_cash_accounts:
-                    cash_account_common = {
-                        "address": node_data.get("address"),
-                        "is_fraudulent": False,
-                    }
-                    cash_account_specific = {
-                        "start_balance": 0.0,
-                        "current_balance": 0.0,
-                        "institution_id": None,
-                        "account_category": AccountCategory.CASH,
-                        "currency": COUNTRY_TO_CURRENCY[ind_country_code],
-                    }
-                    cash_acc_id = self._add_node(
-                        NodeType.ACCOUNT,
-                        cash_account_common,
-                        cash_account_specific,
-                        creation_date=ind_creation_date,
-                    )
-                    # Link ownership
-                    self._add_edge(
-                        ind_id,
-                        cash_acc_id,
-                        OwnershipAttributes(
-                            ownership_start_date=ind_creation_date.date(),
-                            ownership_percentage=100.0,
-                        ),
-                    )
-                    self.individual_cash_accounts[ind_id] = cash_acc_id
-
-            # Accounts for Businesses
-            for bus_id in self.all_nodes.get(NodeType.BUSINESS, []):
-                node_data = self.graph.nodes[bus_id]
-                bus_creation_date = node_data.get("creation_date")
-                bus_country_code = node_data.get("address", {}).get("country")
-
-                if bus_creation_date and bus_country_code:
-                    bus_accounts_and_ownerships = self.account.generate_accounts_and_ownership_data_for_entity(
-                        entity_node_type=NodeType.BUSINESS,
-                        entity_creation_date=bus_creation_date,
-                        entity_country_code=bus_country_code,
-                        sim_start_date=sim_start_date
-                    )
-                    for acc_creation_date, acc_common, acc_specific, owner_specific in bus_accounts_and_ownerships:
-                        acc_id = self._add_node(
-                            NodeType.ACCOUNT, acc_common, acc_specific, creation_date=acc_creation_date)
-                        ownership_instance = OwnershipAttributes(
-                            **owner_specific)
-                        self._add_edge(bus_id, acc_id, ownership_instance)
+        account_tasks = []
+        for batch in individual_batches:
+            account_tasks.append(
+                (process_individual_batch, (self, batch, lock, sim_start_date)))
+        for batch in business_batches:
+            account_tasks.append(
+                (process_business_batch, (self, batch, lock, sim_start_date)))
+        run_in_threads(account_tasks)
 
         print("Entity and account generation complete.")
 
@@ -370,9 +311,9 @@ class GraphGenerator:
     def select_fraudulent_entities(self):
         print("Selecting fraudulent entities based on risk scores...")
         min_risk_score = self.fraud_selection_config.get(
-            "min_risk_score_for_fraud_consideration", 0.20)
+            "min_risk_score_for_fraud_consideration", 0.30)
         base_prob = self.fraud_selection_config.get(
-            "base_fraud_probability_if_considered", 0.10)
+            "base_fraud_probability_if_considered", 0.20)
 
         fraud_candidates = 0
         selected_fraudulent = 0
@@ -414,6 +355,7 @@ class GraphGenerator:
 
         # If not enough fraudulent entities, add non-fraudulent ones
         if len(candidate_entities) < num_entities_required:
+            print("RUNNING")
             needed_more = num_entities_required - len(candidate_entities)
             non_fraudulent_pool = []
             for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
@@ -433,7 +375,6 @@ class GraphGenerator:
 
         # Shuffle to ensure randomness if we have more than needed, then select
         random.shuffle(candidate_entities)
-        print("Candidate entities: ", candidate_entities)
         return candidate_entities[:num_entities_required]
 
     def inject_aml_patterns(self):
