@@ -21,54 +21,66 @@ class FrontBusinessStructural(StructuralComponent):
         overseas_business_accounts_ids = []
         entity_roles = {}
 
-        business_ids = self.filter_entities_by_criteria(
-            available_entities, {"node_type": NodeType.BUSINESS}
+        potential_front_businesses = self.filter_entities_by_criteria(
+            available_entities,
+            {"node_type": NodeType.BUSINESS}
         )
-        random.shuffle(business_ids)
+        random.shuffle(potential_front_businesses)
+
+        # If no businesses in available_entities, consider all businesses in graph
+        if not potential_front_businesses:
+            potential_front_businesses = list(
+                self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+            random.shuffle(potential_front_businesses)
 
         # Default values for pattern parameters
-        min_bus_accounts = 2
-        num_front_business_accounts_to_use = 3
-        min_overseas_dest_bus_accounts = 2
-        max_overseas_bus_accounts_for_front = 4
+        min_bus_accounts = self.params.get("front_business_pattern", {}).get(
+            "min_accounts_for_front_business", 2)
+        num_front_business_accounts_to_use = self.params.get(
+            "front_business_pattern", {}).get("num_front_business_accounts_to_use", 3)
+        min_overseas_dest_bus_accounts = self.params.get(
+            "front_business_pattern", {}).get("min_overseas_destination_accounts", 2)
+        max_overseas_bus_accounts_for_front = self.params.get(
+            "front_business_pattern", {}).get("max_overseas_destination_accounts_for_front", 4)
 
-        for bus_id in business_ids:
-            owned_accounts = [
+        for bus_id in potential_front_businesses:
+            owned_accounts_data = [
                 n for n in self.graph.neighbors(bus_id)
                 if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
             ]
 
-            if len(owned_accounts) >= min_bus_accounts:
-                institutions = set()
-                for acc_id in owned_accounts:
-                    inst_id = self.graph.nodes[acc_id].get("institution_id")
-                    if inst_id:
-                        institutions.add(inst_id)
-                # if len(institutions) < min_banks_for_front_business: continue
-
+            if len(owned_accounts_data) >= min_bus_accounts:
                 potential_dest_accounts = []
-                all_graph_accounts = [e for e in available_entities if self.graph.nodes[e].get(
-                    "node_type") == NodeType.ACCOUNT]
+                # Search all accounts in the graph for overseas destinations
+                all_graph_accounts = self.graph_generator.all_nodes.get(
+                    NodeType.ACCOUNT, [])
                 business_country = self.graph.nodes[bus_id].get(
                     "address", {}).get("country")
 
                 for acc_id in all_graph_accounts:
-                    if acc_id in owned_accounts:
+                    if acc_id in owned_accounts_data:  # Exclude accounts owned by the front business itself
                         continue
 
-                    acc_country = self.graph.nodes[acc_id].get(
+                    acc_node_data = self.graph.nodes[acc_id]
+                    acc_country = acc_node_data.get(
                         "address", {}).get("country")
-                    if acc_country != business_country:
+
+                    # Ensure account has a country and it's different from the front business's country
+                    if acc_country and acc_country != business_country:
+                        # Check if this account is owned by any business
+                        is_owned_by_business = False
                         for owner_id in self.graph.predecessors(acc_id):
                             if self.graph.nodes[owner_id].get("node_type") == NodeType.BUSINESS:
-                                potential_dest_accounts.append(acc_id)
+                                is_owned_by_business = True
                                 break
+                        if is_owned_by_business:
+                            potential_dest_accounts.append(acc_id)
 
                 if len(potential_dest_accounts) >= min_overseas_dest_bus_accounts:
                     central_business_id = bus_id
                     entity_roles[bus_id] = "front_business"
-                    business_accounts_ids = random.sample(owned_accounts, k=min(
-                        len(owned_accounts), num_front_business_accounts_to_use))
+                    business_accounts_ids = random.sample(owned_accounts_data, k=min(
+                        len(owned_accounts_data), num_front_business_accounts_to_use))
                     for i, acc_id in enumerate(business_accounts_ids):
                         entity_roles[acc_id] = f"front_business_account_{i+1}"
 

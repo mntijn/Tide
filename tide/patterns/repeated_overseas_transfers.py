@@ -17,20 +17,27 @@ class IndividualToOverseasStructural(StructuralComponent):
 
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         central_individual_id = None
+        central_individual_account_id = None
         peripheral_overseas_account_ids = []
         entity_roles = {}
 
-        # Find an individual
-        individual_ids = self.filter_entities_by_criteria(
+        potential_individuals = self.filter_entities_by_criteria(
             available_entities, {"node_type": NodeType.INDIVIDUAL}
         )
-        random.shuffle(individual_ids)
+        random.shuffle(potential_individuals)
 
-        # Default for now
-        min_overseas_entities = 2
-        max_overseas_entities = 5
+        if not potential_individuals:
+            potential_individuals = list(
+                self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+            random.shuffle(potential_individuals)
 
-        for ind_id in individual_ids:
+        min_overseas_entities = self.params.get(
+            "repeated_overseas_transfers_pattern", {}).get("min_overseas_entities", 2)
+        max_overseas_entities = self.params.get(
+            "repeated_overseas_transfers_pattern", {}).get("max_overseas_entities", 5)
+
+        for ind_id in potential_individuals:
+            # Get accounts owned by this individual from the main graph
             owned_accounts = [
                 n for n in self.graph.neighbors(ind_id)
                 if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
@@ -38,46 +45,61 @@ class IndividualToOverseasStructural(StructuralComponent):
             if not owned_accounts:
                 continue
 
-            central_individual_account_id = random.choice(owned_accounts)
-            central_individual_id = ind_id
-            entity_roles[central_individual_account_id] = "source_individual_account"
-            entity_roles[ind_id] = "source_individual"
+            current_central_individual_account_id = random.choice(
+                owned_accounts)
 
-            all_accounts = [
-                e for e in available_entities
-                if self.graph.nodes[e].get("node_type") == NodeType.ACCOUNT
-            ]
+            # Search all accounts in the graph for suitable overseas destinations
+            all_graph_accounts = self.graph_generator.all_nodes.get(
+                NodeType.ACCOUNT, [])
 
-            individual_country = self.graph.nodes[ind_id].get(
+            individual_node_data = self.graph.nodes[ind_id]
+            individual_country = individual_node_data.get(
                 "address", {}).get("country")
             high_risk_countries_list = self.params.get(
                 "high_risk_countries", [])
 
             potential_overseas_dest_accounts = []
-            for acc_id in all_accounts:
-                if acc_id == central_individual_account_id:
+            for acc_id in all_graph_accounts:
+                if acc_id in owned_accounts:
                     continue
 
-                acc_country = self.graph.nodes[acc_id].get(
-                    "address", {}).get("country")
-                if acc_country != individual_country:
+                acc_node_data = self.graph.nodes[acc_id]
+                acc_country = acc_node_data.get("address", {}).get("country")
+
+                # Ensure account has a country and it's different
+                if acc_country and acc_country != individual_country:
                     if not high_risk_countries_list or acc_country in high_risk_countries_list:
-                        # If high_risk_countries_list is empty, consider all overseas
-                        potential_overseas_dest_accounts.append(acc_id)
+                        # Check if this account is owned by an Individual or Business
+                        is_owned_by_entity = False
+                        for owner_id in self.graph.predecessors(acc_id):
+                            owner_node_type = self.graph.nodes[owner_id].get(
+                                "node_type")
+                            if owner_node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+                                is_owned_by_entity = True
+                                break
+                        if is_owned_by_entity:
+                            potential_overseas_dest_accounts.append(acc_id)
 
             if len(potential_overseas_dest_accounts) >= min_overseas_entities:
+                central_individual_id = ind_id
+                central_individual_account_id = current_central_individual_account_id
+
+                entity_roles[central_individual_account_id] = "source_individual_account"
+                entity_roles[ind_id] = "source_individual"
+
                 num_to_select = random.randint(
                     min_overseas_entities,
                     min(len(potential_overseas_dest_accounts),
                         max_overseas_entities)
                 )
                 peripheral_overseas_account_ids = random.sample(
-                    potential_overseas_dest_accounts, num_to_select)
-                for i, acc_id in enumerate(peripheral_overseas_account_ids):
-                    entity_roles[acc_id] = f"destination_overseas_account_{i+1}"
+                    potential_overseas_dest_accounts, num_to_select
+                )
+                for i, acc_id_selected in enumerate(peripheral_overseas_account_ids):
+                    entity_roles[acc_id_selected] = f"destination_overseas_account_{i+1}"
                 break
 
-        if not central_individual_id or not peripheral_overseas_account_ids:
+        if not central_individual_id or not central_individual_account_id or not peripheral_overseas_account_ids:
             return EntitySelection(central_entities=[], peripheral_entities=[], entity_roles={})
 
         return EntitySelection(

@@ -18,6 +18,7 @@ from .utils import COUNTRY_CODES, COUNTRY_TO_CURRENCY, map_occupation_to_busines
 from .entity_creators import (
     InstitutionCreator, IndividualCreator, BusinessCreator, AccountCreator
 )
+from .patterns.manager import PatternManager
 
 
 class GraphGenerator:
@@ -57,6 +58,9 @@ class GraphGenerator:
         self.results_queue = Queue()
         self.individual_cash_accounts: Dict[str, str] = {}
         self.cash_account_id: Optional[str] = None
+
+        self.pattern_manager = PatternManager(self, self.params)
+        self.pattern_manager.entity_selector = self
 
         self.background_tx_rate_per_account_per_day = params.get(
             "transaction_rates", {}).get("per_account_per_day", 0.2)
@@ -386,13 +390,60 @@ class GraphGenerator:
         print(
             f"Considered {fraud_candidates} entities for fraud based on risk_score >= {min_risk_score}.")
         print(f"Selected {selected_fraudulent} entities as fraudulent.")
-        for nt, count in self.fraudulent_entities_map.items():
-            if count:
-                print(f"  - {len(count)} {nt.value}(s)")
+        for nt, items in self.fraudulent_entities_map.items():
+            if items:
+                print(f"  - {len(items)} {nt.value}(s)")
+
+    def select_entities_for_pattern(self, pattern_name: str, num_entities: int) -> List[str]:
+        """
+        Selects entities for a given AML pattern.
+        Prioritizes fraudulent entities (Individuals and Businesses).
+        If not enough fraudulent entities are available, non-fraudulent ones are considered.
+        """
+        candidate_entities = []
+
+        # Prioritize fraudulent entities
+        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+            candidate_entities.extend(
+                self.fraudulent_entities_map.get(node_type, []))
+
+        # If not enough fraudulent entities, add non-fraudulent ones
+        if len(candidate_entities) < num_entities:
+            needed_more = num_entities - len(candidate_entities)
+            non_fraudulent_pool = []
+            for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+                all_of_type = self.all_nodes.get(node_type, [])
+                fraudulent_of_type = set(
+                    self.fraudulent_entities_map.get(node_type, []))
+                non_fraudulent_pool.extend(
+                    [node_id for node_id in all_of_type if node_id not in fraudulent_of_type])
+
+            if non_fraudulent_pool:
+                candidate_entities.extend(random.sample(
+                    non_fraudulent_pool, min(needed_more, len(non_fraudulent_pool))))
+
+        if not candidate_entities:
+            print(f"Warning: No entities available for pattern {pattern_name}")
+            return []
+
+        # Shuffle to ensure randomness if we have more than needed, then select
+        random.shuffle(candidate_entities)
+        return candidate_entities[:num_entities]
 
     def inject_aml_patterns(self):
         """Inject combined temporal and structural AML patterns using PatternManager."""
         print(f"Injecting up to {self.num_aml_patterns} AML patterns...")
+        if not self.pattern_manager:
+            print("Error: PatternManager not initialized.")
+            return
+
+        fraudulent_edges = self.pattern_manager.inject_patterns()
+        if fraudulent_edges:
+            print(
+                f"PatternManager injected {len(fraudulent_edges)} new fraudulent edges.")
+        else:
+            print("PatternManager did not inject any new fraudulent edges.")
+
         return
 
     def simulate_background_activity(self):
@@ -446,4 +497,6 @@ class GraphGenerator:
             writer.writeheader()
             for src, dest, attrs in self.graph.edges(data=True):
                 row = {'src': src, 'dest': dest, **attrs}
+                if 'edge_type' not in attrs and isinstance(attrs.get('edge_type'), EdgeType):
+                    row['edge_type'] = attrs['edge_type'].value
                 writer.writerow(row)
