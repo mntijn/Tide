@@ -4,9 +4,11 @@ from typing import List, Dict, Any, Tuple, Optional, Set
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from ..data_structures import (
-    NodeType, EdgeType, TransactionType, TransactionAttributes,
-    NodeAttributes
+from ..datastructures.enums import (
+    NodeType, EdgeType, TransactionType
+)
+from ..datastructures.attributes import (
+    TransactionAttributes, NodeAttributes
 )
 
 

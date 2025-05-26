@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 50
+  individuals: 500
   # businesses: 0
   institutions: 3
   individual_accounts_per_institution_range: [1, 3]
@@ -21,8 +21,6 @@ pattern_frequency:
   num_illicit_patterns: 5
 # Reporting threshold for structuring amounts
 reporting_threshold: 10000
-# List of high-risk countries for pattern targeting
-high_risk_countries: []
 # Base probability for high-risk business selection
 high_risk_business_probability: 0.05
 

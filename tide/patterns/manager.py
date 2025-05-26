@@ -7,7 +7,7 @@
 import random
 from typing import Dict, Any, List
 
-from ..data_structures import NodeType
+from ..datastructures.enums import NodeType
 from .repeated_overseas_transfers import RepeatedOverseasTransfersPattern
 from .rapid_fund_movement import RapidFundMovementPattern
 from .front_business_activity import FrontBusinessPattern

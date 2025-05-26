@@ -6,7 +6,8 @@ from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
     CompositePattern, PatternInjector
 )
-from ..data_structures import NodeType, TransactionType, TransactionAttributes
+from ..datastructures.enums import NodeType, TransactionType
+from ..datastructures.attributes import TransactionAttributes
 
 
 class IndividualWithMultipleAccountsStructural(StructuralComponent):

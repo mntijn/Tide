@@ -8,16 +8,20 @@ from faker import Faker
 import threading
 from queue import Queue, Empty
 
-from .data_structures import (
+from .datastructures.enums import (
     NodeType, EdgeType, TransactionType, AccountCategory,
+    AgeGroup, Gender
+)
+from .datastructures.attributes import (
     NodeAttributes, AccountAttributes, EdgeAttributes,
     TransactionAttributes, OwnershipAttributes,
     IndividualAttributes, BusinessAttributes, InstitutionAttributes
 )
-from .utils import COUNTRY_CODES, COUNTRY_TO_CURRENCY, map_occupation_to_business_category, HIGH_RISK_BUSINESS_CATEGORIES
-from .entity_creators import (
-    InstitutionCreator, IndividualCreator, BusinessCreator, AccountCreator
+from .utils.constants import (
+    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES
 )
+from .utils.business import map_occupation_to_business_category
+from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
 
 
@@ -51,10 +55,11 @@ class GraphGenerator:
 
         self.params["time_span"] = self.time_span
 
-        self.institution_creator = InstitutionCreator(self.params)
-        self.individual_creator = IndividualCreator(self.params)
-        self.business_creator = BusinessCreator(self.params)
-        self.account_creator: Optional[AccountCreator] = None
+        # Initialize entity instances
+        self.institution = Institution(self.params)
+        self.individual = Individual(self.params)
+        self.business = Business(self.params)
+        self.account: Optional[Account] = None
         self.results_queue = Queue()
         self.individual_cash_accounts: Dict[str, str] = {}
         self.cash_account_id: Optional[str] = None
@@ -127,12 +132,12 @@ class GraphGenerator:
 
     def _task_generate_institutions(self):
         """Gen institution data in a thread."""
-        data = self.institution_creator.generate_institutions_data()
+        data = self.institution.generate_data()
         self.results_queue.put(('institutions', data))
 
     def _task_generate_individuals(self):
         """Gen individual data in a thread."""
-        data = self.individual_creator.generate_individuals_data()
+        data = self.individual.generate_data()
         self.results_queue.put(('individuals', data))
 
     def initialize_entities(self):
@@ -172,7 +177,7 @@ class GraphGenerator:
                 institution_countries[institution_id] = common_attrs["address"]["country"]
 
         all_institution_ids = self.all_nodes.get(NodeType.INSTITUTION, [])
-        self.account_creator = AccountCreator(
+        self.account = Account(
             self.params, all_institution_ids, institution_countries)
 
         # Create accounts for Individuals and create owned businesses
@@ -199,7 +204,7 @@ class GraphGenerator:
 
                 if suggested_category:
                     # Create a business that aligns with the occupation
-                    business_data_tuple = self.business_creator.generate_age_consistent_business_for_individual(
+                    business_data_tuple = self.business.generate_age_consistent_business_for_individual(
                         individual_age_group=ind_specific_attrs["age_group"],
                         individual_creation_date=ind_creation_date_dt,
                         sim_start_date=sim_start_date,
@@ -246,7 +251,7 @@ class GraphGenerator:
                     owner_creation_date = owner_data.get("creation_date")
 
                     # Generate a business with random (potentially high-risk) category
-                    bus_tuple = self.business_creator.generate_age_consistent_business_for_individual(
+                    bus_tuple = self.business.generate_age_consistent_business_for_individual(
                         individual_age_group=owner_age_group,
                         individual_creation_date=owner_creation_date,
                         sim_start_date=sim_start_date,
@@ -275,7 +280,7 @@ class GraphGenerator:
         print("Proceeding to create accounts for all Individuals and Businesses...")
 
         # Create accounts for all entities
-        if self.account_creator and all_institution_ids:
+        if self.account and all_institution_ids:
             # Accounts for Individuals
             for ind_id in self.all_nodes.get(NodeType.INDIVIDUAL, []):
                 node_data = self.graph.nodes[ind_id]
@@ -283,7 +288,7 @@ class GraphGenerator:
                 ind_country_code = node_data.get("address", {}).get("country")
 
                 if ind_creation_date and ind_country_code:
-                    accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
+                    accounts_and_ownerships = self.account.generate_accounts_and_ownership_data_for_entity(
                         entity_node_type=NodeType.INDIVIDUAL,
                         entity_creation_date=ind_creation_date,
                         entity_country_code=ind_country_code,
@@ -335,7 +340,7 @@ class GraphGenerator:
                 bus_country_code = node_data.get("address", {}).get("country")
 
                 if bus_creation_date and bus_country_code:
-                    bus_accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
+                    bus_accounts_and_ownerships = self.account.generate_accounts_and_ownership_data_for_entity(
                         entity_node_type=NodeType.BUSINESS,
                         entity_creation_date=bus_creation_date,
                         entity_country_code=bus_country_code,

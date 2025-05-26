@@ -6,7 +6,7 @@ from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
     CompositePattern, PatternInjector
 )
-from ..data_structures import NodeType, TransactionType, TransactionAttributes
+from ..datastructures.enums import NodeType, TransactionType
 
 
 class RepeatedOverseasTransfersStructural(StructuralComponent):
