@@ -4,6 +4,7 @@ import yaml
 from typing import Dict, Any
 
 from tide.graph_generator import GraphGenerator
+from tide.output import export_to_csv
 
 
 def load_configurations() -> Dict[str, Any]:
@@ -34,11 +35,14 @@ if __name__ == "__main__":
         generator_parameters["time_span"]["end_date"])
 
     aml_graph_gen = GraphGenerator(params=generator_parameters)
-    aml_graph_gen.generate_graph()
+    graph = aml_graph_gen.generate_graph()
 
     print(f"\n--- Graph Summary ---")
     print(f"Number of nodes: {aml_graph_gen.num_of_nodes()}")
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
 
-    aml_graph_gen.export_to_csv(
-        nodes_filepath="generated_nodes.csv", edges_filepath="generated_edges.csv")
+    export_to_csv(
+        graph=graph,
+        nodes_filepath="generated_nodes.csv",
+        edges_filepath="generated_edges.csv"
+    )
