@@ -351,8 +351,7 @@ class GraphGenerator:
         print("Entity and account generation complete.")
 
         # Create a single dummy account that represents the physical cash
-        # system (ATMs / cash in transit). This node will be used by patterns
-        # to model deposits (cash ➜ account) and withdrawals (account ➜ cash).
+        # system (ATMs / cash in transit).
         if self.cash_account_id is None:
             self.cash_account_id = self._add_node(
                 NodeType.ACCOUNT,
@@ -394,11 +393,12 @@ class GraphGenerator:
             if items:
                 print(f"  - {len(items)} {nt.value}(s)")
 
-    def select_entities_for_pattern(self, pattern_name: str, num_entities: int) -> List[str]:
+    def select_entities_for_pattern(self, pattern_name: str, num_entities_required: int) -> List[str]:
         """
         Selects entities for a given AML pattern.
         Prioritizes fraudulent entities (Individuals and Businesses).
         If not enough fraudulent entities are available, non-fraudulent ones are considered.
+        The number of entities to select is determined by num_entities_required.
         """
         candidate_entities = []
 
@@ -408,8 +408,8 @@ class GraphGenerator:
                 self.fraudulent_entities_map.get(node_type, []))
 
         # If not enough fraudulent entities, add non-fraudulent ones
-        if len(candidate_entities) < num_entities:
-            needed_more = num_entities - len(candidate_entities)
+        if len(candidate_entities) < num_entities_required:
+            needed_more = num_entities_required - len(candidate_entities)
             non_fraudulent_pool = []
             for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
                 all_of_type = self.all_nodes.get(node_type, [])
@@ -428,7 +428,7 @@ class GraphGenerator:
 
         # Shuffle to ensure randomness if we have more than needed, then select
         random.shuffle(candidate_entities)
-        return candidate_entities[:num_entities]
+        return candidate_entities[:num_entities_required]
 
     def inject_aml_patterns(self):
         """Inject combined temporal and structural AML patterns using PatternManager."""

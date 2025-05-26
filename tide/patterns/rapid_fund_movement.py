@@ -18,7 +18,6 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         central_individual_id = None
         peripheral_account_ids = []
-        entity_roles = {}
 
         individual_ids = self.filter_entities_by_criteria(
             available_entities, {"node_type": NodeType.INDIVIDUAL}
@@ -42,19 +41,15 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
 
             if len(owned_accounts) >= min_accounts_for_pattern:
                 central_individual_id = ind_id
-                entity_roles[ind_id] = "central_individual_rapid_movement"
                 peripheral_account_ids = list(owned_accounts)
-                for i, acc_id in enumerate(peripheral_account_ids):
-                    entity_roles[acc_id] = f"individual_account_{i+1}"
                 break
 
         if not central_individual_id or not peripheral_account_ids:
-            return EntitySelection(central_entities=[], peripheral_entities=[], entity_roles={})
+            return EntitySelection(central_entities=[], peripheral_entities=[])
 
         return EntitySelection(
             central_entities=peripheral_account_ids,
             peripheral_entities=[central_individual_id],
-            entity_roles=entity_roles
         )
 
 
@@ -182,9 +177,60 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         return sequences
 
 
+class RapidFundMovementStructural(StructuralComponent):
+    """
+    Selects entities for rapid fund movement:
+    - A source account (individual or business).
+    - One or more intermediary accounts.
+    - A destination account.
+    """
+    @property
+    def num_required_entities(self) -> int:
+        return 3  # Source, at least one intermediary, destination
+
+    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+        central_individual_id = None
+        peripheral_account_ids = []
+
+        individual_ids = self.filter_entities_by_criteria(
+            available_entities, {"node_type": NodeType.INDIVIDUAL}
+        )
+        random.shuffle(individual_ids)
+
+        # Default for now
+        min_accounts_for_pattern = 2
+
+        for ind_id in individual_ids:
+            owned_accounts = set()
+            for acc_node in self.graph.neighbors(ind_id):
+                if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
+                    owned_accounts.add(acc_node)
+
+            for owned_node_id in self.graph.neighbors(ind_id):
+                if self.graph.nodes[owned_node_id].get("node_type") == NodeType.BUSINESS:
+                    for acc_node in self.graph.neighbors(owned_node_id):
+                        if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
+                            owned_accounts.add(acc_node)
+
+            if len(owned_accounts) >= min_accounts_for_pattern:
+                central_individual_id = ind_id
+                peripheral_account_ids = list(owned_accounts)
+                break
+
+        if not central_individual_id or not peripheral_account_ids:
+            return EntitySelection(central_entities=[], peripheral_entities=[])
+
+        return EntitySelection(
+            central_entities=peripheral_account_ids,
+            peripheral_entities=[central_individual_id],
+        )
+
+
 class RapidFundMovementPattern(CompositePattern):
+    """Injects rapid fund movement pattern"""
+
     def __init__(self, graph_generator, params: Dict[str, Any]):
-        structural_component = IndividualWithMultipleAccountsStructural(
+        structural_component = RapidFundMovementStructural(
             graph_generator, params)
         temporal_component = RapidInflowOutflowTemporal(
             graph_generator, params)
@@ -192,4 +238,8 @@ class RapidFundMovementPattern(CompositePattern):
 
     @property
     def pattern_name(self) -> str:
-        return "RapidFundMovementThroughIndividualAccounts"
+        return "RapidFundMovement"
+
+    @property
+    def num_required_entities(self) -> int:
+        return self.structural.num_required_entities

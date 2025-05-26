@@ -15,11 +15,14 @@ class FrontBusinessStructural(StructuralComponent):
     Connects to overseas business accounts.
     """
 
+    @property
+    def num_required_entities(self) -> int:
+        return 2  # Business and an individual
+
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         central_business_id = None
         business_accounts_ids = []
         overseas_business_accounts_ids = []
-        entity_roles = {}
 
         potential_front_businesses = self.filter_entities_by_criteria(
             available_entities,
@@ -78,11 +81,8 @@ class FrontBusinessStructural(StructuralComponent):
 
                 if len(potential_dest_accounts) >= min_overseas_dest_bus_accounts:
                     central_business_id = bus_id
-                    entity_roles[bus_id] = "front_business"
                     business_accounts_ids = random.sample(owned_accounts_data, k=min(
                         len(owned_accounts_data), num_front_business_accounts_to_use))
-                    for i, acc_id in enumerate(business_accounts_ids):
-                        entity_roles[acc_id] = f"front_business_account_{i+1}"
 
                     num_overseas_to_select = random.randint(
                         min_overseas_dest_bus_accounts,
@@ -91,17 +91,14 @@ class FrontBusinessStructural(StructuralComponent):
                     )
                     overseas_business_accounts_ids = random.sample(
                         potential_dest_accounts, num_overseas_to_select)
-                    for i, acc_id in enumerate(overseas_business_accounts_ids):
-                        entity_roles[acc_id] = f"destination_overseas_business_account_{i+1}"
                     break
 
         if not central_business_id or not business_accounts_ids or not overseas_business_accounts_ids:
-            return EntitySelection(central_entities=[], peripheral_entities=[], entity_roles={})
+            return EntitySelection(central_entities=[], peripheral_entities=[])
 
         return EntitySelection(
             central_entities=business_accounts_ids,
             peripheral_entities=overseas_business_accounts_ids,
-            entity_roles=entity_roles
         )
 
 
@@ -229,6 +226,8 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
 
 
 class FrontBusinessPattern(CompositePattern):
+    """Injects front business activity pattern"""
+
     def __init__(self, graph_generator, params: Dict[str, Any]):
         structural_component = FrontBusinessStructural(graph_generator, params)
         temporal_component = FrequentCashDepositsAndOverseasTransfersTemporal(
@@ -238,3 +237,7 @@ class FrontBusinessPattern(CompositePattern):
     @property
     def pattern_name(self) -> str:
         return "FrontBusinessActivity"
+
+    @property
+    def num_required_entities(self) -> int:
+        return self.structural.num_required_entities

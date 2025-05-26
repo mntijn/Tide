@@ -50,9 +50,11 @@ class PatternManager:
         for i in range(num_patterns):
             pattern_injector = random.choice(self.patterns)
             pattern_name = pattern_injector.pattern_name
+            required_entities_for_pattern = pattern_injector.num_required_entities
 
             pattern_entities = self.entity_selector.select_entities_for_pattern(
-                pattern_name, num_entities=15)
+                pattern_name, required_entities_for_pattern
+            )
 
             try:
                 edges = pattern_injector.inject_pattern(pattern_entities)

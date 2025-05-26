@@ -9,17 +9,21 @@ from .base import (
 from ..data_structures import NodeType, TransactionType, TransactionAttributes
 
 
-class IndividualToOverseasStructural(StructuralComponent):
+class RepeatedOverseasTransfersStructural(StructuralComponent):
     """
-    An individual connected to multiple overseas entities (individuals or businesses).
-    The individual's account and the overseas entities' accounts are involved.
+    Selects:
+    - An individual or business entity.
+    - An existing overseas account (or creates one if none suitable).
     """
+
+    @property
+    def num_required_entities(self) -> int:
+        return 2
 
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         central_individual_id = None
         central_individual_account_id = None
         peripheral_overseas_account_ids = []
-        entity_roles = {}
 
         potential_individuals = self.filter_entities_by_criteria(
             available_entities, {"node_type": NodeType.INDIVIDUAL}
@@ -84,9 +88,6 @@ class IndividualToOverseasStructural(StructuralComponent):
                 central_individual_id = ind_id
                 central_individual_account_id = current_central_individual_account_id
 
-                entity_roles[central_individual_account_id] = "source_individual_account"
-                entity_roles[ind_id] = "source_individual"
-
                 num_to_select = random.randint(
                     min_overseas_entities,
                     min(len(potential_overseas_dest_accounts),
@@ -95,17 +96,14 @@ class IndividualToOverseasStructural(StructuralComponent):
                 peripheral_overseas_account_ids = random.sample(
                     potential_overseas_dest_accounts, num_to_select
                 )
-                for i, acc_id_selected in enumerate(peripheral_overseas_account_ids):
-                    entity_roles[acc_id_selected] = f"destination_overseas_account_{i+1}"
                 break
 
         if not central_individual_id or not central_individual_account_id or not peripheral_overseas_account_ids:
-            return EntitySelection(central_entities=[], peripheral_entities=[], entity_roles={})
+            return EntitySelection(central_entities=[], peripheral_entities=[])
 
         return EntitySelection(
             central_entities=[central_individual_account_id],
             peripheral_entities=peripheral_overseas_account_ids,
-            entity_roles=entity_roles
         )
 
 
@@ -178,8 +176,10 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
 
 
 class RepeatedOverseasTransfersPattern(CompositePattern):
+    """Injects repeated overseas transfers pattern"""
+
     def __init__(self, graph_generator, params: Dict[str, Any]):
-        structural_component = IndividualToOverseasStructural(
+        structural_component = RepeatedOverseasTransfersStructural(
             graph_generator, params)
         temporal_component = FrequentOrPeriodicTransfersTemporal(
             graph_generator, params)
@@ -187,4 +187,8 @@ class RepeatedOverseasTransfersPattern(CompositePattern):
 
     @property
     def pattern_name(self) -> str:
-        return "RepeatedOutboundTransfersToOverseas"
+        return "RepeatedOverseasTransfers"
+
+    @property
+    def num_required_entities(self) -> int:
+        return self.structural.num_required_entities

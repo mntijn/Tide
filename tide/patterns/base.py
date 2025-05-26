@@ -16,7 +16,6 @@ class EntitySelection:
     central_entities: List[str]  # Main actors (the individual, front business)
     # Supporting entities (overseas accounts, multiple accounts)
     peripheral_entities: List[str]
-    entity_roles: Dict[str, str]  # Maps entity_id to role description
 
 
 @dataclass
@@ -37,6 +36,12 @@ class PatternInjector:
         self.graph_generator = graph_generator
         self.params = params
         self.time_span = params.get("time_span", {})
+
+    @property
+    @abstractmethod
+    def num_required_entities(self) -> int:
+        """Minimum number of entities required for this pattern."""
+        pass
 
     def _create_transaction_edge(self,
                                  src_id: str,
@@ -69,6 +74,12 @@ class StructuralComponent(ABC):
         self.graph = graph_generator.graph
         self.graph_generator = graph_generator
         self.params = params
+
+    @property
+    @abstractmethod
+    def num_required_entities(self) -> int:
+        """Minimum number of entities this structural component needs."""
+        pass
 
     @abstractmethod
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
@@ -213,6 +224,11 @@ class CompositePattern(PatternInjector):
         super().__init__(graph_generator, params)
         self.structural = structural_component
         self.temporal = temporal_component
+
+    @property
+    def num_required_entities(self) -> int:
+        """Number of entities required, delegated to the structural component."""
+        return self.structural.num_required_entities
 
     def inject_pattern(self, entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
         """Main method to inject the complete pattern"""
