@@ -4,7 +4,7 @@ import yaml
 from typing import Dict, Any
 
 from tide.graph_generator import GraphGenerator
-from tide.output import export_to_csv
+from tide.outputs import export_to_csv
 
 
 def load_configurations() -> Dict[str, Any]:

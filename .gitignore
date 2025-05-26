@@ -3,8 +3,3 @@ venv/
 __pycache__/
 .vscode/
 .DS_Store
-example_usage.py
-requirements_viz.txt
-visualize_aml_graph.py
-aml_analysis_output/
-*.png

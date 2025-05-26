@@ -146,7 +146,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
             deposit_timestamps = self.generate_timestamps(
                 current_time, "high_frequency", num_deposits_in_cycle)
             deposit_amounts = self.generate_structured_amounts(
-                num_deposits_in_cycle, base_amount=random.uniform(10000, 50000))
+                num_deposits_in_cycle, base_amount=random.randint(10000, 50000))
 
             deposit_txs_this_cycle = []
             for j in range(min(num_deposits_in_cycle, len(deposit_timestamps))):
@@ -188,7 +188,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
                 amt for _, _, attrs in deposit_txs_this_cycle for amt in [attrs.amount])
             base_transfer_amount = (total_deposited_this_cycle / num_overseas_transfers_in_cycle * random.uniform(0.8, 1.0)
                                     if total_deposited_this_cycle > 0 and num_overseas_transfers_in_cycle > 0
-                                    else random.uniform(5000, 20000))
+                                    else round(random.uniform(5000, 20000), 2))
             transfer_amounts = self.generate_structured_amounts(
                 num_overseas_transfers_in_cycle, base_amount=base_transfer_amount)
 

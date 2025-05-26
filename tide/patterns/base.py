@@ -204,12 +204,14 @@ class TemporalComponent(ABC):
         """Generate amounts that may be structured to avoid thresholds"""
         if base_amount is None:
             reporting_threshold = self.params.get("reporting_threshold", 10000)
-            base_amount = reporting_threshold * random.uniform(0.7, 0.95)
+            base_amount = reporting_threshold * \
+                round(random.uniform(0.7, 0.95), 2)
 
         amounts = []
         for i in range(count):
             # Add variation to avoid exact patterns
-            variation = random.uniform(-base_amount * 0.15, base_amount * 0.15)
+            variation = round(random.uniform(-base_amount *
+                              0.15, base_amount * 0.15), 2)
             amounts.append(max(100, base_amount + variation))
 
         return amounts

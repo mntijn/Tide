@@ -103,7 +103,9 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         inflow_timestamps = self.generate_timestamps(
             inflow_start_time, "high_frequency", num_incoming_transfers)
         inflow_amounts = self.generate_structured_amounts(
-            num_incoming_transfers, base_amount=random.uniform(500, 5000))
+            num_incoming_transfers, base_amount=round(
+                random.uniform(500, 5000), 2)
+        )
 
         inflow_transactions = []
         inflow_duration = datetime.timedelta(days=0)

@@ -54,8 +54,8 @@ class Account(BaseEntity):
                 datetime.timedelta(seconds=acc_creation_offset_seconds)
 
             chosen_institution_id = random.choice(self.all_institution_ids)
-            start_balance = random.uniform(
-                self.account_balance_range[0], self.account_balance_range[1])
+            start_balance = round(random.uniform(
+                self.account_balance_range[0], self.account_balance_range[1]), 2)
             institution_country = self.institution_countries.get(
                 chosen_institution_id)
             currency = self.currency_mapping.get(institution_country)
