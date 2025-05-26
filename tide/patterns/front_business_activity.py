@@ -27,19 +27,18 @@ class FrontBusinessStructural(StructuralComponent):
         random.shuffle(business_ids)
 
         # Default values for pattern parameters
-        min_biz_accounts = 2
+        min_bus_accounts = 2
         num_front_business_accounts_to_use = 3
-        min_overseas_dest_biz_accounts = 2
-        max_overseas_biz_accounts_for_front = 4
-        # min_banks_for_front_business = 2 # This was commented out, keeping as a potential future param
+        min_overseas_dest_bus_accounts = 2
+        max_overseas_bus_accounts_for_front = 4
 
-        for biz_id in business_ids:
+        for bus_id in business_ids:
             owned_accounts = [
-                n for n in self.graph.neighbors(biz_id)
+                n for n in self.graph.neighbors(bus_id)
                 if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
             ]
 
-            if len(owned_accounts) >= min_biz_accounts:
+            if len(owned_accounts) >= min_bus_accounts:
                 institutions = set()
                 for acc_id in owned_accounts:
                     inst_id = self.graph.nodes[acc_id].get("institution_id")
@@ -50,7 +49,7 @@ class FrontBusinessStructural(StructuralComponent):
                 potential_dest_accounts = []
                 all_graph_accounts = [e for e in available_entities if self.graph.nodes[e].get(
                     "node_type") == NodeType.ACCOUNT]
-                business_country = self.graph.nodes[biz_id].get(
+                business_country = self.graph.nodes[bus_id].get(
                     "address", {}).get("country")
 
                 for acc_id in all_graph_accounts:
@@ -65,18 +64,18 @@ class FrontBusinessStructural(StructuralComponent):
                                 potential_dest_accounts.append(acc_id)
                                 break
 
-                if len(potential_dest_accounts) >= min_overseas_dest_biz_accounts:
-                    central_business_id = biz_id
-                    entity_roles[biz_id] = "front_business"
+                if len(potential_dest_accounts) >= min_overseas_dest_bus_accounts:
+                    central_business_id = bus_id
+                    entity_roles[bus_id] = "front_business"
                     business_accounts_ids = random.sample(owned_accounts, k=min(
                         len(owned_accounts), num_front_business_accounts_to_use))
                     for i, acc_id in enumerate(business_accounts_ids):
                         entity_roles[acc_id] = f"front_business_account_{i+1}"
 
                     num_overseas_to_select = random.randint(
-                        min_overseas_dest_biz_accounts,
+                        min_overseas_dest_bus_accounts,
                         min(len(potential_dest_accounts),
-                            max_overseas_biz_accounts_for_front)
+                            max_overseas_bus_accounts_for_front)
                     )
                     overseas_business_accounts_ids = random.sample(
                         potential_dest_accounts, num_overseas_to_select)
