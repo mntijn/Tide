@@ -433,6 +433,7 @@ class GraphGenerator:
 
         # Shuffle to ensure randomness if we have more than needed, then select
         random.shuffle(candidate_entities)
+        print("Candidate entities: ", candidate_entities)
         return candidate_entities[:num_entities_required]
 
     def inject_aml_patterns(self):

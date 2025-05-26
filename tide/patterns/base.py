@@ -211,7 +211,7 @@ class TemporalComponent(ABC):
         for i in range(count):
             # Add variation to avoid exact patterns
             variation = round(random.uniform(-base_amount *
-                              0.15, base_amount * 0.15), 2)
+                              0.15, base_amount * 0.15))
             amounts.append(max(100, base_amount + variation))
 
         return amounts

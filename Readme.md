@@ -10,3 +10,7 @@ Graphs.yaml allows for more general graph settings. Patterns.yaml allows for pat
 
 ## Running the generator
 To run, just create a venv, run `pip install -r requirements.txt`, and then `python main.py`
+
+## Patterns
+
+Not implemented correctly yet.
