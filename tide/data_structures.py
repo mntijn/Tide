@@ -31,6 +31,7 @@ class AccountCategory(Enum):
     SAVINGS = "savings"
     LOAN = "loan"
     BUSINESS = "business"
+    CASH = "cash"
 
 
 class AgeGroup(Enum):

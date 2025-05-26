@@ -5,17 +5,18 @@ import csv
 from dataclasses import asdict
 from typing import List, Dict, Any, Optional, Tuple
 from faker import Faker
+import threading
+from queue import Queue, Empty
 
 from .data_structures import (
-    NodeType, EdgeType, TransactionType,
+    NodeType, EdgeType, TransactionType, AccountCategory,
     NodeAttributes, AccountAttributes, EdgeAttributes,
     TransactionAttributes, OwnershipAttributes,
     IndividualAttributes, BusinessAttributes, InstitutionAttributes
 )
-from .utils import COUNTRY_CODES
+from .utils import COUNTRY_CODES, COUNTRY_TO_CURRENCY, map_occupation_to_business_category, HIGH_RISK_BUSINESS_CATEGORIES
 from .entity_creators import (
-    InstitutionCreator, IndividualCreator, BusinessCreator, AccountCreator,
-    calculate_age_specific_business_rates
+    InstitutionCreator, IndividualCreator, BusinessCreator, AccountCreator
 )
 
 
@@ -53,11 +54,19 @@ class GraphGenerator:
         self.individual_creator = IndividualCreator(self.params)
         self.business_creator = BusinessCreator(self.params)
         self.account_creator: Optional[AccountCreator] = None
+        self.results_queue = Queue()
+        self.individual_cash_accounts: Dict[str, str] = {}
+        self.cash_account_id: Optional[str] = None
 
         self.background_tx_rate_per_account_per_day = params.get(
             "transaction_rates", {}).get("per_account_per_day", 0.2)
         self.num_aml_patterns = params.get(
             "pattern_frequency", {}).get("num_illicit_patterns", 5)
+
+        # Probability (0-1) that an individual with no occupation-based match will still start a high-risk business
+        self.high_risk_business_probability = params.get(
+            "high_risk_business_probability", 0.05
+        )
 
         self.validate_configuration()
 
@@ -112,65 +121,220 @@ class GraphGenerator:
     def _add_edge(self, src_id: str, dest_id: str, attributes: EdgeAttributes):
         self.graph.add_edge(src_id, dest_id, **asdict(attributes))
 
+    def _task_generate_institutions(self):
+        """Gen institution data in a thread."""
+        data = self.institution_creator.generate_institutions_data()
+        self.results_queue.put(('institutions', data))
+
+    def _task_generate_individuals(self):
+        """Gen individual data in a thread."""
+        data = self.individual_creator.generate_individuals_data()
+        self.results_queue.put(('individuals', data))
+
     def initialize_entities(self):
-        print("Creating graph entities..")
+        print("Starting entity generation...")
         sim_start_date = self.time_span["start_date"]
 
-        # Create Institutions and accounts
-        institutions_data = self.institution_creator.generate_institutions_data()
+        thread_institutions = threading.Thread(
+            target=self._task_generate_institutions)
+        thread_individuals = threading.Thread(
+            target=self._task_generate_individuals)
+
+        thread_institutions.start()
+        thread_individuals.start()
+
+        thread_institutions.join()
+        thread_individuals.join()
+
+        thread_results = {}
+        while not self.results_queue.empty():
+            try:
+                key, value = self.results_queue.get_nowait()
+                thread_results[key] = value
+            except Empty:
+                break
+
+        institutions_data = thread_results.get('institutions', [])
+        individuals_data = thread_results.get('individuals', [])
+
+        print("Initial entity data fetched. Adding to graph and creating relationships...")
+
+        # Create accounts for Institutions
         institution_countries = {}
-        for common_attrs, specific_attrs in institutions_data:
-            institution_id = self._add_node(NodeType.INSTITUTION, common_attrs,
-                                            specific_attrs, creation_date=None)
-            # Store the institution's country for account creation
-            institution_countries[institution_id] = common_attrs["address"]["country"]
+        if institutions_data:
+            for common_attrs, specific_attrs in institutions_data:
+                institution_id = self._add_node(NodeType.INSTITUTION, common_attrs,
+                                                specific_attrs, creation_date=None)
+                institution_countries[institution_id] = common_attrs["address"]["country"]
 
         all_institution_ids = self.all_nodes.get(NodeType.INSTITUTION, [])
         self.account_creator = AccountCreator(
             self.params, all_institution_ids, institution_countries)
 
-        # Create Individuals and accounts
-        individuals_data = self.individual_creator.generate_individuals_data()
-        individual_business_ownership_rate = self.params.get(
-            "individual_business_ownership_rate")
-        age_group_probabilities = self.params.get(
-            "age_group_business_probabilities")
-
-        # Calculate normalized age-specific probabilities
-        age_specific_rates = calculate_age_specific_business_rates(
-            individuals_data, individual_business_ownership_rate, age_group_probabilities)
-
-        for ind_creation_date, common_attrs, specific_attrs in individuals_data:
-            ind_id = self._add_node(
-                NodeType.INDIVIDUAL, common_attrs, specific_attrs, creation_date=ind_creation_date)
-
-            # Check if this individual should own a business using age-specific probability
-            age_group_value = specific_attrs["age_group"].value
-            age_specific_rate = age_specific_rates.get(age_group_value, 0.0)
-            if random.random() < age_specific_rate:
-                # Create an age-consistent business for this individual
-                business_data = self.business_creator.generate_age_consistent_business_for_individual(
-                    individual_age_group=specific_attrs["age_group"],
-                    individual_creation_date=ind_creation_date,
-                    sim_start_date=sim_start_date
+        # Create accounts for Individuals and create owned businesses
+        num_owned_businesses_created = 0
+        if individuals_data:
+            for ind_creation_date_dt, ind_common_attrs, ind_specific_attrs in individuals_data:
+                # Add the individual node
+                ind_id = self._add_node(
+                    NodeType.INDIVIDUAL,
+                    ind_common_attrs,
+                    ind_specific_attrs,
+                    creation_date=ind_creation_date_dt,
                 )
-                bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data
-                bus_id = self._add_node(
-                    NodeType.BUSINESS, bus_common_attrs, bus_specific_attrs, creation_date=bus_creation_date)
 
-                # Create ownership relationship between individual and business
-                ownership_attrs = OwnershipAttributes(
-                    ownership_start_date=bus_creation_date.date(),
-                    ownership_percentage=100.0
-                )
-                self._add_edge(ind_id, bus_id, ownership_attrs)
+                # Determine if this individual's occupation suggests business ownership
+                occupation_str: str = ind_specific_attrs.get("occupation", "")
+                suggested_category = map_occupation_to_business_category(
+                    occupation_str)
 
-                # Create accounts for the business
-                if self.account_creator and all_institution_ids:
+                # Fallback: assign a random HIGH_RISK_BUSINESS_CATEGORY even if occupation provides no clear mapping.
+                if suggested_category is None and random.random() < self.high_risk_business_probability:
+                    suggested_category = random.choice(
+                        HIGH_RISK_BUSINESS_CATEGORIES)
+
+                if suggested_category:
+                    # Create a business that aligns with the occupation
+                    business_data_tuple = self.business_creator.generate_age_consistent_business_for_individual(
+                        individual_age_group=ind_specific_attrs["age_group"],
+                        individual_creation_date=ind_creation_date_dt,
+                        sim_start_date=sim_start_date,
+                        business_category_override=suggested_category,
+                    )
+
+                    bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
+
+                    bus_id = self._add_node(
+                        NodeType.BUSINESS,
+                        bus_common_attrs,
+                        bus_specific_attrs,
+                        creation_date=bus_creation_date,
+                    )
+
+                    ownership_attrs = OwnershipAttributes(
+                        ownership_start_date=bus_creation_date.date(),
+                        ownership_percentage=100.0,
+                    )
+
+                    self._add_edge(ind_id, bus_id, ownership_attrs)
+                    num_owned_businesses_created += 1
+
+        # If a target business count is set in config (graph_scale.businesses),
+        # ensure we meet it by creating additional businesses owned by random
+        # individuals. These extra businesses do not rely on occupation matching.
+        target_business_count = self.graph_scale.get("businesses", 0)
+        if target_business_count > num_owned_businesses_created:
+            additional_needed = target_business_count - num_owned_businesses_created
+            print(
+                f"Config override: Creating {additional_needed} extra business(es) to reach target of {target_business_count}."
+            )
+
+            individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
+            if not individual_ids:
+                print(
+                    "Warning: No individuals available to own extra businesses. Skipping override.")
+            else:
+                for _ in range(additional_needed):
+                    owner_id = random.choice(individual_ids)
+                    owner_data = self.graph.nodes[owner_id]
+
+                    owner_age_group = owner_data.get("age_group")
+                    owner_creation_date = owner_data.get("creation_date")
+
+                    # Generate a business with random (potentially high-risk) category
+                    bus_tuple = self.business_creator.generate_age_consistent_business_for_individual(
+                        individual_age_group=owner_age_group,
+                        individual_creation_date=owner_creation_date,
+                        sim_start_date=sim_start_date,
+                    )
+
+                    bus_creation_date, bus_common_attrs, bus_specific_attrs = bus_tuple
+
+                    bus_id = self._add_node(
+                        NodeType.BUSINESS,
+                        bus_common_attrs,
+                        bus_specific_attrs,
+                        creation_date=bus_creation_date,
+                    )
+
+                    self._add_edge(
+                        owner_id,
+                        bus_id,
+                        OwnershipAttributes(
+                            ownership_start_date=bus_creation_date.date(),
+                            ownership_percentage=100.0,
+                        ),
+                    )
+                    num_owned_businesses_created += 1
+
+        print("All entity nodes (Institutions, Individuals, Businesses) created.")
+        print("Proceeding to create accounts for all Individuals and Businesses...")
+
+        # Create accounts for all entities
+        if self.account_creator and all_institution_ids:
+            # Accounts for Individuals
+            for ind_id in self.all_nodes.get(NodeType.INDIVIDUAL, []):
+                node_data = self.graph.nodes[ind_id]
+                ind_creation_date = node_data.get("creation_date")
+                ind_country_code = node_data.get("address", {}).get("country")
+
+                if ind_creation_date and ind_country_code:
+                    accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
+                        entity_node_type=NodeType.INDIVIDUAL,
+                        entity_creation_date=ind_creation_date,
+                        entity_country_code=ind_country_code,
+                        sim_start_date=sim_start_date
+                    )
+                    for acc_creation_date, acc_common, acc_specific, owner_specific in accounts_and_ownerships:
+                        acc_id = self._add_node(
+                            NodeType.ACCOUNT, acc_common, acc_specific, creation_date=acc_creation_date)
+                        ownership_instance = OwnershipAttributes(
+                            **owner_specific)
+                        self._add_edge(ind_id, acc_id, ownership_instance)
+
+                # Create a dedicated "cash" account for the individual.
+                # Used for deposits and withdrawals.
+
+                if ind_id not in self.individual_cash_accounts:
+                    cash_account_common = {
+                        "address": node_data.get("address"),
+                        "is_fraudulent": False,
+                    }
+                    cash_account_specific = {
+                        "start_balance": 0.0,
+                        "current_balance": 0.0,
+                        "institution_id": None,
+                        "account_category": AccountCategory.CASH,
+                        "currency": COUNTRY_TO_CURRENCY[ind_country_code],
+                    }
+                    cash_acc_id = self._add_node(
+                        NodeType.ACCOUNT,
+                        cash_account_common,
+                        cash_account_specific,
+                        creation_date=ind_creation_date,
+                    )
+                    # Link ownership
+                    self._add_edge(
+                        ind_id,
+                        cash_acc_id,
+                        OwnershipAttributes(
+                            ownership_start_date=ind_creation_date.date(),
+                            ownership_percentage=100.0,
+                        ),
+                    )
+                    self.individual_cash_accounts[ind_id] = cash_acc_id
+
+            # Accounts for Businesses
+            for bus_id in self.all_nodes.get(NodeType.BUSINESS, []):
+                node_data = self.graph.nodes[bus_id]
+                bus_creation_date = node_data.get("creation_date")
+                bus_country_code = node_data.get("address", {}).get("country")
+
+                if bus_creation_date and bus_country_code:
                     bus_accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
                         entity_node_type=NodeType.BUSINESS,
                         entity_creation_date=bus_creation_date,
-                        entity_country_code=bus_common_attrs["address"]["country"],
+                        entity_country_code=bus_country_code,
                         sim_start_date=sim_start_date
                     )
                     for acc_creation_date, acc_common, acc_specific, owner_specific in bus_accounts_and_ownerships:
@@ -180,52 +344,20 @@ class GraphGenerator:
                             **owner_specific)
                         self._add_edge(bus_id, acc_id, ownership_instance)
 
-            # Now, generate and add accounts for this individual
-            if self.account_creator and all_institution_ids:
-                accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
-                    entity_node_type=NodeType.INDIVIDUAL,
-                    entity_creation_date=ind_creation_date,
-                    entity_country_code=common_attrs["address"]["country"],
-                    sim_start_date=sim_start_date
-                )
-                for acc_creation_date, acc_common, acc_specific, owner_specific in accounts_and_ownerships:
-                    acc_id = self._add_node(
-                        NodeType.ACCOUNT, acc_common, acc_specific, creation_date=acc_creation_date)
-                    ownership_instance = OwnershipAttributes(**owner_specific)
-                    self._add_edge(ind_id, acc_id, ownership_instance)
+        print("Entity and account generation complete.")
 
-        # Create remaining standalone businesses and their accounts
-        current_business_count = len(self.all_nodes.get(NodeType.BUSINESS, []))
-        target_business_count = self.graph_scale.get("businesses", 0)
-        remaining_businesses_to_create = max(
-            0, target_business_count - current_business_count)
-
-        if remaining_businesses_to_create > 0:
-            original_business_count = self.graph_scale.get("businesses")
-            self.graph_scale["businesses"] = remaining_businesses_to_create
-
-            businesses_data = self.business_creator.generate_businesses_data()
-            for bus_creation_date, common_attrs, specific_attrs in businesses_data:
-                bus_id = self._add_node(
-                    NodeType.BUSINESS, common_attrs, specific_attrs, creation_date=bus_creation_date)
-                # Generate and add accounts for this business
-                if self.account_creator and all_institution_ids:
-                    accounts_and_ownerships = self.account_creator.generate_accounts_and_ownership_data_for_entity(
-                        entity_node_type=NodeType.BUSINESS,
-                        entity_creation_date=bus_creation_date,
-                        entity_country_code=common_attrs["address"]["country"],
-                        sim_start_date=sim_start_date
-                    )
-                    for acc_creation_date, acc_common, acc_specific, owner_specific in accounts_and_ownerships:
-                        acc_id = self._add_node(
-                            NodeType.ACCOUNT, acc_common, acc_specific, creation_date=acc_creation_date)
-                        ownership_instance = OwnershipAttributes(
-                            **owner_specific)
-                        self._add_edge(bus_id, acc_id, ownership_instance)
-
-            self.graph_scale["businesses"] = original_business_count
-
-        print("Created entities.")
+        # Create a single dummy account that represents the physical cash
+        # system (ATMs / cash in transit). This node will be used by patterns
+        # to model deposits (cash ➜ account) and withdrawals (account ➜ cash).
+        if self.cash_account_id is None:
+            self.cash_account_id = self._add_node(
+                NodeType.ACCOUNT,
+                {"address": {"country": "CASH"}},
+                {"start_balance": 0.0, "current_balance": 0.0, "currency": "EUR"},
+                creation_date=self.time_span["start_date"],
+            )
+            print(
+                f"Created global cash system account: {self.cash_account_id}")
 
     def select_fraudulent_entities(self):
         print("Selecting fraudulent entities based on risk scores...")
@@ -255,7 +387,7 @@ class GraphGenerator:
             f"Considered {fraud_candidates} entities for fraud based on risk_score >= {min_risk_score}.")
         print(f"Selected {selected_fraudulent} entities as fraudulent.")
         for nt, count in self.fraudulent_entities_map.items():
-            if count:  # Only print if there are fraudulent entities of this type
+            if count:
                 print(f"  - {len(count)} {nt.value}(s)")
 
     def inject_aml_patterns(self):

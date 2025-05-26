@@ -1,5 +1,6 @@
 from faker import Faker
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from .data_structures import AgeGroup
 
 COUNTRY_CODES = [
     "USA", "UK", "JP", "FR", "DE", "NL", "KY", "LI", "MC", "BS", "IM", "AE"
@@ -34,6 +35,7 @@ COUNTRY_TO_CURRENCY = {
     "MC": "EUR",
     "BS": "BSD",
     "AE": "AED",
+    "IM": "GBP",
 }
 
 HIGH_RISK_BUSINESS_CATEGORIES = [
@@ -214,3 +216,68 @@ def generate_business_category(faker: Faker) -> str:
     ]
 
     return faker.random_element(business_categories)
+
+
+def map_occupation_to_business_category(occupation: str) -> Optional[str]:
+    """Return a plausible business category based on an individual's occupation."""
+    occupation_lower = occupation.lower()
+
+    keyword_category_mapping = [
+        (["software", "developer", "programmer", "engineer",
+         "it", "technology"], "Software Development"),
+        (["consultant", "consulting", "management consultant"], "Consulting Services"),
+        (["teacher", "professor", "education"], "Educational Services"),
+        (["doctor", "nurse", "medical", "physician", "health"], "Healthcare Services"),
+        (["lawyer", "attorney", "legal"], "Law Firm"),
+        (["accountant", "finance", "accounting"], "Accounting Firm"),
+        (["chef", "cook", "restaurant", "food"], "Food Services"),
+        (["driver", "transport", "logistics"], "Transportation"),
+        (["construction", "builder", "architect", "civil"], "Construction"),
+        (["marketing", "advertising", "public relations", "pr"], "Marketing Agency"),
+        (["farmer", "agricultur"], "Agriculture"),
+        (["sales", "retail"], "Retail Trade"),
+        (["entrepreneur", "founder", "owner", "ceo",
+         "business owner"], "Management Consulting"),
+        (["real estate", "estate agent"], "Real Estate"),
+    ]
+
+    for keywords, category in keyword_category_mapping:
+        for kw in keywords:
+            if kw in occupation_lower:
+                return category
+
+    return None
+
+
+def occupation_indicates_business_owner(occupation: str) -> bool:
+    """Determine whether the occupation string suggests the individual could own a business."""
+    return map_occupation_to_business_category(occupation) is not None
+
+
+def generate_age_consistent_occupation(faker: Faker, age_group: AgeGroup) -> str:
+    """Return an occupation that is plausible for the given age group.
+
+    For the youngest age group (18-24) we avoid highly specialised or senior
+    professions that typically require advanced degrees or lengthy experience
+    """
+
+    # Restricted titles for the youngest age bracket
+    restricted_keywords = {
+        AgeGroup.EIGHTEEN_TO_TWENTY_FOUR: [
+            "lawyer", "solicitor", "attorney", "accountant", "chartered",
+            "banker", "director", "manager", "physician", "surgeon",
+            "doctor", "architect", "partner"
+        ]
+    }
+
+    occupation = faker.job()
+
+    if age_group in restricted_keywords:
+        keywords = restricted_keywords[age_group]
+        max_tries = 20
+        tries = 0
+        while any(k in occupation.lower() for k in keywords) and tries < max_tries:
+            occupation = faker.job()
+            tries += 1
+
+    return occupation

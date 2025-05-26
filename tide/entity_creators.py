@@ -9,7 +9,7 @@ from .data_structures import (
     IndividualAttributes, BusinessAttributes, InstitutionAttributes,
     OwnershipAttributes, AgeGroup, Gender
 )
-from .utils import COUNTRY_CODES, generate_localized_address, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_OCCUPATIONS, HIGH_RISK_AGE_GROUPS, generate_business_category, COUNTRY_TO_CURRENCY
+from .utils import *
 
 
 def get_max_age_from_group(age_group: AgeGroup) -> int:
@@ -134,10 +134,11 @@ class IndividualCreator(BaseCreator):
                 "address": generate_localized_address(country_code),
                 "is_fraudulent": False  # Default to False, will be updated later
             }
+            age_group = random.choice(list(AgeGroup))
             specific_attrs = {
                 "name": self.faker.name(),
-                "age_group": random.choice(list(AgeGroup)),
-                "occupation": self.faker.job(),
+                "age_group": age_group,
+                "occupation": generate_age_consistent_occupation(self.faker, age_group),
                 "gender": random.choice(list(Gender)),
             }
             # Calculate and add risk score
@@ -228,7 +229,8 @@ class BusinessCreator(BaseCreator):
         self,
         individual_age_group: AgeGroup,
         individual_creation_date: datetime.datetime,
-        sim_start_date: datetime.datetime
+        sim_start_date: datetime.datetime,
+        business_category_override: Optional[str] = None,
     ) -> Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]:
         """
         Generates a business that is consistent with the given individual's age, including a risk score.
@@ -258,7 +260,9 @@ class BusinessCreator(BaseCreator):
                 datetime.timedelta(seconds=random.randint(0, int(time_delta)))
 
         country_code = random.choice(COUNTRY_CODES)
-        business_category = generate_business_category(self.faker)
+
+        business_category = business_category_override if business_category_override else generate_business_category(
+            self.faker)
 
         is_in_high_risk_category = business_category in HIGH_RISK_BUSINESS_CATEGORIES
         is_in_high_risk_country = country_code in HIGH_RISK_COUNTRIES

@@ -1,6 +1,6 @@
 graph_scale:
-  individuals: 50
-  businesses: 8
+  individuals: 30
+  # businesses: 0
   institutions: 3
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 6]
@@ -15,17 +15,9 @@ company_size_range: [1, 1000]
 salary_payment_days: [24, 30, 1]
 salary_amount_range: [2500.0, 7500.0]
 business_creation_date_range: [90, 5475]
-individual_business_ownership_rate: 0.2
-
-age_group_business_probabilities:
-  "18-24": 0.5
-  "25-34": 2.0
-  "35-49": 1.8
-  "50-64": 1.0
-  "65+": 0.3
 
 pattern_frequency:
-  num_illicit_patterns: 5
+  num_illicit_patterns: 2
 amount_distribution_params:
   mean: 100
   variance: 50
