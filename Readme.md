@@ -13,9 +13,9 @@ To run, just create a venv, run `pip install -r requirements.txt`, and then `pyt
 
 ## Docs
 
-## Entity creation
+<!-- ## Entity creation
 
-Specify the number of individuals and institutions for the graph. Businesses will be generated based on individual attributes, but you can set a minimum number of businesses. Tide will create additional businesses as needed to meet this minimum.
+Specify the number of individuals and institutions for the graph. Businesses will be generated based on individual attributes, but you can set a minimum number of businesses. Tide will create additional businesses as needed to meet this minimum. -->
 
 ## Patterns
 
