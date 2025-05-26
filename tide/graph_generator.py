@@ -34,6 +34,9 @@ class GraphGenerator:
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
         self.fraud_selection_config = params.get("fraud_selection_config", {})
+        self.pattern_config = params.get("pattern_config", {})
+
+        self._update_pattern_parameters()
 
         if isinstance(self.time_span.get("start_date"), str):
             self.time_span["start_date"] = datetime.datetime.fromisoformat(
@@ -73,6 +76,48 @@ class GraphGenerator:
         )
 
         self.validate_configuration()
+
+    def _update_pattern_parameters(self):
+        """Update pattern-specific parameters in the main params dict"""
+        # Update front business pattern parameters
+        front_business_config = self.pattern_config.get("frontBusiness", {})
+        if front_business_config:
+            if "front_business_pattern" not in self.params:
+                self.params["front_business_pattern"] = {}
+            self.params["front_business_pattern"].update({
+                "min_accounts_for_front_business": front_business_config.get("min_accounts_for_front_business", 2),
+                "num_front_business_accounts_to_use": front_business_config.get("num_front_business_accounts_to_use", 3),
+                "min_overseas_destination_accounts": front_business_config.get("min_overseas_destination_accounts", 2),
+                "max_overseas_destination_accounts_for_front": front_business_config.get("max_overseas_destination_accounts_for_front", 4)
+            })
+
+        # Update repeated overseas transfers pattern parameters
+        repeated_overseas_config = self.pattern_config.get(
+            "repeatedOverseas", {})
+        if repeated_overseas_config:
+            if "repeated_overseas_transfers_pattern" not in self.params:
+                self.params["repeated_overseas_transfers_pattern"] = {}
+            self.params["repeated_overseas_transfers_pattern"].update({
+                "min_overseas_entities": repeated_overseas_config.get("min_overseas_entities", 2),
+                "max_overseas_entities": repeated_overseas_config.get("max_overseas_entities", 5)
+            })
+
+        # Update rapid fund movement pattern parameters
+        rapid_movement_config = self.pattern_config.get("rapidMovement", {})
+        if rapid_movement_config:
+            if "rapid_fund_movement_pattern" not in self.params:
+                self.params["rapid_fund_movement_pattern"] = {}
+            self.params["rapid_fund_movement_pattern"].update({
+                "min_accounts_for_pattern": rapid_movement_config.get("min_accounts_for_pattern", 2)
+            })
+
+        # Update transaction parameters for each pattern
+        for pattern_name, pattern_config in self.pattern_config.items():
+            if "transaction_params" in pattern_config:
+                pattern_key = f"{pattern_name}_pattern"
+                if pattern_key not in self.params:
+                    self.params[pattern_key] = {}
+                self.params[pattern_key]["transaction_params"] = pattern_config["transaction_params"]
 
     def num_of_nodes(self):
         return self.node_counter

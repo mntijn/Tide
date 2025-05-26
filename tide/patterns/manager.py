@@ -27,7 +27,7 @@ class PatternManager:
             # add new patterns here
         ]
 
-        # Initialize entity selector (will be set by graph generator)
+        # Initialize entity selector (set by graph generator)
         self.entity_selector = None
 
     def inject_patterns(self):

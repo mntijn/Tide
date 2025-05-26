@@ -1,0 +1,67 @@
+# Pattern configuration for AML pattern generation
+
+# Front Business Activity Pattern
+# Simulates a business acting as a front for money laundering
+frontBusiness:
+  # Minimum number of accounts required for a business to be considered as a front business
+  min_accounts_for_front_business: 2
+  # Number of front business accounts to use in the pattern
+  num_front_business_accounts_to_use: 3
+  # Minimum number of overseas destination accounts required
+  min_overseas_destination_accounts: 2
+  # Maximum number of overseas destination accounts to use for a front business
+  max_overseas_destination_accounts_for_front: 4
+  # Transaction parameters
+  transaction_params:
+    # Minimum number of deposit cycles
+    min_deposit_cycles: 5
+    # Maximum number of deposit cycles
+    max_deposit_cycles: 15
+    # Base amount range for deposits (min, max)
+    deposit_amount_range: [10000, 50000]
+    # Number of deposits per cycle (min, max)
+    deposits_per_cycle: [1, 3]
+
+# Repeated Overseas Transfers Pattern
+# Simulates repeated transfers to overseas accounts
+repeatedOverseas:
+  # Minimum number of overseas entities required
+  min_overseas_entities: 2
+  # Maximum number of overseas entities to use
+  max_overseas_entities: 5
+  # Transaction parameters
+  transaction_params:
+    # Minimum number of transactions
+    min_transactions: 10
+    # Maximum number of transactions
+    max_transactions: 30
+    # Base amount range for transfers (min, max)
+    transfer_amount_range: [5000, 20000]
+    # Time between transfers (in days)
+    transfer_interval_days: [7, 14, 30]
+
+# Rapid Fund Movement Pattern
+# Simulates rapid movement of funds through multiple accounts
+rapidMovement:
+  # Minimum number of accounts required for the pattern
+  min_accounts_for_pattern: 2
+  # Transaction parameters
+  transaction_params:
+    # Inflow parameters
+    inflows:
+      # Minimum number of incoming transfers
+      min_inflows: 15
+      # Maximum number of incoming transfers
+      max_inflows: 30
+      # Base amount range for inflows (min, max)
+      amount_range: [500, 5000]
+    # Withdrawal parameters
+    withdrawals:
+      # Minimum number of withdrawals
+      min_withdrawals: 20
+      # Maximum number of withdrawals
+      max_withdrawals: 50
+      # Base amount range for withdrawals (min, max)
+      amount_range: [100, 2000]
+    # Time between inflow and withdrawal (in hours)
+    inflow_to_withdrawal_delay: [1, 24]

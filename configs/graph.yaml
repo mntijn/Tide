@@ -16,8 +16,16 @@ salary_payment_days: [24, 30, 1]
 salary_amount_range: [2500.0, 7500.0]
 business_creation_date_range: [90, 5475]
 
+# Pattern generation settings
 pattern_frequency:
   num_illicit_patterns: 5
+# Reporting threshold for structuring amounts
+reporting_threshold: 10000
+# List of high-risk countries for pattern targeting
+high_risk_countries: []
+# Base probability for high-risk business selection
+high_risk_business_probability: 0.05
+
 amount_distribution_params:
   mean: 100
   variance: 50
