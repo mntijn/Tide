@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 5000
+  individuals: 2
   # businesses: 0
   institutions: 12
   individual_accounts_per_institution_range: [1, 3]
@@ -23,6 +23,8 @@ pattern_frequency:
 reporting_threshold: 10000
 # Base probability for high-risk business selection
 high_risk_business_probability: 0.05
+# Probability for an account to be an offshore account
+offshore_account_probability: 0.1
 
 amount_distribution_params:
   mean: 100
@@ -54,6 +56,6 @@ risk_weights:
 
 fraud_selection_config:
   # An entity's risk_score must be >= this to even be considered for being marked fraudulent.
-  min_risk_score_for_fraud_consideration: 0.20
+  min_risk_score_for_fraud_consideration: 0.40
   # If risk_score >= min_risk_score_for_fraud_consideration
   base_fraud_probability_if_considered: 0.10

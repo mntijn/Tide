@@ -2,11 +2,13 @@ import networkx as nx
 import random
 import datetime
 import csv
+import logging
 from dataclasses import asdict
 from typing import List, Dict, Any, Optional, Tuple
 from faker import Faker
 import threading
 from queue import Queue, Empty
+import multiprocessing
 
 from .datastructures.enums import (
     NodeType, EdgeType, TransactionType, AccountCategory,
@@ -25,6 +27,10 @@ from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
 from .utils.accounts import batchify, process_individual_batch, process_business_batch
 from .utils.threading import run_in_threads
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class GraphGenerator:
@@ -93,18 +99,18 @@ class GraphGenerator:
                           self.graph_scale.get("businesses", 0))
 
         if self.num_aml_patterns > total_entities:
-            print(
-                f"Warning: Number of AML patterns ({self.num_aml_patterns}) exceeds total entities ({total_entities})")
-            print("Consider reducing num_illicit_patterns or increasing graph scale.")
+            logger.warning(
+                f"Number of AML patterns ({self.num_aml_patterns}) exceeds total entities ({total_entities})")
 
         if self.graph_scale.get("institutions", 0) == 0:
-            print("Warning: No institutions configured. Accounts cannot be created.")
+            logger.warning(
+                "No institutions configured. Accounts cannot be created.")
 
         min_risk_threshold = self.fraud_selection_config.get(
             "min_risk_score_for_fraud_consideration", 0.20)
         if min_risk_threshold > 1.0 or min_risk_threshold < 0.0:
-            print(
-                f"Warning: min_risk_score_for_fraud_consideration ({min_risk_threshold}) should be between 0.0 and 1.0")
+            logger.warning(
+                f"min_risk_score_for_fraud_consideration ({min_risk_threshold}) should be between 0.0 and 1.0")
 
     def _add_node(self,
                   node_type: NodeType,
@@ -143,7 +149,7 @@ class GraphGenerator:
         self.results_queue.put(('individuals', data))
 
     def initialize_entities(self):
-        print("Starting entity generation...")
+        logger.info("Starting entity generation...")
         sim_start_date = self.time_span["start_date"]
 
         # Use run_in_threads for entity data generation in parallel
@@ -164,17 +170,20 @@ class GraphGenerator:
         institutions_data = thread_results.get('institutions', [])
         individuals_data = thread_results.get('individuals', [])
 
-        print("Initial entity data fetched. Adding to graph and creating relationships...")
-
         # Create accounts for Institutions
         institution_countries = {}
         if institutions_data:
             for common_attrs, specific_attrs in institutions_data:
-                institution_id = self._add_node(NodeType.INSTITUTION, common_attrs,
-                                                specific_attrs, creation_date=None)
-                institution_countries[institution_id] = common_attrs["address"]["country"]
+                try:
+                    institution_id = self._add_node(NodeType.INSTITUTION, common_attrs,
+                                                    specific_attrs, creation_date=None)
+                    institution_countries[institution_id] = common_attrs["address"]["country"]
+                except Exception as e:
+                    logger.error(f"Error creating institution node: {str(e)}")
 
         all_institution_ids = self.all_nodes.get(NodeType.INSTITUTION, [])
+        logger.info(f"Created {len(all_institution_ids)} institutions")
+
         self.account = Account(
             self.params, all_institution_ids, institution_countries)
 
@@ -182,106 +191,108 @@ class GraphGenerator:
         num_owned_businesses_created = 0
         if individuals_data:
             for ind_creation_date_dt, ind_common_attrs, ind_specific_attrs in individuals_data:
-                # Add the individual node
-                ind_id = self._add_node(
-                    NodeType.INDIVIDUAL,
-                    ind_common_attrs,
-                    ind_specific_attrs,
-                    creation_date=ind_creation_date_dt,
-                )
-
-                # Determine if this individual's occupation suggests business ownership
-                occupation_str: str = ind_specific_attrs.get("occupation", "")
-                suggested_category = map_occupation_to_business_category(
-                    occupation_str)
-
-                # Fallback: assign a random HIGH_RISK_BUSINESS_CATEGORY even if occupation provides no clear mapping.
-                if suggested_category is None and random.random() < self.high_risk_business_probability:
-                    suggested_category = random.choice(
-                        HIGH_RISK_BUSINESS_CATEGORIES)
-
-                if suggested_category:
-                    # Create a business that aligns with the occupation
-                    business_data_tuple = self.business.generate_age_consistent_business_for_individual(
-                        individual_age_group=ind_specific_attrs["age_group"],
-                        individual_creation_date=ind_creation_date_dt,
-                        sim_start_date=sim_start_date,
-                        business_category_override=suggested_category,
+                try:
+                    # Add the individual node
+                    ind_id = self._add_node(
+                        NodeType.INDIVIDUAL,
+                        ind_common_attrs,
+                        ind_specific_attrs,
+                        creation_date=ind_creation_date_dt,
                     )
 
-                    bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
+                    # Determine if this individual's occupation suggests business ownership
+                    occupation_str: str = ind_specific_attrs.get(
+                        "occupation", "")
+                    suggested_category = map_occupation_to_business_category(
+                        occupation_str)
 
-                    bus_id = self._add_node(
-                        NodeType.BUSINESS,
-                        bus_common_attrs,
-                        bus_specific_attrs,
-                        creation_date=bus_creation_date,
-                    )
+                    if suggested_category:
+                        # Create a business that aligns with the occupation
+                        business_data_tuple = self.business.generate_age_consistent_business_for_individual(
+                            individual_age_group=ind_specific_attrs["age_group"],
+                            individual_creation_date=ind_creation_date_dt,
+                            sim_start_date=sim_start_date,
+                            business_category_override=suggested_category,
+                        )
 
-                    ownership_attrs = OwnershipAttributes(
-                        ownership_start_date=bus_creation_date.date(),
-                        ownership_percentage=100.0,
-                    )
+                        bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
 
-                    self._add_edge(ind_id, bus_id, ownership_attrs)
-                    num_owned_businesses_created += 1
+                        bus_id = self._add_node(
+                            NodeType.BUSINESS,
+                            bus_common_attrs,
+                            bus_specific_attrs,
+                            creation_date=bus_creation_date,
+                        )
 
-        # If a target business count is set in config (graph_scale.businesses),
-        # ensure we meet it by creating additional businesses owned by random
-        # individuals. These extra businesses do not rely on occupation matching.
+                        ownership_attrs = OwnershipAttributes(
+                            ownership_start_date=bus_creation_date.date(),
+                            ownership_percentage=100.0,
+                        )
+
+                        self._add_edge(ind_id, bus_id, ownership_attrs)
+                        num_owned_businesses_created += 1
+                except Exception as e:
+                    logger.error(f"Error processing individual data: {str(e)}")
+
+        # Create additional businesses if needed
         target_business_count = self.graph_scale.get("businesses", 0)
         if target_business_count > num_owned_businesses_created:
             additional_needed = target_business_count - num_owned_businesses_created
-            print(
-                f"Config override: Creating {additional_needed} extra business(es) to reach target of {target_business_count}."
-            )
+            logger.info(
+                f"Creating {additional_needed} additional businesses to reach target of {target_business_count}")
 
             individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
             if not individual_ids:
-                print(
-                    "Warning: No individuals available to own extra businesses. Skipping override.")
+                logger.warning(
+                    "No individuals available to own extra businesses. Skipping override.")
             else:
-                for _ in range(additional_needed):
-                    owner_id = random.choice(individual_ids)
-                    owner_data = self.graph.nodes[owner_id]
+                for i in range(additional_needed):
+                    try:
+                        owner_id = random.choice(individual_ids)
+                        owner_data = self.graph.nodes[owner_id]
 
-                    owner_age_group = owner_data.get("age_group")
-                    owner_creation_date = owner_data.get("creation_date")
+                        owner_age_group = owner_data.get("age_group")
+                        owner_creation_date = owner_data.get("creation_date")
 
-                    # Generate a business with random (potentially high-risk) category
-                    bus_tuple = self.business.generate_age_consistent_business_for_individual(
-                        individual_age_group=owner_age_group,
-                        individual_creation_date=owner_creation_date,
-                        sim_start_date=sim_start_date,
-                    )
+                        bus_tuple = self.business.generate_age_consistent_business_for_individual(
+                            individual_age_group=owner_age_group,
+                            individual_creation_date=owner_creation_date,
+                            sim_start_date=sim_start_date,
+                        )
 
-                    bus_creation_date, bus_common_attrs, bus_specific_attrs = bus_tuple
+                        bus_creation_date, bus_common_attrs, bus_specific_attrs = bus_tuple
 
-                    bus_id = self._add_node(
-                        NodeType.BUSINESS,
-                        bus_common_attrs,
-                        bus_specific_attrs,
-                        creation_date=bus_creation_date,
-                    )
+                        bus_id = self._add_node(
+                            NodeType.BUSINESS,
+                            bus_common_attrs,
+                            bus_specific_attrs,
+                            creation_date=bus_creation_date,
+                        )
 
-                    self._add_edge(
-                        owner_id,
-                        bus_id,
-                        OwnershipAttributes(
-                            ownership_start_date=bus_creation_date.date(),
-                            ownership_percentage=100.0,
-                        ),
-                    )
-                    num_owned_businesses_created += 1
+                        self._add_edge(
+                            owner_id,
+                            bus_id,
+                            OwnershipAttributes(
+                                ownership_start_date=bus_creation_date.date(),
+                                ownership_percentage=100.0,
+                            ),
+                        )
+                        num_owned_businesses_created += 1
+                    except Exception as e:
+                        logger.error(
+                            f"Error creating additional business: {str(e)}")
 
-        print("All entity nodes (Institutions, Individuals, Businesses) created.")
-        print("Proceeding to create accounts for all Individuals and Businesses...")
+        logger.info(f"Created {num_owned_businesses_created} total businesses")
 
-        # Also generate accounts in parallel
-        num_threads = 4
+        # Generate accounts in parallel
+        num_threads = multiprocessing.cpu_count()
+        logger.info(
+            f"Generating accounts in parallel using {num_threads} threads...")
+
         lock = threading.Lock()
         individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
         business_ids = self.all_nodes.get(NodeType.BUSINESS, [])
+
         individual_batches = batchify(individual_ids, num_threads)
         business_batches = batchify(business_ids, num_threads)
 
@@ -292,24 +303,29 @@ class GraphGenerator:
         for batch in business_batches:
             account_tasks.append(
                 (process_business_batch, (self, batch, lock, sim_start_date)))
+
         run_in_threads(account_tasks)
+        logger.info("Account generation tasks completed")
 
-        print("Entity and account generation complete.")
-
-        # Create a single dummy account that represents the physical cash
-        # system (ATMs / cash in transit).
+        # Create global cash system account
         if self.cash_account_id is None:
-            self.cash_account_id = self._add_node(
-                NodeType.ACCOUNT,
-                {"address": {"country": "CASH"}},
-                {"start_balance": 0.0, "current_balance": 0.0, "currency": "EUR"},
-                creation_date=self.time_span["start_date"],
-            )
-            print(
-                f"Created global cash system account: {self.cash_account_id}")
+            try:
+                self.cash_account_id = self._add_node(
+                    NodeType.ACCOUNT,
+                    {"address": {"country": "CASH"}},
+                    {"start_balance": 0.0, "current_balance": 0.0, "currency": "EUR"},
+                    creation_date=self.time_span["start_date"],
+                )
+                logger.info(
+                    f"Created global cash system account: {self.cash_account_id}")
+            except Exception as e:
+                logger.error(
+                    f"Error creating global cash system account: {str(e)}")
+
+        logger.info("Entity and account generation complete")
 
     def select_fraudulent_entities(self):
-        print("Selecting fraudulent entities based on risk scores...")
+        logger.info("Selecting fraudulent entities based on risk scores...")
         min_risk_score = self.fraud_selection_config.get(
             "min_risk_score_for_fraud_consideration", 0.30)
         base_prob = self.fraud_selection_config.get(
@@ -332,19 +348,19 @@ class GraphGenerator:
                         self.fraudulent_entities_map[node_type].append(node_id)
                         selected_fraudulent += 1
 
-        print(
+        logger.info(
             f"Considered {fraud_candidates} entities for fraud based on risk_score >= {min_risk_score}.")
-        print(f"Selected {selected_fraudulent} entities as fraudulent.")
+        logger.info(f"Selected {selected_fraudulent} entities as fraudulent.")
         for nt, items in self.fraudulent_entities_map.items():
             if items:
-                print(f"  - {len(items)} {nt.value}(s)")
+                logger.info(f"  - {len(items)} {nt.value}(s)")
 
     def select_entities_for_pattern(self, pattern_name: str, num_entities_required: int) -> List[str]:
         """
         Selects entities for a given AML pattern.
         Prioritizes fraudulent entities (Individuals and Businesses).
         If not enough fraudulent entities are available, non-fraudulent ones are considered.
-        The number of entities to select is determined by num_entities_required.
+        The number of entities to select is determined by num_entities_required for each pattern.
         """
         candidate_entities = []
 
@@ -355,7 +371,6 @@ class GraphGenerator:
 
         # If not enough fraudulent entities, add non-fraudulent ones
         if len(candidate_entities) < num_entities_required:
-            print("RUNNING")
             needed_more = num_entities_required - len(candidate_entities)
             non_fraudulent_pool = []
             for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
@@ -370,7 +385,7 @@ class GraphGenerator:
                     non_fraudulent_pool, min(needed_more, len(non_fraudulent_pool))))
 
         if not candidate_entities:
-            print(f"Warning: No entities available for pattern {pattern_name}")
+            logger.warning(f"No entities available for pattern {pattern_name}")
             return []
 
         # Shuffle to ensure randomness if we have more than needed, then select
@@ -379,30 +394,31 @@ class GraphGenerator:
 
     def inject_aml_patterns(self):
         """Inject combined temporal and structural AML patterns using PatternManager."""
-        print(f"Injecting up to {self.num_aml_patterns} AML patterns...")
+        logger.info(f"Injecting up to {self.num_aml_patterns} AML patterns...")
         if not self.pattern_manager:
-            print("Error: PatternManager not initialized.")
+            logger.error("PatternManager not initialized.")
             return
 
         fraudulent_edges = self.pattern_manager.inject_patterns()
         if fraudulent_edges:
-            print(
+            logger.info(
                 f"PatternManager injected {len(fraudulent_edges)} new fraudulent edges.")
         else:
-            print("PatternManager did not inject any new fraudulent edges.")
+            logger.warning(
+                "PatternManager did not inject any new fraudulent edges.")
 
         return
 
     def simulate_background_activity(self):
-        print("Simulating background financial activity...")
+        logger.info("Simulating background financial activity...")
         pass
 
     def generate_graph(self):
-        print("Starting graph generation...")
+        logger.info("Starting graph generation...")
         self.initialize_entities()
         self.select_fraudulent_entities()
         self.inject_aml_patterns()
         self.simulate_background_activity()
-        print(
+        logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph
