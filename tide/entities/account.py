@@ -33,7 +33,7 @@ class Account(BaseEntity):
             "account_balance_range_normal", [1000, 50000])
         self.balance_range_offshore = params.get(
             "account_balance_range_offshore", self.balance_range_normal)
-        # Tax haven accounts typically have 6x higher balances (14% of accounts hold ~50% of assets)
+        # Tax haven accounts typically have 6x higher balances
         self.balance_range_tax_haven = [
             x * 6 for x in self.balance_range_offshore]
 
@@ -42,14 +42,13 @@ class Account(BaseEntity):
         probability = self.base_offshore_probability
 
         if entity_node_type == NodeType.INDIVIDUAL:
-            # Increase probability based on risk score (wealthier/more sophisticated individuals)
             risk_score = entity_data.get("risk_score", 0.0)
             probability += risk_score * 0.05
 
             # Increase probability for business owners/entrepreneurs and high-paid occupations
             occupation = entity_data.get("occupation", "")
             if occupation in HIGH_RISK_OCCUPATIONS:  # These are often business-related
-                probability += 0.03
+                probability += 0.02
             if occupation in HIGH_PAID_OCCUPATIONS:  # Higher chance for high-paid individuals
                 probability += 0.08
 
@@ -64,7 +63,7 @@ class Account(BaseEntity):
                 probability += 0.02
 
         elif entity_node_type == NodeType.BUSINESS:
-            # Businesses are more likely to have offshore accounts, but still not guaranteed
+            # Businesses are more likely to have offshore accounts
             probability += 0.05
 
             # Increase probability for businesses in high-risk countries
@@ -72,7 +71,7 @@ class Account(BaseEntity):
             if country_code in HIGH_RISK_COUNTRIES:
                 probability += 0.04
 
-        # Cap the probability at 0.25 (25%) - increased from 0.15 to account for high-paid occupations
+        # Cap the probability at 0.25 (25%)
         return min(probability, 0.25)
 
     def generate_accounts_and_ownership_data_for_entity(
@@ -167,8 +166,6 @@ class Account(BaseEntity):
                 "address": account_address,
                 "is_fraudulent": False
             }
-            print(
-                f"Creating account in country {account_country_code} with currency {currency} and balance {start_balance}")
             acc_specific_attrs = {
                 "start_balance": start_balance,
                 "current_balance": start_balance,

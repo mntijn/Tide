@@ -208,11 +208,18 @@ class GraphGenerator:
 
                     if suggested_category:
                         # Create a business that aligns with the occupation
+                        print("Creating business in country: ",
+                              ind_common_attrs.get("address", {}).get("country"), " using occupation: ", occupation_str, "they live in country: ", ind_common_attrs.get("address", {}).get("country"))
                         business_data_tuple = self.business.generate_age_consistent_business_for_individual(
                             individual_age_group=ind_specific_attrs["age_group"],
                             individual_creation_date=ind_creation_date_dt,
                             sim_start_date=sim_start_date,
                             business_category_override=suggested_category,
+                            owner_occupation=occupation_str,
+                            owner_risk_score=ind_common_attrs.get(
+                                "risk_score", 0.0),
+                            owner_country=ind_common_attrs.get(
+                                "address", {}).get("country"),
                         )
 
                         bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
@@ -258,6 +265,10 @@ class GraphGenerator:
                             individual_age_group=owner_age_group,
                             individual_creation_date=owner_creation_date,
                             sim_start_date=sim_start_date,
+                            owner_occupation=owner_data.get("occupation", ""),
+                            owner_risk_score=owner_data.get("risk_score", 0.0),
+                            owner_country=owner_data.get(
+                                "address", {}).get("country"),
                         )
 
                         bus_creation_date, bus_common_attrs, bus_specific_attrs = bus_tuple

@@ -101,6 +101,7 @@ HIGH_RISK_COUNTRIES = [
     "BZ",  # Belize
     "VU",  # Vanuatu
     "AG",  # Antigua and Barbuda
+    "LU",  # Luxembourg
 ]
 
 HIGH_PAID_OCCUPATIONS = [

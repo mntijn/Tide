@@ -102,9 +102,6 @@ def process_business_batch(graph_gen, batch, lock, sim_start_date):
             bus_country_code = bus_address.get(
                 "country") if bus_address else None
 
-            logger.info(
-                f"Processing business {bus_id} (country: {bus_country_code}, creation_date: {bus_creation_date})")
-
             if not bus_creation_date or not bus_country_code or not bus_address:
                 logger.warning(
                     f"Skipping business {bus_id} - missing creation_date, country_code, or address")
