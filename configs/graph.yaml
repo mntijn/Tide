@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 2
+  individuals: 20
   # businesses: 0
   institutions: 12
   individual_accounts_per_institution_range: [1, 3]

@@ -48,22 +48,22 @@ class PatternManager:
         fraudulent_edges = []
 
         for i in range(num_patterns):
-            pattern_injector = random.choice(self.patterns)
-            pattern_name = pattern_injector.pattern_name
-            required_entities_for_pattern = pattern_injector.num_required_entities
+            selected_pattern = random.choice(self.patterns)
+            pattern_name = selected_pattern.pattern_name
+            required_entities_for_pattern = selected_pattern.num_required_entities
 
             pattern_entities = self.entity_selector.select_entities_for_pattern(
                 pattern_name, required_entities_for_pattern
             )
 
             try:
-                edges = pattern_injector.inject_pattern(pattern_entities)
+                edges = selected_pattern.inject_pattern(pattern_entities)
                 fraudulent_edges.extend(edges)
                 print(
-                    f"Injected {pattern_injector.pattern_name} with {len(edges)} edges")
+                    f"Injected {selected_pattern.pattern_name} with {len(edges)} edges")
             except Exception as e:
                 print(
-                    f"Failed to inject {pattern_injector.pattern_name}: {e}")
+                    f"Failed to inject {selected_pattern.pattern_name}: {e}")
 
         print(f"Total fraudulent edges created: {len(fraudulent_edges)}")
         return fraudulent_edges

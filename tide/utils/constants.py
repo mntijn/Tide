@@ -1,5 +1,6 @@
 COUNTRY_CODES = [
-    "USA", "UK", "JP", "FR", "DE", "NL", "KY", "LI", "MC", "BS", "IM", "AE"
+    "USA", "UK", "JP", "FR", "DE", "NL", "KY", "LI", "MC", "BS", "IM", "AE", "CH", "LU",
+    "CY", "MT", "SC", "BB", "BM", "HK", "SG", "BZ", "VU", "AG",
 ]
 
 # Map to faker locales
@@ -16,6 +17,18 @@ COUNTRY_TO_LOCALE = {
     "BS": "en_US",
     "IM": "en_GB",
     "AE": "ar_AE",
+    "CH": "de_CH",
+    "LU": "de_LU",
+    "CY": "el_CY",
+    "MT": "en_MT",
+    "SC": "en_US",  # No locale which is fine, as long as country is correct
+    "BB": "en_US",  # No locale which is fine, as long as country is correct
+    "BM": "en_US",  # No locale which is fine, as long as country is correct
+    "HK": "zh_HK",
+    "SG": "en_SG",
+    "BZ": "en_US",  # No locale which is fine, as long as country is correct
+    "VU": "en_US",  # No locale which is fine, as long as country is correct
+    "AG": "en_US",  # No locale which is fine, as long as country is correct
 }
 
 
@@ -32,6 +45,18 @@ COUNTRY_TO_CURRENCY = {
     "BS": "BSD",
     "AE": "AED",
     "IM": "GBP",
+    "CH": "CHF",
+    "LU": "EUR",
+    "CY": "EUR",
+    "MT": "EUR",
+    "SC": "SCR",
+    "BB": "BBD",
+    "BM": "BMD",
+    "HK": "HKD",
+    "SG": "SGD",
+    "BZ": "BZD",
+    "VU": "VUV",
+    "AG": "XCD",
 }
 
 HIGH_RISK_BUSINESS_CATEGORIES = [
@@ -76,6 +101,23 @@ HIGH_RISK_COUNTRIES = [
     "BZ",  # Belize
     "VU",  # Vanuatu
     "AG",  # Antigua and Barbuda
+]
+
+HIGH_PAID_OCCUPATIONS = [
+    "Banker",
+    "Corporate investment banker",
+    "Investment banker, corporate",
+    "Investment banker, operational",
+    "Financial trader",
+    "Financial adviser",
+    "Risk analyst",
+    "Risk manager",
+    "Lawyer",
+    "Solicitor",
+    "Chartered accountant",
+    "Chartered certified accountant",
+    "Tax adviser",
+    "IT consultant"
 ]
 
 HIGH_RISK_OCCUPATIONS = [
