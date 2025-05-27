@@ -32,6 +32,7 @@ class Business(BaseEntity):
         """Calculates a risk score for a business."""
         score = self._calculate_base_risk_score(common_attrs)
 
+        # Add risk score for business category
         business_category = specific_attrs.get("business_category")
         if business_category in HIGH_RISK_BUSINESS_CATEGORIES:
             category_weight = self.risk_weights.get("business_category", 0.25)
@@ -39,6 +40,15 @@ class Business(BaseEntity):
                 "business_categories_weight_factor", 1.0)
             score += category_weight * category_factor
 
+        # Add risk score for company location
+        company_country = common_attrs.get("address", {}).get("country")
+        if company_country in HIGH_RISK_COUNTRIES:
+            country_weight = self.risk_weights.get("country", 0.20)
+            country_factor = self.risk_config.get(
+                "countries_weight_factor", 1.0)
+            score += country_weight * country_factor
+
+        # Add risk score for company size
         num_employees = specific_attrs.get("number_of_employees", 0)
         company_size_thresholds = self.risk_config.get(
             "company_size_thresholds", {})
@@ -158,6 +168,7 @@ class Business(BaseEntity):
                 owner_occupation, owner_risk_score, business_category, owner_country)
 
             if random.random() < offshore_prob:
+                owner_country = country_code
                 # 75% chance to be in a tax haven if going offshore
                 if random.random() < 0.75:
                     tax_havens = [
@@ -183,7 +194,8 @@ class Business(BaseEntity):
 
         is_in_high_risk_category = business_category in HIGH_RISK_BUSINESS_CATEGORIES
         is_in_high_risk_country = country_code in HIGH_RISK_COUNTRIES
-        company_size_range = self.params.get("company_size_range", [1, 1000])
+
+       company_size_range = self.params.get("company_size_range", [1, 1000])
 
         common_attrs = {
             "address": generate_localized_address(country_code),

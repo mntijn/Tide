@@ -55,7 +55,7 @@ risk_weights:
   max_score: 1.0
 
 fraud_selection_config:
-  # An entity's risk_score must be >= this to even be considered for being marked fraudulent.
-  min_risk_score_for_fraud_consideration: 0.40
-  # If risk_score >= min_risk_score_for_fraud_consideration
+  # An entity's risk_score must be >= this to be considered for being marked fraudulent.
+  min_risk_score_for_fraud_consideration: 0.50
+  # If entity is high risk, what is the chance they're selected for a pattern
   base_fraud_probability_if_considered: 0.10
