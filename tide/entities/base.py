@@ -4,7 +4,7 @@ from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import HIGH_RISK_COUNTRIES
 
 
-class BaseEntity:
+class Entity:
     def __init__(self, params: Dict[str, Any]):
         self.params = params
         self.faker = Faker()

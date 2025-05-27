@@ -10,10 +10,10 @@ from ..utils.constants import (
 )
 from ..utils.address import generate_localized_address
 from ..utils.individual import generate_age_consistent_occupation
-from .base import BaseEntity
+from .base import Entity
 
 
-class Individual(BaseEntity):
+class Individual(Entity):
     def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
         """Calculates a risk score for an individual."""
         score = self._calculate_base_risk_score(common_attrs)

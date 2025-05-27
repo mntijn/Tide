@@ -14,19 +14,12 @@ from ..utils.business import (
     generate_business_category,
     get_max_age_from_group
 )
-from .base import BaseEntity
+from .base import Entity
 
 
-class Business(BaseEntity):
+class Business(Entity):
     def __init__(self, params: Dict[str, Any]):
         super().__init__(params)
-        # Configure logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            filename='offshore_businesses.log'
-        )
-        self.logger = logging.getLogger(__name__)
 
     def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
         """Calculates a risk score for a business."""
@@ -195,7 +188,7 @@ class Business(BaseEntity):
         is_in_high_risk_category = business_category in HIGH_RISK_BUSINESS_CATEGORIES
         is_in_high_risk_country = country_code in HIGH_RISK_COUNTRIES
 
-       company_size_range = self.params.get("company_size_range", [1, 1000])
+        company_size_range = self.params.get("company_size_range", [1, 1000])
 
         common_attrs = {
             "address": generate_localized_address(country_code),

@@ -12,10 +12,10 @@ from ..utils.constants import (
     HIGH_PAID_OCCUPATIONS
 )
 from ..utils.address import generate_localized_address
-from .base import BaseEntity
+from .base import Entity
 
 
-class Account(BaseEntity):
+class Account(Entity):
     def __init__(self, params: Dict[str, Any], all_institution_ids: List[str], institution_countries: Dict[str, str]):
         super().__init__(params)
         if not all_institution_ids:

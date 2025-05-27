@@ -4,10 +4,10 @@ from faker import Faker
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import COUNTRY_CODES
 from ..utils.address import generate_localized_address
-from .base import BaseEntity
+from .base import Entity
 
 
-class Institution(BaseEntity):
+class Institution(Entity):
     def generate_data(self) -> List[Tuple[Dict[str, Any], Dict[str, Any]]]:
         """Generates data for institution nodes."""
         institutions_data = []

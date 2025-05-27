@@ -1,11 +1,11 @@
-from .base import BaseEntity
+from .base import Entity
 from .individual import Individual
 from .business import Business
 from .institution import Institution
 from .account import Account
 
 __all__ = [
-    'BaseEntity',
+    'Entity',
     'Individual',
     'Business',
     'Institution',
