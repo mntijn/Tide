@@ -360,7 +360,11 @@ class GraphGenerator:
         for node_id, data in self.graph.nodes(data=True):
             node_type = data.get("node_type")
             country = data.get("country_code")
-            risk_score = data.get("risk_score", 0.0)
+            risk_score = data.get("risk_score")
+
+            # Handle None risk_score values
+            if risk_score is None:
+                risk_score = 0.0
 
             # Build clusters based on node attributes
             if country in HIGH_RISK_COUNTRIES:
