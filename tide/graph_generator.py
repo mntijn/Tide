@@ -84,6 +84,9 @@ class GraphGenerator:
         self.high_risk_business_probability = params.get(
             "high_risk_business_probability", 0.05
         )
+        self.business_creation_probability = params.get(
+            "business_creation_probability", 0.1
+        )
 
         self.validate_configuration()
 
@@ -207,37 +210,38 @@ class GraphGenerator:
                         occupation_str)
 
                     if suggested_category:
-                        # Create a business that aligns with the occupation
-                        print("Creating business in country: ",
-                              ind_common_attrs.get("address", {}).get("country"), " using occupation: ", occupation_str, "they live in country: ", ind_common_attrs.get("address", {}).get("country"))
-                        business_data_tuple = self.business.generate_age_consistent_business_for_individual(
-                            individual_age_group=ind_specific_attrs["age_group"],
-                            individual_creation_date=ind_creation_date_dt,
-                            sim_start_date=sim_start_date,
-                            business_category_override=suggested_category,
-                            owner_occupation=occupation_str,
-                            owner_risk_score=ind_common_attrs.get(
-                                "risk_score", 0.0),
-                            owner_country=ind_common_attrs.get(
-                                "address", {}).get("country"),
-                        )
+                        if random.random() < self.business_creation_probability:
+                            # Create a business that aligns with the occupation
+                            print("Creating business in country: ",
+                                  ind_common_attrs.get("address", {}).get("country"), " using occupation: ", occupation_str, "they live in country: ", ind_common_attrs.get("address", {}).get("country"))
+                            business_data_tuple = self.business.generate_age_consistent_business_for_individual(
+                                individual_age_group=ind_specific_attrs["age_group"],
+                                individual_creation_date=ind_creation_date_dt,
+                                sim_start_date=sim_start_date,
+                                business_category_override=suggested_category,
+                                owner_occupation=occupation_str,
+                                owner_risk_score=ind_common_attrs.get(
+                                    "risk_score", 0.0),
+                                owner_country=ind_common_attrs.get(
+                                    "address", {}).get("country"),
+                            )
 
-                        bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
+                            bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
 
-                        bus_id = self._add_node(
-                            NodeType.BUSINESS,
-                            bus_common_attrs,
-                            bus_specific_attrs,
-                            creation_date=bus_creation_date,
-                        )
+                            bus_id = self._add_node(
+                                NodeType.BUSINESS,
+                                bus_common_attrs,
+                                bus_specific_attrs,
+                                creation_date=bus_creation_date,
+                            )
 
-                        ownership_attrs = OwnershipAttributes(
-                            ownership_start_date=bus_creation_date.date(),
-                            ownership_percentage=100.0,
-                        )
+                            ownership_attrs = OwnershipAttributes(
+                                ownership_start_date=bus_creation_date.date(),
+                                ownership_percentage=100.0,
+                            )
 
-                        self._add_edge(ind_id, bus_id, ownership_attrs)
-                        num_owned_businesses_created += 1
+                            self._add_edge(ind_id, bus_id, ownership_attrs)
+                            num_owned_businesses_created += 1
                 except Exception as e:
                     logger.error(f"Error processing individual data: {str(e)}")
 
