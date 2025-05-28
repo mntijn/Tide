@@ -18,17 +18,15 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
     for ind_id in batch:
         try:
             node_data = graph_gen.graph.nodes[ind_id]
-            ind_creation_date = node_data.get("creation_date")
             ind_country_code = node_data.get("country_code")
 
-            if not ind_creation_date or not ind_country_code:
+            if not ind_country_code:
                 logger.warning(
-                    f"Skipping individual {ind_id} - missing creation_date, country_code, or address")
+                    f"Skipping individual {ind_id} - missing country_code")
                 continue
 
             accounts_and_ownerships = graph_gen.account.generate_accounts_and_ownership_data_for_entity(
                 entity_node_type=NodeType.INDIVIDUAL,
-                entity_creation_date=ind_creation_date,
                 entity_country_code=ind_country_code,
                 entity_data=node_data,
                 sim_start_date=sim_start_date
@@ -67,13 +65,12 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
                             NodeType.ACCOUNT,
                             cash_account_common,
                             cash_account_specific,
-                            creation_date=ind_creation_date,
                         )
                         graph_gen._add_edge(
                             ind_id,
                             cash_acc_id,
                             OwnershipAttributes(
-                                ownership_start_date=ind_creation_date.date(),
+                                ownership_start_date=sim_start_date.date(),
                                 ownership_percentage=100.0,
                             ),
                         )
@@ -122,5 +119,3 @@ def process_business_batch(graph_gen, batch, lock, sim_start_date):
 
         except Exception as e:
             logger.error(f"Error processing business {bus_id}: {str(e)}")
-
-    logger.info(f"Completed processing business batch")

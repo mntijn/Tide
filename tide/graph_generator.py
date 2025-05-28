@@ -113,7 +113,7 @@ class GraphGenerator:
             logger.warning(
                 f"Number of AML patterns ({self.num_aml_patterns}) exceeds total entities ({total_entities})")
 
-        if self.graph_scale.get("institutions", 0) == 0:
+        if self.graph_scale.get("institutions_per_country", 0) == 0:
             logger.warning(
                 "No institutions configured. Accounts cannot be created.")
 

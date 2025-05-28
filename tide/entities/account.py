@@ -1,4 +1,4 @@
-from typing import Dict, Any, Tuple, List
+from typing import Dict, Any, Tuple, List, Optional
 import datetime
 from ..datastructures.enums import NodeType, AgeGroup
 from ..datastructures.attributes import NodeAttributes
@@ -71,16 +71,19 @@ class Account(Entity):
     def generate_accounts_and_ownership_data_for_entity(
         self,
         entity_node_type: NodeType,
-        entity_creation_date: datetime.datetime,
         entity_country_code: str,
         entity_data: Dict[str, Any],
-        sim_start_date: datetime.datetime
+        sim_start_date: datetime.datetime,
+        entity_creation_date: Optional[datetime.datetime] = None,
     ) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any], Dict[str, Any]]]:
         """Generates data for account nodes and their ownership edges for a single entity."""
         accounts_and_ownerships_data = []
 
         if not self.all_institution_ids:
             return []
+
+        if not entity_creation_date:
+            entity_creation_date = sim_start_date
 
         num_accounts_range_key = ""
         if entity_node_type == NodeType.INDIVIDUAL:
