@@ -20,7 +20,7 @@ from .datastructures.attributes import (
     IndividualAttributes, BusinessAttributes, InstitutionAttributes
 )
 from .utils.constants import (
-    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES
+    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS
 )
 from .utils.business import map_occupation_to_business_category, get_random_business_category
 from .utils.random_instance import random_instance
@@ -342,39 +342,46 @@ class GraphGenerator:
 
         logger.info("Entity and account generation complete")
 
-    def select_fraudulent_entities(self):
-        logger.info("Selecting fraudulent entities based on risk scores...")
+    def build_entity_clusters(self):
+        logger.info("Building entity clusters...")
         min_risk_score = self.fraud_selection_config.get(
             "min_risk_score_for_fraud_consideration", 0.30)
-        base_prob = self.fraud_selection_config.get(
-            "base_fraud_probability_if_considered", 0.20)
 
-        fraud_candidates = 0
-        selected_fraudulent = 0
+        # Build all clusters in one efficient pass through the graph
+        clusters: Dict[str, List[str]] = {
+            "high_risk_countries": [],
+            "high_risk_business_categories": [],
+            "intermediaries": [],
+            "fraudulent": [],
+            "high_risk_score": [],
+        }
 
-        # Consider Individuals and Businesses for being marked as fraudulent
-        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-            for node_id in self.all_nodes.get(node_type, []):
-                node_data = self.graph.nodes[node_id]
-                risk_score = node_data.get("risk_score", 0.0)
+        # Single pass through all nodes to build clusters
+        for node_id, data in self.graph.nodes(data=True):
+            node_type = data.get("node_type")
+            country = data.get("country_code")
+            risk_score = data.get("risk_score", 0.0)
 
-                if risk_score >= min_risk_score:
-                    fraud_candidates += 1
-                    # Use the base probability for all entities that meet the minimum risk threshold
-                    if random.random() < base_prob:
-                        self.graph.nodes[node_id]["is_fraudulent"] = True
-                        self.fraudulent_entities_map[node_type].append(node_id)
-                        selected_fraudulent += 1
+            # Build clusters based on node attributes
+            if country in HIGH_RISK_COUNTRIES:
+                clusters["high_risk_countries"].append(node_id)
+
+            if node_type == NodeType.BUSINESS and data.get("is_high_risk_category", False):
+                clusters["high_risk_business_categories"].append(node_id)
+
+            age_group = data.get("age_group")
+            if age_group and str(age_group).upper() in HIGH_RISK_AGE_GROUPS:
+                clusters["intermediaries"].append(node_id)
+
+            # Add to high risk score cluster if meets threshold
+            if risk_score >= min_risk_score:
+                clusters["high_risk_score"].append(node_id)
+
+        # Store the clusters
+        self.entity_clusters = clusters
 
         logger.info(
-            f"Considered {fraud_candidates} entities for fraud based on risk_score >= {min_risk_score}.")
-        logger.info(f"Selected {selected_fraudulent} entities as fraudulent.")
-        for nt, items in self.fraudulent_entities_map.items():
-            if items:
-                logger.info(f"  - {len(items)} {nt.value}(s)")
-
-        # Build quick-lookup clusters once fraud labels are decided
-        self._build_entity_clusters()
+            f"Built entity clusters: {[(k, len(v)) for k, v in clusters.items() if v]}")
 
     def select_entities_for_pattern(self, pattern_name: str, pattern_structural_component: StructuralComponent) -> Optional[EntitySelection]:
         """
@@ -402,7 +409,7 @@ class GraphGenerator:
             return None
 
         # Fall back to providing all entities to the structural selector directly (new approach)
-        candidate_entities = self.entity_clusters.get("all", [])
+        candidate_entities = list(self.graph.nodes)
         selected_entities = pattern_structural_component.select_entities(
             candidate_entities)
 
@@ -436,8 +443,7 @@ class GraphGenerator:
                 f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
             # Provide the whole node list – structural component will pick efficiently using clusters
-            new_edges = pattern_instance.inject_pattern(
-                self.entity_clusters.get("all", []))
+            new_edges = pattern_instance.inject_pattern(list(self.graph.nodes))
             for src, dest, attrs in new_edges:
                 self._add_edge(src, dest, attrs)
             total_edges_added += len(new_edges)
@@ -466,45 +472,9 @@ class GraphGenerator:
     def generate_graph(self):
         logger.info("Starting graph generation...")
         self.initialize_entities()
-        self.select_fraudulent_entities()
+        self.build_entity_clusters()
         self.inject_aml_patterns()
         self.simulate_background_activity()
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph
-
-    # ------------------------------------------------------------------
-    #  Clustering helpers – avoid scanning the whole graph repeatedly
-    # ------------------------------------------------------------------
-    def _build_entity_clusters(self):
-        """Pre-compute useful entity clusters (e.g. tax-haven, high-risk business, intermediaries).
-        These will be used by structural components to pick candidates quickly without
-        traversing the whole node list each time."""
-
-        clusters: Dict[str, List[str]] = {
-            "tax_haven": [],
-            "high_risk_business": [],
-            "intermediary": [],
-            "fraudulent": [],
-        }
-
-        for node_id, data in self.graph.nodes(data=True):
-            country = data.get("country_code")
-
-            if country in HIGH_RISK_COUNTRIES:
-                clusters["tax_haven"].append(node_id)
-
-            if data.get("node_type") == NodeType.BUSINESS and data.get("is_high_risk_category", False):
-                clusters["high_risk_business"].append(node_id)
-
-            # Simple heuristic for intermediary – degree higher than 3
-            if self.graph.degree(node_id) > 3:
-                clusters["intermediary"].append(node_id)
-
-            if data.get("is_fraudulent"):
-                clusters["fraudulent"].append(node_id)
-
-        # Fallback all-node cluster for convenience
-        clusters["all"] = list(self.graph.nodes)
-
-        self.entity_clusters = clusters
