@@ -1,5 +1,4 @@
 import networkx as nx
-import random
 import datetime
 import csv
 import logging
@@ -23,12 +22,12 @@ from .utils.constants import (
     COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS
 )
 from .utils.business import map_occupation_to_business_category, get_random_business_category
-from .utils.random_instance import random_instance
 from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
 from .patterns.base import StructuralComponent, EntitySelection
 from .utils.accounts import batchify, process_individual_batch, process_business_batch
 from .utils.threading import run_in_threads
+from .utils.random_instance import random_instance
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +77,7 @@ class GraphGenerator:
         self.results_queue = Queue()
         self.individual_cash_accounts: Dict[str, str] = {}
         self.cash_account_id: Optional[str] = None
+        self.random_instance = random_instance
 
         self.pattern_manager = PatternManager(self, self.params)
         self.entity_clusters: Dict[str, List[str]] = {}
@@ -218,7 +218,7 @@ class GraphGenerator:
 
                     # Create business if occupation suggests one, or randomly
                     should_create_business = (suggested_category is not None or
-                                              random_instance.random() < self.random_business_probability)
+                                              self.random_instance.random() < self.random_business_probability)
 
                     if should_create_business:
                         # Use suggested category or random one
@@ -265,7 +265,7 @@ class GraphGenerator:
             else:
                 for i in range(additional_needed):
                     try:
-                        owner_id = random.choice(individual_ids)
+                        owner_id = self.random_instance.choice(individual_ids)
                         owner_data = self.graph.nodes[owner_id]
 
                         owner_age_group = owner_data.get("age_group")
@@ -392,7 +392,7 @@ class GraphGenerator:
         for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
             fraudulent_pool.extend(
                 self.fraudulent_entities_map.get(node_type, []))
-        random.shuffle(fraudulent_pool)
+        self.random_instance.shuffle(fraudulent_pool)
 
         non_fraudulent_pool = []
         for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
@@ -401,7 +401,7 @@ class GraphGenerator:
                 self.fraudulent_entities_map.get(node_type, []))
             non_fraudulent_pool.extend(
                 [node_id for node_id in all_of_type if node_id not in fraudulent_of_type])
-        random.shuffle(non_fraudulent_pool)
+        self.random_instance.shuffle(non_fraudulent_pool)
 
         if not fraudulent_pool and not non_fraudulent_pool:
             logger.warning(
@@ -423,10 +423,10 @@ class GraphGenerator:
         return None
 
     def inject_aml_patterns(self):
-        """Inject AML patterns (option 2): each pattern builds its own transactions using the
+        """Inject AML patterns: each pattern builds its own transactions using the
         pre-built clusters and we simply merge the resulting edges into the main graph."""
 
-        logger.info(f"Injecting up to {self.num_aml_patterns} AML patterns...")
+        logger.info(f"Injecting {self.num_aml_patterns} AML patterns...")
 
         if not self.pattern_manager.patterns:
             logger.warning("No AML patterns are registered in PatternManager.")
@@ -434,7 +434,7 @@ class GraphGenerator:
 
         total_edges_added = 0
         patterns = list(self.pattern_manager.patterns.values())
-        random.shuffle(patterns)
+        self.random_instance.shuffle(patterns)
 
         # Limit iterations to the configured number but not more than patterns available
         for i in range(min(self.num_aml_patterns, len(patterns))):
