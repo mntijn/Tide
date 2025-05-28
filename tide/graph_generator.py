@@ -25,6 +25,7 @@ from .utils.constants import (
 from .utils.business import map_occupation_to_business_category
 from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
+from .patterns.base import StructuralComponent, EntitySelection
 from .utils.accounts import batchify, process_individual_batch, process_business_batch
 from .utils.threading import run_in_threads
 
@@ -366,42 +367,45 @@ class GraphGenerator:
             if items:
                 logger.info(f"  - {len(items)} {nt.value}(s)")
 
-    def select_entities_for_pattern(self, pattern_name: str, num_entities_required: int) -> List[str]:
+    def select_entities_for_pattern(self, pattern_name: str, pattern_structural_component: StructuralComponent) -> Optional[EntitySelection]:
         """
-        Selects entities for a given AML pattern.
-        Prioritizes fraudulent entities (Individuals and Businesses).
-        If not enough fraudulent entities are available, non-fraudulent ones are considered.
-        The number of entities to select is determined by num_entities_required for each pattern.
+        Selects entities for a given AML pattern by delegating to the pattern's structural component.
+        Provides prioritized pools of fraudulent and non-fraudulent entities.
         """
-        candidate_entities = []
-
-        # Prioritize fraudulent entities
+        fraudulent_pool = []
         for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-            candidate_entities.extend(
+            fraudulent_pool.extend(
                 self.fraudulent_entities_map.get(node_type, []))
+        random.shuffle(fraudulent_pool)
 
-        # If not enough fraudulent entities, add non-fraudulent ones
-        if len(candidate_entities) < num_entities_required:
-            needed_more = num_entities_required - len(candidate_entities)
-            non_fraudulent_pool = []
-            for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-                all_of_type = self.all_nodes.get(node_type, [])
-                fraudulent_of_type = set(
-                    self.fraudulent_entities_map.get(node_type, []))
-                non_fraudulent_pool.extend(
-                    [node_id for node_id in all_of_type if node_id not in fraudulent_of_type])
+        non_fraudulent_pool = []
+        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+            all_of_type = self.all_nodes.get(node_type, [])
+            fraudulent_of_type = set(
+                self.fraudulent_entities_map.get(node_type, []))
+            non_fraudulent_pool.extend(
+                [node_id for node_id in all_of_type if node_id not in fraudulent_of_type])
+        random.shuffle(non_fraudulent_pool)
 
-            if non_fraudulent_pool:
-                candidate_entities.extend(random.sample(
-                    non_fraudulent_pool, min(needed_more, len(non_fraudulent_pool))))
+        if not fraudulent_pool and not non_fraudulent_pool:
+            logger.warning(
+                f"No entities (fraudulent or non-fraudulent) available at all for pattern {pattern_name}")
+            return None
 
-        if not candidate_entities:
-            logger.warning(f"No entities available for pattern {pattern_name}")
-            return []
+        # Delegate to the structural component's selection logic
+        selected_entities = pattern_structural_component.select_entities_from_pools(
+            fraudulent_pool, non_fraudulent_pool
+        )
 
-        # Shuffle to ensure randomness if we have more than needed, then select
-        random.shuffle(candidate_entities)
-        return candidate_entities[:num_entities_required]
+        if selected_entities and selected_entities.central_entities:
+            logger.info(
+                f"Selected {len(selected_entities.central_entities)} central and {len(selected_entities.peripheral_entities)} peripheral entities for {pattern_name}")
+        else:
+            logger.warning(
+                f"Could not select suitable entities for pattern {pattern_name} using its structural component.")
+            return None
+
+        return selected_entities
 
     def inject_aml_patterns(self):
         """Inject combined temporal and structural AML patterns using PatternManager."""
@@ -410,13 +414,53 @@ class GraphGenerator:
             logger.error("PatternManager not initialized.")
             return
 
-        fraudulent_edges = self.pattern_manager.inject_patterns()
-        if fraudulent_edges:
+        if not self.pattern_manager.patterns:
+            logger.warning("No AML patterns are registered in PatternManager.")
+            return
+
+        total_fraudulent_edges_added = 0
+        patterns_to_attempt = list(self.pattern_manager.patterns.values())
+        random.shuffle(patterns_to_attempt)  # Attempt patterns in random order
+
+        for i in range(self.num_aml_patterns):
+            if not patterns_to_attempt:
+                logger.info("Ran out of available patterns to attempt.")
+                break
+
+            pattern_instance = patterns_to_attempt.pop(0)  # Get a pattern
+            pattern_name = pattern_instance.pattern_name
             logger.info(
-                f"PatternManager injected {len(fraudulent_edges)} new fraudulent edges.")
+                f"Attempting to inject pattern: {pattern_name} ({i+1}/{self.num_aml_patterns})")
+
+            # The pattern_instance is a CompositePattern, which has a 'structural' attribute
+            entity_selection = self.select_entities_for_pattern(
+                pattern_name,
+                pattern_instance.structural  # Pass the structural component
+            )
+
+            if entity_selection:
+                # inject_pattern_with_selection is the new method in CompositePattern
+                fraudulent_edges = pattern_instance.inject_pattern_with_selection(
+                    entity_selection)
+                if fraudulent_edges:
+                    total_fraudulent_edges_added += len(fraudulent_edges)
+                    logger.info(
+                        f"Successfully injected {pattern_name}, adding {len(fraudulent_edges)} fraudulent edges.")
+                else:
+                    logger.warning(
+                        f"Pattern {pattern_name} was selected but resulted in no fraudulent edges.")
+            else:
+                logger.warning(
+                    f"Skipping pattern {pattern_name} as no suitable entities were selected.")
+                # Optionally, try the next pattern if this one fails to find entities
+                # patterns_to_attempt.append(pattern_instance) # Or some other logic to retry/select different pattern
+
+        if total_fraudulent_edges_added > 0:
+            logger.info(
+                f"PatternManager injected a total of {total_fraudulent_edges_added} new fraudulent edges from {self.num_aml_patterns} attempts.")
         else:
             logger.warning(
-                "PatternManager did not inject any new fraudulent edges.")
+                "PatternManager did not inject any new fraudulent edges after attempting patterns.")
 
         return
 
