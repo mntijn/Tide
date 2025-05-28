@@ -1,7 +1,7 @@
 graph_scale:
-  individuals: 10000
+  individuals: 2
   # businesses: 0
-  institutions: 24
+  institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 6]
 transaction_rates:
@@ -14,6 +14,7 @@ background_amount_range: [10.0, 500.0]
 company_size_range: [1, 1000]
 salary_payment_days: [24, 30, 1]
 salary_amount_range: [2500.0, 7500.0]
+random_seed: 42
 business_creation_date_range: [90, 5475]
 
 # Pattern generation settings
@@ -28,6 +29,8 @@ pattern_frequency:
 reporting_threshold: 10000
 # Base probability for high-risk business selection
 high_risk_business_probability: 0.05
+# Probability for creating a random business when occupation doesn't suggest one
+random_business_probability: 0.15
 # Probability for an account to be an offshore account
 offshore_account_probability: 0.1
 
@@ -41,7 +44,6 @@ account_categories:
   - "Current"
   - "Savings"
   - "Loan"
-  - "Business"
 
 high_risk_config:
   countries_weight_factor: 1.0

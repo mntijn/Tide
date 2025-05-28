@@ -1,13 +1,21 @@
-from faker import Faker
+from ..utils.faker_instance import get_faker_instance
 from ..datastructures.enums import AgeGroup
+from ..utils.random_instance import random_instance
 
 
-def generate_age_consistent_occupation(faker: Faker, age_group: AgeGroup) -> str:
+def generate_age_consistent_occupation(age_group: AgeGroup) -> str:
     """Return an occupation that is plausible for the given age group.
 
     For the youngest age group (18-24) we avoid highly specialised or senior
     professions that typically require advanced degrees or lengthy experience
+
+    There is a 5% chance that the occupation will be "unknown" to add realism
+    to the dataset.
     """
+    if random_instance.random() < 0.05:
+        return "unknown"
+
+    faker = get_faker_instance()
 
     # Restricted titles for the youngest age bracket
     restricted_keywords = {

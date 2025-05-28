@@ -1,18 +1,14 @@
 from typing import Dict, Any, Tuple, Optional, List
 import datetime
-import random
-import logging
-from faker import Faker
 from ..datastructures.enums import AgeGroup
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import (
     HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES,
     COUNTRY_CODES, HIGH_RISK_OCCUPATIONS, HIGH_PAID_OCCUPATIONS
 )
-from ..utils.address import generate_localized_address
 from ..utils.business import (
     generate_business_category,
-    get_max_age_from_group
+    get_random_age_from_group
 )
 from .base import Entity
 
@@ -94,22 +90,22 @@ class Business(Entity):
 
         for _ in range(num_businesses):
             creation_date = start_date - datetime.timedelta(
-                days=random.randint(business_creation_range[0], business_creation_range[1]))
-            country_code = random.choice(COUNTRY_CODES)
+                days=self.random_instance.randint(business_creation_range[0], business_creation_range[1]))
+            country_code = self.random_instance.choice(COUNTRY_CODES)
             business_category = generate_business_category(self.faker)
 
             is_in_high_risk_category = business_category in HIGH_RISK_BUSINESS_CATEGORIES
             is_in_high_risk_country = country_code in HIGH_RISK_COUNTRIES
 
             common_attrs = {
-                "address": generate_localized_address(country_code),
+                "country_code": country_code,
                 "is_fraudulent": False
             }
             specific_attrs = {
                 "name": self.faker.company(),
                 "business_category": business_category,
                 "incorporation_year": creation_date.year,
-                "number_of_employees": random.randint(company_size_range[0], company_size_range[1]),
+                "number_of_employees": self.random_instance.randint(company_size_range[0], company_size_range[1]),
                 "is_high_risk_category": is_in_high_risk_category,
                 "is_high_risk_country": is_in_high_risk_country,
             }
@@ -124,7 +120,6 @@ class Business(Entity):
     def generate_age_consistent_business_for_individual(
         self,
         individual_age_group: AgeGroup,
-        individual_creation_date: datetime.datetime,
         sim_start_date: datetime.datetime,
         business_category_override: Optional[str] = None,
         owner_occupation: Optional[str] = None,
@@ -132,58 +127,63 @@ class Business(Entity):
         owner_country: Optional[str] = None,
     ) -> Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]:
         """Generates a business that is consistent with the given individual's age."""
-        individual_max_age = get_max_age_from_group(individual_age_group)
-        individual_18th_birthday = individual_creation_date - \
-            datetime.timedelta(days=(individual_max_age - 18) * 365)
+        # Pick a random age within the person's age group
+        individual_age = get_random_age_from_group(individual_age_group)
 
-        min_business_date = max(individual_18th_birthday, sim_start_date - datetime.timedelta(
-            days=self.params.get("business_creation_date_range", [90, 5475])[1]))
-        max_business_date = sim_start_date - datetime.timedelta(
-            days=self.params.get("business_creation_date_range", [90, 5475])[0])
+        # Calculate when this person would have turned 18
+        years_since_18 = individual_age - 18
+        earliest_business_date = sim_start_date - \
+            datetime.timedelta(days=years_since_18 * 365)
+
+        # Get business creation date constraints from params
+        business_creation_range = self.params.get(
+            "business_creation_date_range", [90, 5475])
+        latest_business_date = sim_start_date - \
+            datetime.timedelta(days=business_creation_range[0])
+        oldest_possible_business = sim_start_date - \
+            datetime.timedelta(days=business_creation_range[1])
+
+        # Business can't be created before person turned 18 or before the oldest allowed business date
+        min_business_date = max(earliest_business_date,
+                                oldest_possible_business)
+        max_business_date = latest_business_date
 
         if min_business_date >= max_business_date:
+            # Fallback if the constraints don't work - create a recent business
             creation_date = sim_start_date - \
-                datetime.timedelta(days=random.randint(30, 365))
+                datetime.timedelta(days=self.random_instance.randint(30, 365))
         else:
             time_delta = (max_business_date -
                           min_business_date).total_seconds()
             creation_date = min_business_date + \
-                datetime.timedelta(seconds=random.randint(0, int(time_delta)))
+                datetime.timedelta(
+                    seconds=self.random_instance.randint(0, int(time_delta)))
 
         business_category = business_category_override if business_category_override else generate_business_category(
             self.faker)
 
         # Default to owner's country, but calculate probability of being offshore
-        country_code = owner_country if owner_country else random.choice(
+        country_code = owner_country if owner_country else self.random_instance.choice(
             COUNTRY_CODES)
         if owner_country and owner_occupation and owner_risk_score is not None:
             offshore_prob = self._calculate_offshore_probability(
                 owner_occupation, owner_risk_score, business_category, owner_country)
 
-            if random.random() < offshore_prob:
+            if self.random_instance.random() < offshore_prob:
                 owner_country = country_code
                 # 75% chance to be in a tax haven if going offshore
-                if random.random() < 0.75:
+                if self.random_instance.random() < 0.75:
                     tax_havens = [
                         c for c in HIGH_RISK_COUNTRIES if c != owner_country]
                     if tax_havens:
-                        country_code = random.choice(tax_havens)
-                        self.logger.debug(
-                            f"Created offshore business in tax haven - Owner Country: {owner_country}, "
-                            f"Business Country: {country_code}, Owner Occupation: {owner_occupation}, "
-                            f"Business Category: {business_category}, Offshore Probability: {offshore_prob:.2f}"
-                        )
+                        country_code = self.random_instance.choice(tax_havens)
                 else:
                     # Otherwise pick a non-tax haven foreign country
                     other_countries = [c for c in COUNTRY_CODES if c !=
                                        owner_country and c not in HIGH_RISK_COUNTRIES]
                     if other_countries:
-                        country_code = random.choice(other_countries)
-                        self.logger.debug(
-                            f"Created offshore business in non-tax haven - Owner Country: {owner_country}, "
-                            f"Business Country: {country_code}, Owner Occupation: {owner_occupation}, "
-                            f"Business Category: {business_category}, Offshore Probability: {offshore_prob:.2f}"
-                        )
+                        country_code = self.random_instance.choice(
+                            other_countries)
 
         is_in_high_risk_category = business_category in HIGH_RISK_BUSINESS_CATEGORIES
         is_in_high_risk_country = country_code in HIGH_RISK_COUNTRIES
@@ -191,14 +191,14 @@ class Business(Entity):
         company_size_range = self.params.get("company_size_range", [1, 1000])
 
         common_attrs = {
-            "address": generate_localized_address(country_code),
+            "country_code": country_code,
             "is_fraudulent": False
         }
         specific_attrs = {
             "name": self.faker.company(),
             "business_category": business_category,
             "incorporation_year": creation_date.year,
-            "number_of_employees": random.randint(company_size_range[0], company_size_range[1]),
+            "number_of_employees": self.random_instance.randint(company_size_range[0], company_size_range[1]),
             "is_high_risk_category": is_in_high_risk_category,
             "is_high_risk_country": is_in_high_risk_country,
         }

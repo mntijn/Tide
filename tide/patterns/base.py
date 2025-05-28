@@ -53,22 +53,12 @@ class PatternInjector:
                                  transaction_type: TransactionType = TransactionType.TRANSFER,
                                  is_fraudulent: bool = True) -> TransactionAttributes:
         """Helper to create transaction attributes"""
-        currency = "EUR"  # Default currency
-        src_node_exists = self.graph.has_node(src_id)
-        dest_node_exists = self.graph.has_node(dest_id)
-
-        # Check source account for currency
-        if src_node_exists and self.graph.nodes[src_id].get("node_type") == NodeType.ACCOUNT and "currency" in self.graph.nodes[src_id]:
-            currency = self.graph.nodes[src_id]["currency"]
-        # Else, check destination account for currency
-        elif dest_node_exists and self.graph.nodes[dest_id].get("node_type") == NodeType.ACCOUNT and "currency" in self.graph.nodes[dest_id]:
-            currency = self.graph.nodes[dest_id]["currency"]
-        # Fallback to source node if not an account but has currency
-        elif src_node_exists and "currency" in self.graph.nodes[src_id]:
-            currency = self.graph.nodes[src_id]["currency"]
-        # Fallback to destination node if not an account but has currency
-        elif dest_node_exists and "currency" in self.graph.nodes[dest_id]:
-            currency = self.graph.nodes[dest_id]["currency"]
+        # Prefer currency of the source account; fall back to destination or EUR
+        currency = "EUR"
+        if self.graph.has_node(src_id):
+            currency = self.graph.nodes[src_id].get("currency", currency)
+        elif self.graph.has_node(dest_id):
+            currency = self.graph.nodes[dest_id].get("currency", currency)
 
         return TransactionAttributes(
             timestamp=timestamp,
@@ -94,10 +84,8 @@ class StructuralComponent(ABC):
         pass
 
     @abstractmethod
-    def select_entities_from_pools(self, fraudulent_pool: List[str], non_fraudulent_pool: List[str]) -> Optional[EntitySelection]:
-        """
-        Selects entities for the pattern from the provided pools
-        """
+    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+        """Select entities based on structural requirements"""
         pass
 
     def filter_entities_by_criteria(self, entities: List[str], criteria: Dict[str, Any]) -> List[str]:
@@ -145,6 +133,15 @@ class StructuralComponent(ABC):
 
         return filtered
 
+    # ------------------------------------------------------------------
+    #  Convenience for fast entity retrieval
+    # ------------------------------------------------------------------
+    def get_cluster(self, name: str) -> List[str]:
+        """Return pre-computed entity cluster from the parent graph generator (if available)."""
+        if hasattr(self.graph_generator, "entity_clusters"):
+            return self.graph_generator.entity_clusters.get(name, [])
+        return []
+
 
 class TemporalComponent(ABC):
     """Base class for temporal components of patterns"""
@@ -167,6 +164,7 @@ class TemporalComponent(ABC):
         """Generate timestamps based on different temporal patterns"""
 
         if pattern_type == "high_frequency":
+            # Burst of transactions in short time window
             timestamps = []
             for i in range(count):
                 offset_minutes = random.randint(0, 1440)  # Within 24 hours
@@ -239,37 +237,32 @@ class CompositePattern(PatternInjector):
         super().__init__(graph_generator, params)
         self.structural = structural_component
         self.temporal = temporal_component
-        self.graph_generator = graph_generator
 
     @property
     def num_required_entities(self) -> int:
         """Number of entities required, delegated to the structural component."""
         return self.structural.num_required_entities
 
-    def inject_pattern_with_selection(self, entity_selection: Optional[EntitySelection]) -> List[Tuple[str, str, TransactionAttributes]]:
-        """Main method to inject the complete pattern using a pre-selected EntitySelection."""
-        fraudulent_edges = []
+    def inject_pattern(self, entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
+        """Generate all edges for this pattern without mutating the master graph.
+        The caller (GraphGenerator) decides when to merge the resulting sub-graph."""
 
-        if not entity_selection or not entity_selection.central_entities:
-            return fraudulent_edges
+        generated_edges: List[Tuple[str, str, TransactionAttributes]] = []
 
         try:
-            # Generate transaction sequences based on temporal pattern
-            transaction_sequences = self.temporal.generate_transaction_sequences(
-                entity_selection)
+            # Entity selection
+            entity_selection = self.structural.select_entities(entities)
+            if not entity_selection.central_entities:
+                return generated_edges
 
-            # Execute all transactions
-            for sequence in transaction_sequences:
-                for src, dest, tx_attrs in sequence.transactions:
-                    self.graph_generator._add_edge(src, dest, tx_attrs)
-                    fraudulent_edges.append((src, dest, tx_attrs))
-
-            return fraudulent_edges
+            # Build sequences
+            for sequence in self.temporal.generate_transaction_sequences(entity_selection):
+                generated_edges.extend(sequence.transactions)
 
         except Exception as e:
-            print(
-                f"Failed to inject {self.__class__.__name__} with pre-selected entities: {e}")
-            return fraudulent_edges
+            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
+
+        return generated_edges
 
     @property
     def pattern_name(self) -> str:

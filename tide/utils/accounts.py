@@ -19,11 +19,9 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
         try:
             node_data = graph_gen.graph.nodes[ind_id]
             ind_creation_date = node_data.get("creation_date")
-            ind_address = node_data.get("address")
-            ind_country_code = ind_address.get(
-                "country") if ind_address else None
+            ind_country_code = node_data.get("country_code")
 
-            if not ind_creation_date or not ind_country_code or not ind_address:
+            if not ind_creation_date or not ind_country_code:
                 logger.warning(
                     f"Skipping individual {ind_id} - missing creation_date, country_code, or address")
                 continue
@@ -32,13 +30,9 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
                 entity_node_type=NodeType.INDIVIDUAL,
                 entity_creation_date=ind_creation_date,
                 entity_country_code=ind_country_code,
-                entity_address=ind_address,
                 entity_data=node_data,
                 sim_start_date=sim_start_date
             )
-
-            logger.info(
-                f"Generated {len(accounts_and_ownerships)} accounts for individual {ind_id}")
 
             with lock:
                 for acc_creation_date, acc_common, acc_specific, owner_specific in accounts_and_ownerships:
@@ -57,7 +51,7 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
             if ind_id not in graph_gen.individual_cash_accounts:
                 try:
                     cash_account_common = {
-                        "address": node_data.get("address"),
+                        "country_code": ind_country_code,
                         "is_fraudulent": False,
                     }
                     cash_account_specific = {
@@ -93,16 +87,13 @@ def process_individual_batch(graph_gen, batch, lock, sim_start_date):
 
 
 def process_business_batch(graph_gen, batch, lock, sim_start_date):
-    logger.info(f"Processing business batch of size {len(batch)}")
     for bus_id in batch:
         try:
             node_data = graph_gen.graph.nodes[bus_id]
             bus_creation_date = node_data.get("creation_date")
-            bus_address = node_data.get("address")
-            bus_country_code = bus_address.get(
-                "country") if bus_address else None
+            bus_country_code = node_data.get("country_code")
 
-            if not bus_creation_date or not bus_country_code or not bus_address:
+            if not bus_creation_date or not bus_country_code:
                 logger.warning(
                     f"Skipping business {bus_id} - missing creation_date, country_code, or address")
                 continue
@@ -111,13 +102,9 @@ def process_business_batch(graph_gen, batch, lock, sim_start_date):
                 entity_node_type=NodeType.BUSINESS,
                 entity_creation_date=bus_creation_date,
                 entity_country_code=bus_country_code,
-                entity_address=bus_address,
                 entity_data=node_data,
                 sim_start_date=sim_start_date
             )
-
-            logger.info(
-                f"Generated {len(bus_accounts_and_ownerships)} accounts for business {bus_id}")
 
             with lock:
                 for acc_creation_date, acc_common, acc_specific, owner_specific in bus_accounts_and_ownerships:

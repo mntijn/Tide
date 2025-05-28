@@ -20,9 +20,10 @@ from .datastructures.attributes import (
     IndividualAttributes, BusinessAttributes, InstitutionAttributes
 )
 from .utils.constants import (
-    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES
+    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES
 )
-from .utils.business import map_occupation_to_business_category
+from .utils.business import map_occupation_to_business_category, get_random_business_category
+from .utils.random_instance import random_instance
 from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
 from .patterns.base import StructuralComponent, EntitySelection
@@ -37,12 +38,17 @@ logger = logging.getLogger(__name__)
 class GraphGenerator:
     def __init__(self, params: Dict[str, Any]):
         self.params = params
+        # ------------------------------------------------------------------
+        #  Reproducibility controls
+        # ------------------------------------------------------------------
+        self.random_seed: Optional[int] = params.get("random_seed")
+
+        # ------------------------------------------------------------------
         self.graph = nx.DiGraph()
         self.node_counter = 0
         self.all_nodes: Dict[NodeType, List[str]] = {nt: [] for nt in NodeType}
         self.fraudulent_entities_map: Dict[NodeType, List[str]] = {
             nt: [] for nt in NodeType}
-        self.faker = Faker()
 
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
@@ -74,7 +80,7 @@ class GraphGenerator:
         self.cash_account_id: Optional[str] = None
 
         self.pattern_manager = PatternManager(self, self.params)
-        self.pattern_manager.entity_selector = self
+        self.entity_clusters: Dict[str, List[str]] = {}
 
         self.background_tx_rate_per_account_per_day = params.get(
             "transaction_rates", {}).get("per_account_per_day", 0.2)
@@ -84,6 +90,10 @@ class GraphGenerator:
         # Probability (0-1) that an individual with no occupation-based match will still start a high-risk business
         self.high_risk_business_probability = params.get(
             "high_risk_business_probability", 0.05
+        )
+
+        self.random_business_probability = params.get(
+            "random_business_probability", 0.15
         )
 
         self.validate_configuration()
@@ -153,11 +163,12 @@ class GraphGenerator:
         logger.info("Starting entity generation...")
         sim_start_date = self.time_span["start_date"]
 
-        # Use run_in_threads for entity data generation in parallel
+        # Build tasks list
         tasks = [
             (self._task_generate_institutions, ()),
             (self._task_generate_individuals, ())
         ]
+
         run_in_threads(tasks)
 
         thread_results = {}
@@ -178,12 +189,11 @@ class GraphGenerator:
                 try:
                     institution_id = self._add_node(NodeType.INSTITUTION, common_attrs,
                                                     specific_attrs, creation_date=None)
-                    institution_countries[institution_id] = common_attrs["address"]["country"]
+                    institution_countries[institution_id] = common_attrs["country_code"]
                 except Exception as e:
                     logger.error(f"Error creating institution node: {str(e)}")
 
         all_institution_ids = self.all_nodes.get(NodeType.INSTITUTION, [])
-        logger.info(f"Created {len(all_institution_ids)} institutions")
 
         self.account = Account(
             self.params, all_institution_ids, institution_countries)
@@ -191,14 +201,13 @@ class GraphGenerator:
         # Create accounts for Individuals and create owned businesses
         num_owned_businesses_created = 0
         if individuals_data:
-            for ind_creation_date_dt, ind_common_attrs, ind_specific_attrs in individuals_data:
+            for ind_common_attrs, ind_specific_attrs in individuals_data:
                 try:
                     # Add the individual node
                     ind_id = self._add_node(
                         NodeType.INDIVIDUAL,
                         ind_common_attrs,
                         ind_specific_attrs,
-                        creation_date=ind_creation_date_dt,
                     )
 
                     # Determine if this individual's occupation suggests business ownership
@@ -207,20 +216,22 @@ class GraphGenerator:
                     suggested_category = map_occupation_to_business_category(
                         occupation_str)
 
-                    if suggested_category:
-                        # Create a business that aligns with the occupation
-                        print("Creating business in country: ",
-                              ind_common_attrs.get("address", {}).get("country"), " using occupation: ", occupation_str, "they live in country: ", ind_common_attrs.get("address", {}).get("country"))
+                    # Create business if occupation suggests one, or randomly
+                    should_create_business = (suggested_category is not None or
+                                              random_instance.random() < self.random_business_probability)
+
+                    if should_create_business:
+                        # Use suggested category or random one
+                        business_category = suggested_category or get_random_business_category()
+
                         business_data_tuple = self.business.generate_age_consistent_business_for_individual(
                             individual_age_group=ind_specific_attrs["age_group"],
-                            individual_creation_date=ind_creation_date_dt,
                             sim_start_date=sim_start_date,
-                            business_category_override=suggested_category,
+                            business_category_override=business_category,
                             owner_occupation=occupation_str,
                             owner_risk_score=ind_common_attrs.get(
                                 "risk_score", 0.0),
-                            owner_country=ind_common_attrs.get(
-                                "address", {}).get("country"),
+                            owner_country=ind_common_attrs.get("country_code"),
                         )
 
                         bus_creation_date, bus_common_attrs, bus_specific_attrs = business_data_tuple
@@ -246,8 +257,6 @@ class GraphGenerator:
         target_business_count = self.graph_scale.get("businesses", 0)
         if target_business_count > num_owned_businesses_created:
             additional_needed = target_business_count - num_owned_businesses_created
-            logger.info(
-                f"Creating {additional_needed} additional businesses to reach target of {target_business_count}")
 
             individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
             if not individual_ids:
@@ -260,16 +269,13 @@ class GraphGenerator:
                         owner_data = self.graph.nodes[owner_id]
 
                         owner_age_group = owner_data.get("age_group")
-                        owner_creation_date = owner_data.get("creation_date")
 
                         bus_tuple = self.business.generate_age_consistent_business_for_individual(
                             individual_age_group=owner_age_group,
-                            individual_creation_date=owner_creation_date,
                             sim_start_date=sim_start_date,
                             owner_occupation=owner_data.get("occupation", ""),
                             owner_risk_score=owner_data.get("risk_score", 0.0),
-                            owner_country=owner_data.get(
-                                "address", {}).get("country"),
+                            owner_country=owner_data.get("country_code"),
                         )
 
                         bus_creation_date, bus_common_attrs, bus_specific_attrs = bus_tuple
@@ -296,7 +302,7 @@ class GraphGenerator:
 
         logger.info(f"Created {num_owned_businesses_created} total businesses")
 
-        # Generate accounts in parallel
+        # Generate accounts in parallel by creating batches of individuals and businesses
         num_threads = multiprocessing.cpu_count()
         logger.info(
             f"Generating accounts in parallel using {num_threads} threads...")
@@ -324,7 +330,7 @@ class GraphGenerator:
             try:
                 self.cash_account_id = self._add_node(
                     NodeType.ACCOUNT,
-                    {"address": {"country": "CASH"}},
+                    {"country_code": "CASH"},
                     {"start_balance": 0.0, "current_balance": 0.0, "currency": "EUR"},
                     creation_date=self.time_span["start_date"],
                 )
@@ -367,6 +373,9 @@ class GraphGenerator:
             if items:
                 logger.info(f"  - {len(items)} {nt.value}(s)")
 
+        # Build quick-lookup clusters once fraud labels are decided
+        self._build_entity_clusters()
+
     def select_entities_for_pattern(self, pattern_name: str, pattern_structural_component: StructuralComponent) -> Optional[EntitySelection]:
         """
         Selects entities for a given AML pattern by delegating to the pattern's structural component.
@@ -392,81 +401,67 @@ class GraphGenerator:
                 f"No entities (fraudulent or non-fraudulent) available at all for pattern {pattern_name}")
             return None
 
-        # Delegate to the structural component's selection logic
-        selected_entities = pattern_structural_component.select_entities_from_pools(
-            fraudulent_pool, non_fraudulent_pool
-        )
+        # Fall back to providing all entities to the structural selector directly (new approach)
+        candidate_entities = self.entity_clusters.get("all", [])
+        selected_entities = pattern_structural_component.select_entities(
+            candidate_entities)
 
         if selected_entities and selected_entities.central_entities:
             logger.info(
-                f"Selected {len(selected_entities.central_entities)} central and {len(selected_entities.peripheral_entities)} peripheral entities for {pattern_name}")
-        else:
-            logger.warning(
-                f"Could not select suitable entities for pattern {pattern_name} using its structural component.")
-            return None
+                f"[Selector] {pattern_name}: central={len(selected_entities.central_entities)}, peripheral={len(selected_entities.peripheral_entities)}")
+            return selected_entities
 
-        return selected_entities
+        logger.warning(
+            f"[Selector] No suitable entities found for {pattern_name} with updated selection logic.")
+        return None
 
     def inject_aml_patterns(self):
-        """Inject combined temporal and structural AML patterns using PatternManager."""
+        """Inject AML patterns (option 2): each pattern builds its own transactions using the
+        pre-built clusters and we simply merge the resulting edges into the main graph."""
+
         logger.info(f"Injecting up to {self.num_aml_patterns} AML patterns...")
-        if not self.pattern_manager:
-            logger.error("PatternManager not initialized.")
-            return
 
         if not self.pattern_manager.patterns:
             logger.warning("No AML patterns are registered in PatternManager.")
             return
 
-        total_fraudulent_edges_added = 0
-        patterns_to_attempt = list(self.pattern_manager.patterns.values())
-        random.shuffle(patterns_to_attempt)  # Attempt patterns in random order
+        total_edges_added = 0
+        patterns = list(self.pattern_manager.patterns.values())
+        random.shuffle(patterns)
 
-        for i in range(self.num_aml_patterns):
-            if not patterns_to_attempt:
-                logger.info("Ran out of available patterns to attempt.")
-                break
-
-            pattern_instance = patterns_to_attempt.pop(0)  # Get a pattern
-            pattern_name = pattern_instance.pattern_name
+        # Limit iterations to the configured number but not more than patterns available
+        for i in range(min(self.num_aml_patterns, len(patterns))):
+            pattern_instance = patterns[i]
             logger.info(
-                f"Attempting to inject pattern: {pattern_name} ({i+1}/{self.num_aml_patterns})")
+                f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
-            # The pattern_instance is a CompositePattern, which has a 'structural' attribute
-            entity_selection = self.select_entities_for_pattern(
-                pattern_name,
-                pattern_instance.structural  # Pass the structural component
-            )
+            # Provide the whole node list – structural component will pick efficiently using clusters
+            new_edges = pattern_instance.inject_pattern(
+                self.entity_clusters.get("all", []))
+            for src, dest, attrs in new_edges:
+                self._add_edge(src, dest, attrs)
+            total_edges_added += len(new_edges)
 
-            if entity_selection:
-                # inject_pattern_with_selection is the new method in CompositePattern
-                fraudulent_edges = pattern_instance.inject_pattern_with_selection(
-                    entity_selection)
-                if fraudulent_edges:
-                    total_fraudulent_edges_added += len(fraudulent_edges)
-                    logger.info(
-                        f"Successfully injected {pattern_name}, adding {len(fraudulent_edges)} fraudulent edges.")
-                else:
-                    logger.warning(
-                        f"Pattern {pattern_name} was selected but resulted in no fraudulent edges.")
-            else:
-                logger.warning(
-                    f"Skipping pattern {pattern_name} as no suitable entities were selected.")
-                # Optionally, try the next pattern if this one fails to find entities
-                # patterns_to_attempt.append(pattern_instance) # Or some other logic to retry/select different pattern
-
-        if total_fraudulent_edges_added > 0:
-            logger.info(
-                f"PatternManager injected a total of {total_fraudulent_edges_added} new fraudulent edges from {self.num_aml_patterns} attempts.")
-        else:
-            logger.warning(
-                "PatternManager did not inject any new fraudulent edges after attempting patterns.")
-
-        return
+        logger.info(
+            f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
 
     def simulate_background_activity(self):
-        logger.info("Simulating background financial activity...")
-        pass
+        """Generate realistic baseline transactions using the dedicated background pattern."""
+        logger.info(
+            "Simulating background financial activity via BackgroundActivityPattern…")
+
+        try:
+            from .patterns.background_activity import BackgroundActivityPattern
+
+            bg_pattern = BackgroundActivityPattern(self, self.params)
+            all_accounts = list(self.all_nodes.get(NodeType.ACCOUNT, []))
+            bg_edges = bg_pattern.inject_pattern(all_accounts)
+            for src, dest, attrs in bg_edges:
+                self._add_edge(src, dest, attrs)
+            logger.info(
+                f"Background activity injected: {len(bg_edges)} edges.")
+        except Exception as e:
+            logger.error(f"Failed to inject background activity: {e}")
 
     def generate_graph(self):
         logger.info("Starting graph generation...")
@@ -477,3 +472,39 @@ class GraphGenerator:
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph
+
+    # ------------------------------------------------------------------
+    #  Clustering helpers – avoid scanning the whole graph repeatedly
+    # ------------------------------------------------------------------
+    def _build_entity_clusters(self):
+        """Pre-compute useful entity clusters (e.g. tax-haven, high-risk business, intermediaries).
+        These will be used by structural components to pick candidates quickly without
+        traversing the whole node list each time."""
+
+        clusters: Dict[str, List[str]] = {
+            "tax_haven": [],
+            "high_risk_business": [],
+            "intermediary": [],
+            "fraudulent": [],
+        }
+
+        for node_id, data in self.graph.nodes(data=True):
+            country = data.get("country_code")
+
+            if country in HIGH_RISK_COUNTRIES:
+                clusters["tax_haven"].append(node_id)
+
+            if data.get("node_type") == NodeType.BUSINESS and data.get("is_high_risk_category", False):
+                clusters["high_risk_business"].append(node_id)
+
+            # Simple heuristic for intermediary – degree higher than 3
+            if self.graph.degree(node_id) > 3:
+                clusters["intermediary"].append(node_id)
+
+            if data.get("is_fraudulent"):
+                clusters["fraudulent"].append(node_id)
+
+        # Fallback all-node cluster for convenience
+        clusters["all"] = list(self.graph.nodes)
+
+        self.entity_clusters = clusters

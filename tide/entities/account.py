@@ -1,7 +1,5 @@
 from typing import Dict, Any, Tuple, List
 import datetime
-import random
-from faker import Faker
 from ..datastructures.enums import NodeType, AgeGroup
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import (
@@ -11,7 +9,6 @@ from ..utils.constants import (
     HIGH_RISK_OCCUPATIONS,
     HIGH_PAID_OCCUPATIONS
 )
-from ..utils.address import generate_localized_address
 from .base import Entity
 
 
@@ -33,9 +30,6 @@ class Account(Entity):
             "account_balance_range_normal", [1000, 50000])
         self.balance_range_offshore = params.get(
             "account_balance_range_offshore", self.balance_range_normal)
-        # Tax haven accounts typically have 6x higher balances
-        self.balance_range_tax_haven = [
-            x * 6 for x in self.balance_range_offshore]
 
     def _calculate_offshore_probability(self, entity_node_type: NodeType, entity_data: Dict[str, Any]) -> float:
         """Calculate the probability of an account being offshore based on entity attributes."""
@@ -58,7 +52,7 @@ class Account(Entity):
                 probability += 0.03
 
             # Increase probability for people from high-risk countries
-            country_code = entity_data.get("address", {}).get("country")
+            country_code = entity_data.get("country_code")
             if country_code in HIGH_RISK_COUNTRIES:
                 probability += 0.02
 
@@ -67,7 +61,7 @@ class Account(Entity):
             probability += 0.05
 
             # Increase probability for businesses in high-risk countries
-            country_code = entity_data.get("address", {}).get("country")
+            country_code = entity_data.get("country_code")
             if country_code in HIGH_RISK_COUNTRIES:
                 probability += 0.04
 
@@ -79,7 +73,6 @@ class Account(Entity):
         entity_node_type: NodeType,
         entity_creation_date: datetime.datetime,
         entity_country_code: str,
-        entity_address: Dict[str, Any],
         entity_data: Dict[str, Any],
         sim_start_date: datetime.datetime
     ) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any], Dict[str, Any]]]:
@@ -98,7 +91,7 @@ class Account(Entity):
             return []
 
         min_acc, max_acc = self.graph_scale.get(num_accounts_range_key, (1, 1))
-        num_accounts_to_create = random.randint(min_acc, max_acc)
+        num_accounts_to_create = self.random_instance.randint(min_acc, max_acc)
 
         # Calculate offshore probability based on entity attributes
         offshore_probability = self._calculate_offshore_probability(
@@ -107,15 +100,13 @@ class Account(Entity):
         for _ in range(num_accounts_to_create):
             min_date = entity_creation_date
             max_date = sim_start_date
-            time_delta_seconds = (max_date - min_date).total_seconds()
-            acc_creation_offset_seconds = random.randint(
-                0, int(time_delta_seconds))
+            time_delta_days = (max_date - min_date).days
+            acc_creation_offset_days = self.random_instance.randint(
+                0, time_delta_days)
             acc_creation_date = min_date + \
-                datetime.timedelta(seconds=acc_creation_offset_seconds)
+                datetime.timedelta(days=acc_creation_offset_days)
 
-            chosen_institution_id = random.choice(self.all_institution_ids)
             account_country_code = entity_country_code
-            account_address = entity_address
 
             # Adjust balance ranges for high-paid occupations
             if entity_node_type == NodeType.INDIVIDUAL and entity_data.get("occupation") in HIGH_PAID_OCCUPATIONS:
@@ -125,27 +116,29 @@ class Account(Entity):
                 balance_range = self.balance_range_normal
 
             # Decide if this is an offshore account using the calculated probability
-            if random.random() < offshore_probability:
+            if self.random_instance.random() < offshore_probability:
                 # 14% chance to be in a tax haven
-                if random.random() < 0.14:
+                if self.random_instance.random() < 0.14:
                     # Try to find a tax haven country
                     tax_havens = [
                         c for c in HIGH_RISK_COUNTRIES if c != entity_country_code]
                     if tax_havens:
-                        account_country_code = random.choice(tax_havens)
+                        account_country_code = self.random_instance.choice(
+                            tax_havens)
                         # For high-paid occupations, increase tax haven balances even more
                         if entity_node_type == NodeType.INDIVIDUAL and entity_data.get("occupation") in HIGH_PAID_OCCUPATIONS:
                             # 8x for high-paid in tax havens
                             balance_range = [
                                 x * 8 for x in self.balance_range_normal]
                         else:
-                            balance_range = self.balance_range_tax_haven
+                            balance_range = self.balance_range_offshore
                 else:
                     # Try to find a non-tax haven country
                     other_countries = [c for c in COUNTRY_CODES if c !=
                                        entity_country_code and c not in HIGH_RISK_COUNTRIES]
                     if other_countries:
-                        account_country_code = random.choice(other_countries)
+                        account_country_code = self.random_instance.choice(
+                            other_countries)
                         # For high-paid occupations, increase offshore balances
                         if entity_node_type == NodeType.INDIVIDUAL and entity_data.get("occupation") in HIGH_PAID_OCCUPATIONS:
                             # 5x for high-paid offshore
@@ -154,23 +147,33 @@ class Account(Entity):
                         else:
                             balance_range = self.balance_range_offshore
 
-                if account_country_code != entity_country_code:
-                    account_address = generate_localized_address(
-                        account_country_code)
+            # Choose an institution from the account's country
+            institutions_in_country = [
+                inst_id for inst_id in self.all_institution_ids
+                if self.institution_countries.get(inst_id) == account_country_code
+            ]
 
-            start_balance = round(random.uniform(
+            # Fallback to any institution if none found in the target country
+            if institutions_in_country:
+                chosen_institution_id = self.random_instance.choice(
+                    institutions_in_country)
+            else:
+                chosen_institution_id = self.random_instance.choice(
+                    self.all_institution_ids)
+
+            start_balance = round(self.random_instance.uniform(
                 balance_range[0], balance_range[1]), 2)
             currency = self.currency_mapping.get(account_country_code)
 
             acc_common_attrs = {
-                "address": account_address,
+                "country_code": account_country_code,
                 "is_fraudulent": False
             }
             acc_specific_attrs = {
                 "start_balance": start_balance,
                 "current_balance": start_balance,
                 "institution_id": chosen_institution_id,
-                "account_category": random.choice(self.account_categories),
+                "account_category": self.random_instance.choice(self.account_categories),
                 "currency": currency,
             }
             ownership_specific_attrs = {
