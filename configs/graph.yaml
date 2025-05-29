@@ -23,9 +23,9 @@ pattern_frequency:
   num_illicit_patterns: 10
 
   # If random is false these values are used instead of num_illicit patterns
-  rapid_fund_movement: 1
-  front_business_activity: 2
-  repeated_overseas_transfers: 1
+  RapidFundMovement: 1
+  FrontBusinessActivity: 2
+  RepeatedOverseasTransfers: 1
 
 # Reporting threshold for structuring amounts
 reporting_threshold: 10000

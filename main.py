@@ -150,14 +150,14 @@ if __name__ == "__main__":
         edges_filepath="generated_edges.csv"
     )
 
-    # Export to GraphML for visualization
-    print("Saving graph in GraphML format for visualization...")
+    # # Export to GraphML for visualization
+    # print("Saving graph in GraphML format for visualization...")
 
-    # Convert enums to strings for GraphML compatibility
-    converted_graph = convert_enums_to_strings(graph)
-    nx.write_graphml(converted_graph, "generated_graph.graphml")
+    # # Convert enums to strings for GraphML compatibility
+    # converted_graph = convert_enums_to_strings(graph)
+    # nx.write_graphml(converted_graph, "generated_graph.graphml")
 
-    print("Graph saved as: generated_graph.graphml")
+    # print("Graph saved as: generated_graph.graphml")
 
-    print("\nTo visualize the patterns, run:")
-    print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")
+    # print("\nTo visualize the patterns, run:")
+    # print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")

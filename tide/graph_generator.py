@@ -332,6 +332,8 @@ class GraphGenerator:
         Other Roles:
         - intermediaries: Money mules/fronts (often unwitting participants)
         - Basic single-factor clusters: Country, business category, age, occupation
+
+        Note: Clusters now include both entities AND their accounts for direct pattern usage.
         """
         logger.info("Building entity clusters...")
         min_risk_score = self.fraud_selection_config.get(
@@ -355,6 +357,30 @@ class GraphGenerator:
             "fraudulent": [],
         }
 
+        # Helper function to add entity and its accounts to clusters
+        def add_entity_and_accounts_to_cluster(cluster_name: str, entity_id: str):
+            """Add both the entity and all its accounts to the specified cluster"""
+            clusters[cluster_name].append(entity_id)
+
+            # Find all accounts owned by this entity
+            for neighbor_id in self.graph.neighbors(entity_id):
+                neighbor_data = self.graph.nodes.get(neighbor_id, {})
+                if neighbor_data.get("node_type") == NodeType.ACCOUNT:
+                    clusters[cluster_name].append(neighbor_id)
+
+            # Also check if this entity owns businesses that have accounts
+            if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
+                for owned_business_id in self.graph.neighbors(entity_id):
+                    business_data = self.graph.nodes.get(owned_business_id, {})
+                    if business_data.get("node_type") == NodeType.BUSINESS:
+                        # Add business accounts too
+                        for business_account_id in self.graph.neighbors(owned_business_id):
+                            business_account_data = self.graph.nodes.get(
+                                business_account_id, {})
+                            if business_account_data.get("node_type") == NodeType.ACCOUNT:
+                                clusters[cluster_name].append(
+                                    business_account_id)
+
         # Single pass through all nodes to build all clusters
         for node_id, data in self.graph.nodes(data=True):
             node_type = data.get("node_type")
@@ -373,32 +399,36 @@ class GraphGenerator:
 
             # Check individual risk factors
             if country in HIGH_RISK_COUNTRIES:
-                clusters["high_risk_countries"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "high_risk_countries", node_id)
                 risk_factors.append("high_risk_country")
 
             if node_type == NodeType.BUSINESS and data.get("is_high_risk_category", False):
-                clusters["high_risk_business_categories"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "high_risk_business_categories", node_id)
                 risk_factors.append("high_risk_business")
 
             age_group = data.get("age_group")
             if age_group and str(age_group).upper() in HIGH_RISK_AGE_GROUPS:
-                clusters["high_risk_age_groups"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "high_risk_age_groups", node_id)
                 risk_factors.append("high_risk_age")
 
             occupation = data.get("occupation")
             if occupation and occupation in HIGH_RISK_OCCUPATIONS:
-                clusters["high_risk_occupations"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "high_risk_occupations", node_id)
                 risk_factors.append("high_risk_occupation")
 
             if risk_score >= min_risk_score:
-                clusters["high_risk_score"].append(node_id)
+                add_entity_and_accounts_to_cluster("high_risk_score", node_id)
                 risk_factors.append("high_risk_score")
 
             # Build composite clusters based on multiple risk factors
 
             # Super high risk: entities with 3+ risk factors
             if len(risk_factors) >= 3:
-                clusters["super_high_risk"].append(node_id)
+                add_entity_and_accounts_to_cluster("super_high_risk", node_id)
 
             # Intermediaries: comprehensive criteria for potential money mules/intermediaries
             is_intermediary = False
@@ -426,7 +456,7 @@ class GraphGenerator:
                 is_intermediary = True
 
             if is_intermediary:
-                clusters["intermediaries"].append(node_id)
+                add_entity_and_accounts_to_cluster("intermediaries", node_id)
 
             # Offshore candidates: entities likely to have or use offshore accounts
             is_offshore_candidate = False
@@ -451,7 +481,8 @@ class GraphGenerator:
                 is_offshore_candidate = True
 
             if is_offshore_candidate:
-                clusters["offshore_candidates"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "offshore_candidates", node_id)
 
             # Structuring candidates: entities likely to engage in transaction structuring
             is_structuring_candidate = False
@@ -475,7 +506,12 @@ class GraphGenerator:
                 is_structuring_candidate = True
 
             if is_structuring_candidate:
-                clusters["structuring_candidates"].append(node_id)
+                add_entity_and_accounts_to_cluster(
+                    "structuring_candidates", node_id)
+
+        # Deduplicate all clusters (since entities might be added multiple times)
+        for cluster_name in clusters:
+            clusters[cluster_name] = list(set(clusters[cluster_name]))
 
         # Store the clusters
         self.entity_clusters = clusters
@@ -484,10 +520,22 @@ class GraphGenerator:
         cluster_summary = [(k, len(v)) for k, v in clusters.items() if v]
         logger.info(f"Built entity clusters: {cluster_summary}")
 
+        # Log breakdown of entities vs accounts in clusters
+        for cluster_name, entities in clusters.items():
+            if entities:
+                entity_count = len([e for e in entities if self.graph.nodes.get(
+                    e, {}).get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]])
+                account_count = len([e for e in entities if self.graph.nodes.get(
+                    e, {}).get("node_type") == NodeType.ACCOUNT])
+                logger.info(
+                    f"  {cluster_name}: {entity_count} entities + {account_count} accounts = {len(entities)} total")
+
         # Log overlap statistics for insight
         total_entities = len([n for n, d in self.graph.nodes(data=True)
                               if d.get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]])
-        super_high_risk_count = len(clusters["super_high_risk"])
+        super_high_risk_entities = [e for e in clusters["super_high_risk"]
+                                    if self.graph.nodes.get(e, {}).get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]]
+        super_high_risk_count = len(super_high_risk_entities)
         if total_entities > 0:
             logger.info(f"Super high-risk entities: {super_high_risk_count}/{total_entities} "
                         f"({super_high_risk_count/total_entities*100:.1f}%)")
@@ -507,7 +555,7 @@ class GraphGenerator:
         all_nodes_list = list(self.graph.nodes)
 
         if is_random:
-            # Random mode: randomly select num_illicit_patterns patterns
+            # Random mode: randomly select <num_illicit_patterns> patterns
             logger.info(
                 f"Injecting {self.num_aml_patterns} AML patterns randomly...")
             available_patterns = list(self.pattern_manager.patterns.values())
@@ -520,13 +568,10 @@ class GraphGenerator:
                 logger.info(
                     f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
-                # Create task tuple: (function, args, task_index)
                 task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
                 pattern_tasks.append(task)
 
-            # Run patterns in parallel with deterministic seeding
-            pattern_results = run_patterns_in_parallel(
-                pattern_tasks, self.random_seed)
+            pattern_results = run_patterns_in_parallel(pattern_tasks)
 
             # Merge all edges into the main graph
             for edges in pattern_results:
@@ -538,44 +583,28 @@ class GraphGenerator:
             # Fixed mode: use specific counts for each pattern type
             logger.info("Injecting AML patterns with specific counts...")
 
-            # Map config keys to pattern names
-            config_to_pattern_mapping = {}
-            for pattern_name, pattern_instance in self.pattern_manager.patterns.items():
-                # Create multiple possible config keys for each pattern
-                normalized_name = pattern_name.lower().replace("_", "")
-                config_to_pattern_mapping[normalized_name] = pattern_instance
-
-                # Also try without common suffixes
-                if normalized_name.endswith("_pattern"):
-                    config_to_pattern_mapping[normalized_name[:-8]
-                                              ] = pattern_instance
+            config_to_pattern_mapping = self.pattern_manager.patterns
 
             # Collect all pattern tasks first
             pattern_tasks = []
             task_index = 0
             total_patterns_injected = 0
 
-            # Only sort config keys in deterministic mode (when seed is defined)
             config_keys = (sorted(pattern_frequency_config.keys()) if self.random_seed
                            else pattern_frequency_config.keys())
 
             for config_key in config_keys:
                 count = pattern_frequency_config[config_key]
-                # Skip non-pattern config keys
                 if config_key in ["random", "num_illicit_patterns"]:
                     continue
 
                 if isinstance(count, int) and count > 0:
-                    # Normalize the config key
-                    normalized_config_key = config_key.lower().replace("_", "")
-
                     pattern_instance = config_to_pattern_mapping.get(
-                        normalized_config_key)
+                        config_key)
                     if pattern_instance:
                         logger.info(
                             f"Injecting {count} instances of {pattern_instance.pattern_name}")
                         for i in range(count):
-                            # Create task tuple: (function, args, task_index)
                             task = (pattern_instance.inject_pattern,
                                     (all_nodes_list,), task_index)
                             pattern_tasks.append(task)
@@ -590,11 +619,8 @@ class GraphGenerator:
                     "No patterns were injected. Check your pattern_frequency configuration.")
                 return
 
-            # Run all patterns in parallel with deterministic seeding
-            pattern_results = run_patterns_in_parallel(
-                pattern_tasks, self.random_seed)
+            pattern_results = run_patterns_in_parallel(pattern_tasks)
 
-            # Merge all edges into the main graph
             for edges in pattern_results:
                 for src, dest, attrs in edges:
                     self._add_edge(src, dest, attrs)
