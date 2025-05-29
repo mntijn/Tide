@@ -19,7 +19,7 @@ from .datastructures.attributes import (
     IndividualAttributes, BusinessAttributes, InstitutionAttributes
 )
 from .utils.constants import (
-    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS
+    COUNTRY_CODES, COUNTRY_TO_CURRENCY, HIGH_RISK_BUSINESS_CATEGORIES, HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS, HIGH_RISK_OCCUPATIONS
 )
 from .utils.business import map_occupation_to_business_category, get_random_business_category
 from .entities import Individual, Business, Institution, Account
@@ -347,45 +347,160 @@ class GraphGenerator:
         min_risk_score = self.fraud_selection_config.get(
             "min_risk_score_for_fraud_consideration", 0.30)
 
-        # Build all clusters in one efficient pass through the graph
+        # Build clusters using a more sophisticated approach that recognizes overlapping risk factors
         clusters: Dict[str, List[str]] = {
+            # Basic single-factor clusters
             "high_risk_countries": [],
             "high_risk_business_categories": [],
-            "intermediaries": [],
-            "fraudulent": [],
+            "high_risk_age_groups": [],
+            "high_risk_occupations": [],
             "high_risk_score": [],
+
+            # Composite clusters for entities with multiple risk factors
+            "super_high_risk": [],  # Multiple high-risk factors
+            # Potential intermediaries (comprehensive criteria)
+            "intermediaries": [],
+            "offshore_candidates": [],  # Likely to have offshore connections
+            "structuring_candidates": [],  # Likely to engage in structuring
+            "fraudulent": [],  # Still maintained for backward compatibility
         }
 
-        # Single pass through all nodes to build clusters
+        # Single pass through all nodes to build all clusters
         for node_id, data in self.graph.nodes(data=True):
             node_type = data.get("node_type")
             country = data.get("country_code")
-            risk_score = data.get("risk_score")
+            risk_score = data.get("risk_score", 0.0)
 
-            # Handle None risk_score values
+            # Handle None risk_score values explicitly
             if risk_score is None:
                 risk_score = 0.0
 
-            # Build clusters based on node attributes
+            # Skip accounts for most clusters (focus on individuals/businesses)
+            if node_type == NodeType.ACCOUNT:
+                continue
+
+            risk_factors = []  # Track all risk factors for this entity
+
+            # Check individual risk factors
             if country in HIGH_RISK_COUNTRIES:
                 clusters["high_risk_countries"].append(node_id)
+                risk_factors.append("high_risk_country")
 
             if node_type == NodeType.BUSINESS and data.get("is_high_risk_category", False):
                 clusters["high_risk_business_categories"].append(node_id)
+                risk_factors.append("high_risk_business")
 
             age_group = data.get("age_group")
             if age_group and str(age_group).upper() in HIGH_RISK_AGE_GROUPS:
-                clusters["intermediaries"].append(node_id)
+                clusters["high_risk_age_groups"].append(node_id)
+                risk_factors.append("high_risk_age")
 
-            # Add to high risk score cluster if meets threshold
+            occupation = data.get("occupation")
+            if occupation and occupation in HIGH_RISK_OCCUPATIONS:
+                clusters["high_risk_occupations"].append(node_id)
+                risk_factors.append("high_risk_occupation")
+
             if risk_score >= min_risk_score:
                 clusters["high_risk_score"].append(node_id)
+                risk_factors.append("high_risk_score")
+
+            # Build composite clusters based on multiple risk factors
+
+            # Super high risk: entities with 3+ risk factors
+            if len(risk_factors) >= 3:
+                clusters["super_high_risk"].append(node_id)
+
+            # Intermediaries: comprehensive criteria for potential money mules/intermediaries
+            is_intermediary = False
+
+            # Young adults (18-24) are often recruited as intermediaries
+            if age_group and str(age_group).upper() == "EIGHTEEN_TO_TWENTY_FOUR":
+                is_intermediary = True
+
+            # Elderly (65+) can be vulnerable to being used as intermediaries
+            elif age_group and str(age_group).upper() == "SIXTY_FIVE_PLUS":
+                is_intermediary = True
+
+            # High-risk occupations with access to financial systems
+            elif occupation and occupation in HIGH_RISK_OCCUPATIONS:
+                is_intermediary = True
+
+            # Individuals in high-risk countries (easier to use as intermediaries)
+            elif node_type == NodeType.INDIVIDUAL and country in HIGH_RISK_COUNTRIES:
+                is_intermediary = True
+
+            # Small businesses in high-risk categories (often used as fronts)
+            elif (node_type == NodeType.BUSINESS and
+                  data.get("is_high_risk_category", False) and
+                  data.get("number_of_employees", 0) <= 10):
+                is_intermediary = True
+
+            if is_intermediary:
+                clusters["intermediaries"].append(node_id)
+
+            # Offshore candidates: entities likely to have or use offshore accounts
+            is_offshore_candidate = False
+
+            # High-paid occupations often have offshore accounts
+            if occupation and occupation in ["Banker", "Investment banker", "Financial trader",
+                                             "Lawyer", "Chartered accountant", "IT consultant"]:
+                is_offshore_candidate = True
+
+            # Businesses in high-risk categories often use offshore structures
+            elif (node_type == NodeType.BUSINESS and
+                  data.get("business_category") in ["Private Banking", "Investment Banking",
+                                                    "Trust Services", "Currency Exchange"]):
+                is_offshore_candidate = True
+
+            # Entities from high-risk countries
+            elif country in HIGH_RISK_COUNTRIES:
+                is_offshore_candidate = True
+
+            # High overall risk score
+            elif risk_score >= 0.7:
+                is_offshore_candidate = True
+
+            if is_offshore_candidate:
+                clusters["offshore_candidates"].append(node_id)
+
+            # Structuring candidates: entities likely to engage in transaction structuring
+            is_structuring_candidate = False
+
+            # Cash-intensive businesses
+            cash_businesses = ["Casinos", "Currency Exchange", "Check Cashing Services",
+                               "Convenience Stores", "Gas Stations", "Bars and Nightclubs",
+                               "Pawn Shops", "Laundromats"]
+            if (node_type == NodeType.BUSINESS and
+                    data.get("business_category") in cash_businesses):
+                is_structuring_candidate = True
+
+            # Individuals with financial backgrounds who know the rules
+            elif (node_type == NodeType.INDIVIDUAL and occupation and
+                  any(keyword in occupation.lower() for keyword in
+                      ["bank", "financial", "accountant", "trader"])):
+                is_structuring_candidate = True
+
+            # Multiple risk factors (sophisticated actors)
+            elif len(risk_factors) >= 2:
+                is_structuring_candidate = True
+
+            if is_structuring_candidate:
+                clusters["structuring_candidates"].append(node_id)
 
         # Store the clusters
         self.entity_clusters = clusters
 
-        logger.info(
-            f"Built entity clusters: {[(k, len(v)) for k, v in clusters.items() if v]}")
+        # Log cluster sizes for debugging
+        cluster_summary = [(k, len(v)) for k, v in clusters.items() if v]
+        logger.info(f"Built entity clusters: {cluster_summary}")
+
+        # Log overlap statistics for insight
+        total_entities = len([n for n, d in self.graph.nodes(data=True)
+                              if d.get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]])
+        super_high_risk_count = len(clusters["super_high_risk"])
+        if total_entities > 0:
+            logger.info(f"Super high-risk entities: {super_high_risk_count}/{total_entities} "
+                        f"({super_high_risk_count/total_entities*100:.1f}%)")
 
     def select_entities_for_pattern(self, pattern_name: str, pattern_structural_component: StructuralComponent) -> Optional[EntitySelection]:
         """

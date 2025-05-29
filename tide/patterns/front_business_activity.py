@@ -25,17 +25,46 @@ class FrontBusinessStructural(StructuralComponent):
         business_accounts_ids = []
         overseas_business_accounts_ids = []
 
-        potential_front_businesses = self.filter_entities_by_criteria(
-            available_entities,
-            {"node_type": NodeType.BUSINESS}
-        )
-        random.shuffle(potential_front_businesses)
+        # Use the new clustering logic to find better candidates for front businesses
+        # Priority order: super_high_risk -> offshore_candidates -> high_risk_business_categories -> all businesses
+        potential_front_businesses = []
 
-        # If no businesses in available_entities, consider all businesses in graph
+        # First try super high-risk entities (multiple risk factors)
+        super_high_risk = self.get_cluster("super_high_risk")
+        businesses_super_high_risk = self.filter_entities_by_criteria(
+            super_high_risk, {"node_type": NodeType.BUSINESS})
+        if businesses_super_high_risk:
+            potential_front_businesses.extend(businesses_super_high_risk)
+
+        # Then try businesses that are likely offshore candidates
+        if len(potential_front_businesses) < 10:  # If we need more candidates
+            offshore_candidates = self.get_cluster("offshore_candidates")
+            businesses_offshore = self.filter_entities_by_criteria(
+                offshore_candidates, {"node_type": NodeType.BUSINESS})
+            potential_front_businesses.extend(businesses_offshore)
+
+        # Then try high-risk business categories
+        if len(potential_front_businesses) < 10:
+            high_risk_biz = self.get_cluster("high_risk_business_categories")
+            potential_front_businesses.extend(high_risk_biz)
+
+        # Finally, use traditional filtering as fallback
+        if len(potential_front_businesses) < 5:
+            traditional_candidates = self.filter_entities_by_criteria(
+                available_entities, {"node_type": NodeType.BUSINESS})
+            potential_front_businesses.extend(traditional_candidates)
+
+        # Remove duplicates and prioritize by risk factors
+        potential_front_businesses = list(set(potential_front_businesses))
+        potential_front_businesses = self.prioritize_by_risk_factors(
+            potential_front_businesses)
+
+        # If still no businesses found, fall back to all businesses in graph
         if not potential_front_businesses:
             potential_front_businesses = list(
                 self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
-            random.shuffle(potential_front_businesses)
+
+        random.shuffle(potential_front_businesses)
 
         # Default values for pattern parameters
         min_bus_accounts = self.params.get("front_business_pattern", {}).get(
@@ -59,7 +88,7 @@ class FrontBusinessStructural(StructuralComponent):
                 all_graph_accounts = self.graph_generator.all_nodes.get(
                     NodeType.ACCOUNT, [])
                 business_country = self.graph.nodes[bus_id].get(
-                    "address", {}).get("country")
+                    "country_code")  # Note: updated to use country_code instead of address.country
 
                 for acc_id in all_graph_accounts:
                     if acc_id in owned_accounts_data:  # Exclude accounts owned by the front business itself
@@ -67,7 +96,7 @@ class FrontBusinessStructural(StructuralComponent):
 
                     acc_node_data = self.graph.nodes[acc_id]
                     acc_country = acc_node_data.get(
-                        "address", {}).get("country")
+                        "country_code")  # Updated field name
 
                     # Ensure account has a country and it's different from the front business's country
                     if acc_country and acc_country != business_country:
