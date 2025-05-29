@@ -343,6 +343,17 @@ class GraphGenerator:
         logger.info("Entity and account generation complete")
 
     def build_entity_clusters(self):
+        """Builds entity clusters for pattern targeting:
+
+        Pattern Source Selection:
+        1. super_high_risk/high_risk_score: Entities with 3+ risk factors
+        2. offshore_candidates: Financial sophistication for international operations
+        3. structuring_candidates: Usually executors, not sources
+
+        Other Roles:
+        - intermediaries: Money mules/fronts (often unwitting participants)
+        - Basic single-factor clusters: Country, business category, age, occupation
+        """
         logger.info("Building entity clusters...")
         min_risk_score = self.fraud_selection_config.get(
             "min_risk_score_for_fraud_consideration", 0.30)
@@ -358,11 +369,11 @@ class GraphGenerator:
 
             # Composite clusters for entities with multiple risk factors
             "super_high_risk": [],  # Multiple high-risk factors
-            # Potential intermediaries (comprehensive criteria)
+            # Potential intermediaries
             "intermediaries": [],
             "offshore_candidates": [],  # Likely to have offshore connections
             "structuring_candidates": [],  # Likely to engage in structuring
-            "fraudulent": [],  # Still maintained for backward compatibility
+            "fraudulent": [],
         }
 
         # Single pass through all nodes to build all clusters
@@ -501,45 +512,6 @@ class GraphGenerator:
         if total_entities > 0:
             logger.info(f"Super high-risk entities: {super_high_risk_count}/{total_entities} "
                         f"({super_high_risk_count/total_entities*100:.1f}%)")
-
-    def select_entities_for_pattern(self, pattern_name: str, pattern_structural_component: StructuralComponent) -> Optional[EntitySelection]:
-        """
-        Selects entities for a given AML pattern by delegating to the pattern's structural component.
-        Provides prioritized pools of fraudulent and non-fraudulent entities.
-        """
-        fraudulent_pool = []
-        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-            fraudulent_pool.extend(
-                self.fraudulent_entities_map.get(node_type, []))
-        self.random_instance.shuffle(fraudulent_pool)
-
-        non_fraudulent_pool = []
-        for node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-            all_of_type = self.all_nodes.get(node_type, [])
-            fraudulent_of_type = set(
-                self.fraudulent_entities_map.get(node_type, []))
-            non_fraudulent_pool.extend(
-                [node_id for node_id in all_of_type if node_id not in fraudulent_of_type])
-        self.random_instance.shuffle(non_fraudulent_pool)
-
-        if not fraudulent_pool and not non_fraudulent_pool:
-            logger.warning(
-                f"No entities (fraudulent or non-fraudulent) available at all for pattern {pattern_name}")
-            return None
-
-        # Fall back to providing all entities to the structural selector directly (new approach)
-        candidate_entities = list(self.graph.nodes)
-        selected_entities = pattern_structural_component.select_entities(
-            candidate_entities)
-
-        if selected_entities and selected_entities.central_entities:
-            logger.info(
-                f"[Selector] {pattern_name}: central={len(selected_entities.central_entities)}, peripheral={len(selected_entities.peripheral_entities)}")
-            return selected_entities
-
-        logger.warning(
-            f"[Selector] No suitable entities found for {pattern_name} with updated selection logic.")
-        return None
 
     def inject_aml_patterns(self):
         """Inject AML patterns: each pattern builds its own transactions using the

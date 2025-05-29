@@ -1,4 +1,3 @@
-import random
 import datetime
 from typing import List, Dict, Any, Tuple
 
@@ -8,6 +7,7 @@ from .base import (
 )
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
+from ..utils.random_instance import random_instance
 
 
 class BackgroundActivityStructural(StructuralComponent):
@@ -42,7 +42,8 @@ class DailyRandomTransfersTemporal(TemporalComponent):
 
         for acc_id in all_accounts:
             # Slight randomness around the configured rate
-            expected_txs = int(tx_rate * total_days * random.uniform(0.5, 1.5))
+            expected_txs = int(tx_rate * total_days *
+                               random_instance.uniform(0.5, 1.5))
             if expected_txs == 0:
                 continue
 
@@ -50,19 +51,28 @@ class DailyRandomTransfersTemporal(TemporalComponent):
             timestamps: List[datetime.datetime] = []
             for _ in range(expected_txs):
                 # Pick a random moment within time span
-                random_day_offset = random.randint(0, total_days)
-                random_second = random.randint(0, 86_399)
+                random_day_offset = random_instance.randint(0, total_days)
+                random_second = random_instance.randint(0, 86_399)
                 ts = start_date + \
                     datetime.timedelta(days=random_day_offset,
                                        seconds=random_second)
                 timestamps.append(ts)
 
                 # Pick a random destination account (excluding self)
-                dest_id = random.choice(all_accounts)
-                while dest_id == acc_id:
-                    dest_id = random.choice(all_accounts)
+                # Ensure there is more than one account to pick from to avoid infinite loop
+                if len(all_accounts) <= 1:
+                    continue  # Cannot make a transfer
 
-                amount = round(random.uniform(10, 1000), 2)
+                dest_id = random_instance.choice(all_accounts)
+                while dest_id == acc_id:
+                    dest_id = random_instance.choice(all_accounts)
+
+                # Use background_amount_range from params (loaded from graph.yaml)
+                amount_range = self.params.get("background_amount_range", [
+                                               10.0, 500.0])  # Default if not in params
+                amount = round(random_instance.uniform(
+                    amount_range[0], amount_range[1]), 2)
+
                 tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
                     src_id=acc_id,
                     dest_id=dest_id,
