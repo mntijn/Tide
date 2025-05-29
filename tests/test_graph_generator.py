@@ -13,9 +13,9 @@ class TestGraphGenerator(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Load test configurations once for all tests"""
-        with open("configs/graph.yaml", 'r') as f:
+        with open("tests/configs/graph.yaml", 'r') as f:
             cls.graph_config = yaml.safe_load(f)
-        with open("configs/patterns.yaml", 'r') as f:
+        with open("tests/configs/patterns.yaml", 'r') as f:
             cls.patterns_config = yaml.safe_load(f)
 
         # Merge configs as done in main.py
@@ -131,6 +131,93 @@ class TestGraphGenerator(unittest.TestCase):
         for edge in graph1.edges():
             self.assertIn(edge, graph2.edges())
             self.assertEqual(graph1.edges[edge], graph2.edges[edge])
+
+    def test_random_seed_non_determinism(self):
+        """Test that graphs are different when using different seeds or no seed"""
+        # Generate graphs with different seeds
+        params1 = self.params.copy()
+        params1["random_seed"] = 42
+        gen1 = GraphGenerator(params=params1)
+        graph1 = gen1.generate_graph()
+
+        params2 = self.params.copy()
+        params2["random_seed"] = 123
+        gen2 = GraphGenerator(params=params2)
+        graph2 = gen2.generate_graph()
+
+        # Graphs with different seeds should be different
+        # They may have different structure (node/edge counts) or different attributes
+        structure_different = (graph1.number_of_nodes() != graph2.number_of_nodes() or
+                               graph1.number_of_edges() != graph2.number_of_edges())
+
+        attributes_different = False
+
+        # If structure is the same, check if attributes are different
+        if not structure_different:
+            # Check if any node attributes differ
+            for node in graph1.nodes():
+                if node in graph2.nodes():
+                    if graph1.nodes[node] != graph2.nodes[node]:
+                        attributes_different = True
+                        break
+
+            # Check if any edge attributes differ
+            if not attributes_different:
+                for edge in graph1.edges():
+                    if edge in graph2.edges():
+                        if graph1.edges[edge] != graph2.edges[edge]:
+                            attributes_different = True
+                            break
+
+        # At least structure or attributes should be different
+        self.assertTrue(structure_different or attributes_different,
+                        "Graphs with different seeds should be different")
+
+        # Test with no seed specified (should use system randomness)
+        params3 = self.params.copy()
+        if "random_seed" in params3:
+            del params3["random_seed"]  # Remove seed to use system randomness
+        gen3 = GraphGenerator(params=params3)
+        graph3 = gen3.generate_graph()
+
+        params4 = self.params.copy()
+        if "random_seed" in params4:
+            del params4["random_seed"]  # Remove seed to use system randomness
+        gen4 = GraphGenerator(params=params4)
+        graph4 = gen4.generate_graph()
+
+        # These should be different (very high probability)
+        # Check structure first
+        no_seed_structure_different = (graph3.number_of_nodes() != graph4.number_of_nodes() or
+                                       graph3.number_of_edges() != graph4.number_of_edges())
+
+        no_seed_attributes_different = False
+
+        # If structure is the same, check attributes
+        if not no_seed_structure_different:
+            differences_found = 0
+
+            # Check node attributes
+            for node in graph3.nodes():
+                if node in graph4.nodes():
+                    if graph3.nodes[node] != graph4.nodes[node]:
+                        differences_found += 1
+                        if differences_found >= 5:  # Found enough differences
+                            no_seed_attributes_different = True
+                            break
+
+            # Check edge attributes if we haven't found enough node differences
+            if differences_found < 5:
+                for edge in graph3.edges():
+                    if edge in graph4.edges():
+                        if graph3.edges[edge] != graph4.edges[edge]:
+                            differences_found += 1
+                            if differences_found >= 5:
+                                no_seed_attributes_different = True
+                                break
+
+        self.assertTrue(no_seed_structure_different or no_seed_attributes_different,
+                        "Graphs without seeds should be different")
 
     def test_pattern_injection(self):
         """Test if AML patterns are correctly injected"""

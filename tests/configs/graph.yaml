@@ -1,0 +1,70 @@
+graph_scale:
+  individuals: 5000
+  # businesses: 0
+  institutions_per_country: 1
+  individual_accounts_per_institution_range: [1, 3]
+  business_accounts_per_institution_range: [1, 6]
+transaction_rates:
+  per_account_per_day: 1
+time_span:
+  start_date: '2023-01-01T00:00:00'
+  end_date: '2023-05-15T23:59:59'
+account_balance_range_normal: [1000.0, 50000.0]
+background_amount_range: [10.0, 500.0]
+company_size_range: [1, 1000]
+salary_payment_days: [24, 30, 1]
+salary_amount_range: [2500.0, 7500.0]
+random_seed: 42
+business_creation_date_range: [90, 5475]
+
+# Pattern generation settings
+pattern_frequency:
+  random: True
+  num_illicit_patterns: 10
+
+  # If random is false these values are used instead of num_illicit patterns
+  RapidFundMovement: 1
+  FrontBusinessActivity: 2
+  RepeatedOverseasTransfers: 1
+
+# Reporting threshold for structuring amounts
+reporting_threshold: 10000
+# Base probability for high-risk business selection
+high_risk_business_probability: 0.05
+# Probability for creating a random business when occupation doesn't suggest one
+random_business_probability: 0.15
+# Probability for an account to be an offshore account
+offshore_account_probability: 0.1
+
+amount_distribution_params:
+  mean: 100
+  variance: 50
+high_transaction_amount_ratio: 0.05
+low_transaction_amount_ratio: 0.1
+
+account_categories:
+  - "Current"
+  - "Savings"
+  - "Loan"
+
+high_risk_config:
+  countries_weight_factor: 1.0
+  business_categories_weight_factor: 1.0
+  company_size_thresholds:
+    very_small_max: 5
+
+risk_weights:
+  base_individual: 0.05
+  base_business: 0.10
+  age_group: 0.15
+  occupation: 0.12
+  country: 0.2
+  business_category: 0.25
+  very_small_company: 0.10
+  max_score: 1.0
+
+fraud_selection_config:
+  # An entity's risk_score must be >= this to be considered for being marked fraudulent.
+  min_risk_score_for_fraud_consideration: 0.50
+  # If entity is high risk, what is the chance they're selected for a pattern
+  base_fraud_probability_if_considered: 0.10
