@@ -1,7 +1,7 @@
 graph_scale:
-  individuals: 20000
+  individuals: 5000
   # businesses: 0
-  institutions_per_country: 2
+  institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 6]
 transaction_rates:
@@ -19,11 +19,13 @@ business_creation_date_range: [90, 5475]
 
 # Pattern generation settings
 pattern_frequency:
-  random: False
-  num_illicit_patterns: 5
-  rapid_fund_movement: True
-  front_business_activity: True
-  repeated_overseas transfers: True
+  random: True
+  num_illicit_patterns: 10
+
+  # If random is false these values are used instead of num_illicit patterns
+  rapid_fund_movement: 1
+  front_business_activity: 2
+  repeated_overseas_transfers: 1
 
 # Reporting threshold for structuring amounts
 reporting_threshold: 10000

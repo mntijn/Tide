@@ -5,9 +5,6 @@ import logging
 from dataclasses import asdict
 from typing import List, Dict, Any, Optional, Tuple
 from faker import Faker
-import threading
-from queue import Queue, Empty
-import multiprocessing
 
 from .datastructures.enums import (
     NodeType, EdgeType, TransactionType, AccountCategory,
@@ -25,9 +22,9 @@ from .utils.business import map_occupation_to_business_category, get_random_busi
 from .entities import Individual, Business, Institution, Account
 from .patterns.manager import PatternManager
 from .patterns.base import StructuralComponent, EntitySelection
-from .utils.accounts import batchify, process_individual_batch, process_business_batch
-from .utils.threading import run_in_threads
+from .utils.accounts import process_individual, process_business
 from .utils.random_instance import random_instance
+from .utils.faker_instance import reset_faker_seed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,7 +71,6 @@ class GraphGenerator:
         self.individual = Individual(self.params)
         self.business = Business(self.params)
         self.account: Optional[Account] = None
-        self.results_queue = Queue()
         self.individual_cash_accounts: Dict[str, str] = {}
         self.cash_account_id: Optional[str] = None
         self.random_instance = random_instance
@@ -149,38 +145,28 @@ class GraphGenerator:
     def _add_edge(self, src_id: str, dest_id: str, attributes: EdgeAttributes):
         self.graph.add_edge(src_id, dest_id, **asdict(attributes))
 
-    def _task_generate_institutions(self):
-        """Gen institution data in a thread."""
-        data = self.institution.generate_data()
-        self.results_queue.put(('institutions', data))
-
-    def _task_generate_individuals(self):
-        """Gen individual data in a thread."""
-        data = self.individual.generate_data()
-        self.results_queue.put(('individuals', data))
-
     def initialize_entities(self):
         logger.info("Starting entity generation...")
+
+        # Reset random seeds if defined for reproducibility
+        if self.random_seed:
+            logger.info(
+                f"Deterministic mode enabled with seed {self.random_seed}")
+            self.random_instance.seed(self.random_seed)
+            # Also reset global random module
+            import random
+            random.seed(self.random_seed)
+            # Reset Faker instance
+            reset_faker_seed()
+
         sim_start_date = self.time_span["start_date"]
 
-        # Build tasks list
-        tasks = [
-            (self._task_generate_institutions, ()),
-            (self._task_generate_individuals, ())
-        ]
+        # Generate entity data sequentially
+        logger.info("Generating institutions...")
+        institutions_data = self.institution.generate_data()
 
-        run_in_threads(tasks)
-
-        thread_results = {}
-        while not self.results_queue.empty():
-            try:
-                key, value = self.results_queue.get_nowait()
-                thread_results[key] = value
-            except Empty:
-                break
-
-        institutions_data = thread_results.get('institutions', [])
-        individuals_data = thread_results.get('individuals', [])
+        logger.info("Generating individuals...")
+        individuals_data = self.individual.generate_data()
 
         # Create accounts for Institutions
         institution_countries = {}
@@ -302,28 +288,20 @@ class GraphGenerator:
 
         logger.info(f"Created {num_owned_businesses_created} total businesses")
 
-        # Generate accounts in parallel by creating batches of individuals and businesses
-        num_threads = multiprocessing.cpu_count()
-        logger.info(
-            f"Generating accounts in parallel using {num_threads} threads...")
-
-        lock = threading.Lock()
+        # Generate accounts sequentially
+        logger.info("Generating accounts...")
         individual_ids = self.all_nodes.get(NodeType.INDIVIDUAL, [])
         business_ids = self.all_nodes.get(NodeType.BUSINESS, [])
 
-        individual_batches = batchify(individual_ids, num_threads)
-        business_batches = batchify(business_ids, num_threads)
+        # Process all individuals
+        for ind_id in individual_ids:
+            process_individual(self, ind_id, None, sim_start_date)
 
-        account_tasks = []
-        for batch in individual_batches:
-            account_tasks.append(
-                (process_individual_batch, (self, batch, lock, sim_start_date)))
-        for batch in business_batches:
-            account_tasks.append(
-                (process_business_batch, (self, batch, lock, sim_start_date)))
+        # Process all businesses
+        for bus_id in business_ids:
+            process_business(self, bus_id, None, sim_start_date)
 
-        run_in_threads(account_tasks)
-        logger.info("Account generation tasks completed")
+        logger.info("Account generation completed")
 
         # Create global cash system account
         if self.cash_account_id is None:
@@ -517,27 +495,83 @@ class GraphGenerator:
         """Inject AML patterns: each pattern builds its own transactions using the
         pre-built clusters and we simply merge the resulting edges into the main graph."""
 
-        logger.info(f"Injecting {self.num_aml_patterns} AML patterns...")
+        pattern_frequency_config = self.params.get("pattern_frequency", {})
+        is_random = pattern_frequency_config.get("random", False)
 
         if not self.pattern_manager.patterns:
             logger.warning("No AML patterns are registered in PatternManager.")
             return
 
         total_edges_added = 0
-        patterns = list(self.pattern_manager.patterns.values())
-        self.random_instance.shuffle(patterns)
 
-        # Limit iterations to the configured number but not more than patterns available
-        for i in range(min(self.num_aml_patterns, len(patterns))):
-            pattern_instance = patterns[i]
+        if is_random:
+            # Random mode: randomly select num_illicit_patterns patterns
             logger.info(
-                f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
+                f"Injecting {self.num_aml_patterns} AML patterns randomly...")
+            available_patterns = list(self.pattern_manager.patterns.values())
 
-            # Provide the whole node list – structural component will pick efficiently using clusters
-            new_edges = pattern_instance.inject_pattern(list(self.graph.nodes))
-            for src, dest, attrs in new_edges:
-                self._add_edge(src, dest, attrs)
-            total_edges_added += len(new_edges)
+            for i in range(self.num_aml_patterns):
+                pattern_instance = self.random_instance.choice(
+                    available_patterns)
+                logger.info(
+                    f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
+
+                new_edges = pattern_instance.inject_pattern(
+                    list(self.graph.nodes))
+                for src, dest, attrs in new_edges:
+                    self._add_edge(src, dest, attrs)
+                total_edges_added += len(new_edges)
+        else:
+            # Fixed mode: use specific counts for each pattern type
+            logger.info("Injecting AML patterns with specific counts...")
+
+            # Map config keys to pattern names (handle variations in naming)
+            config_to_pattern_mapping = {}
+            for pattern_name, pattern_instance in self.pattern_manager.patterns.items():
+                # Create multiple possible config keys for each pattern
+                normalized_name = pattern_name.lower().replace("_", "")
+                config_to_pattern_mapping[normalized_name] = pattern_instance
+
+                # Also try without common suffixes
+                if normalized_name.endswith("_pattern"):
+                    config_to_pattern_mapping[normalized_name[:-8]
+                                              ] = pattern_instance
+
+            total_patterns_injected = 0
+            # Only sort config keys in deterministic mode (when seed is defined)
+            config_keys = (sorted(pattern_frequency_config.keys()) if self.random_seed
+                           else pattern_frequency_config.keys())
+
+            for config_key in config_keys:
+                count = pattern_frequency_config[config_key]
+                # Skip non-pattern config keys
+                if config_key in ["random", "num_illicit_patterns"]:
+                    continue
+
+                if isinstance(count, int) and count > 0:
+                    # Normalize the config key
+                    normalized_config_key = config_key.lower().replace(
+                        "_", "")
+
+                    pattern_instance = config_to_pattern_mapping.get(
+                        normalized_config_key)
+                    if pattern_instance:
+                        logger.info(
+                            f"Injecting {count} instances of {pattern_instance.pattern_name}")
+                        for i in range(count):
+                            new_edges = pattern_instance.inject_pattern(
+                                list(self.graph.nodes))
+                            for src, dest, attrs in new_edges:
+                                self._add_edge(src, dest, attrs)
+                            total_edges_added += len(new_edges)
+                            total_patterns_injected += 1
+                    else:
+                        logger.warning(
+                            f"Pattern for config key '{config_key}' not found. Available patterns: {list(config_to_pattern_mapping.keys())}")
+
+            if total_patterns_injected == 0:
+                logger.warning(
+                    "No patterns were injected. Check your pattern_frequency configuration.")
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
@@ -565,7 +599,7 @@ class GraphGenerator:
         self.initialize_entities()
         self.build_entity_clusters()
         self.inject_aml_patterns()
-        self.simulate_background_activity()
+        # self.simulate_background_activity()
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph

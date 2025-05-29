@@ -27,5 +27,17 @@ def get_faker_instance():
     return get_faker_instance._instance
 
 
+def reset_faker_seed():
+    """Reset the faker instance seed for reproducibility across multiple runs."""
+    if hasattr(get_faker_instance, '_instance'):
+        config_path = Path(__file__).parent.parent.parent / \
+            'configs' / 'graph.yaml'
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        seed = config.get('random_seed')
+        if seed is not None:
+            get_faker_instance._instance.seed_instance(seed)
+
+
 # Create a convenient alias for importing
 faker = get_faker_instance()

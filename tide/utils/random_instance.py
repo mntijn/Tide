@@ -22,8 +22,10 @@ def get_random_instance():
 
         # Create a new random.Random instance
         get_random_instance._instance = random.Random()
-        if seed is not None:
+        if seed:
             get_random_instance._instance.seed(seed)
+            # Also seed the global random module for complete determinism
+            random.seed(seed)
 
     return get_random_instance._instance
 

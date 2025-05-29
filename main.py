@@ -1,7 +1,9 @@
 import random
 import datetime
 import yaml
+import networkx as nx
 from typing import Dict, Any
+from enum import Enum
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
@@ -24,6 +26,106 @@ def load_configurations() -> Dict[str, Any]:
     return main_config
 
 
+def convert_enums_to_strings(graph: nx.DiGraph) -> nx.DiGraph:
+    """
+    Convert all non-serializable values in graph attributes to strings for GraphML compatibility.
+    GraphML only supports basic data types: string, int, float, boolean.
+
+    Args:
+        graph: The original graph with complex data types
+
+    Returns:
+        A new graph with all values converted to GraphML-compatible types
+    """
+    def convert_value(value):
+        """Convert a single value to GraphML-compatible format."""
+        # Handle None
+        if value is None:
+            return ""
+
+        # Handle basic types that GraphML supports
+        if isinstance(value, (str, int, float, bool)):
+            return value
+
+        # Handle enums
+        if isinstance(value, Enum):
+            return str(value.value)
+
+        # Handle datetime objects
+        if isinstance(value, datetime.datetime):
+            return value.isoformat()
+        elif isinstance(value, datetime.date):
+            return value.isoformat()
+
+        # Handle class types
+        if isinstance(value, type):
+            return value.__name__
+
+        # Handle dictionaries (convert to JSON-like string)
+        if isinstance(value, dict):
+            try:
+                # Convert dict values recursively
+                converted_dict = {k: convert_value(
+                    v) for k, v in value.items()}
+                return str(converted_dict)
+            except:
+                return str(value)
+
+        # Handle lists/tuples
+        if isinstance(value, (list, tuple)):
+            try:
+                converted_list = [convert_value(v) for v in value]
+                return str(converted_list)
+            except:
+                return str(value)
+
+        # Handle any other object - convert to string
+        try:
+            # Try to get a meaningful string representation
+            if hasattr(value, '__name__'):
+                return value.__name__
+            elif hasattr(value, 'name'):
+                return str(value.name)
+            elif hasattr(value, 'value'):
+                return str(value.value)
+            else:
+                return str(value)
+        except:
+            # Fallback to basic string conversion
+            return str(type(value).__name__)
+
+    # Create a copy of the graph
+    converted_graph = graph.copy()
+
+    # Convert node attributes
+    for node_id, attrs in converted_graph.nodes(data=True):
+        # Use list() to avoid modification during iteration
+        for key, value in list(attrs.items()):
+            try:
+                converted_value = convert_value(value)
+                attrs[key] = converted_value
+            except Exception as e:
+                # If conversion fails, use a safe fallback
+                print(
+                    f"Warning: Could not convert node attribute {key}={value}, using fallback. Error: {e}")
+                attrs[key] = str(type(value).__name__)
+
+    # Convert edge attributes
+    for src, dest, attrs in converted_graph.edges(data=True):
+        # Use list() to avoid modification during iteration
+        for key, value in list(attrs.items()):
+            try:
+                converted_value = convert_value(value)
+                attrs[key] = converted_value
+            except Exception as e:
+                # If conversion fails, use a safe fallback
+                print(
+                    f"Warning: Could not convert edge attribute {key}={value}, using fallback. Error: {e}")
+                attrs[key] = str(type(value).__name__)
+
+    return converted_graph
+
+
 if __name__ == "__main__":
     # Load and merge configurations
     generator_parameters = load_configurations()
@@ -41,8 +143,21 @@ if __name__ == "__main__":
     print(f"Number of nodes: {aml_graph_gen.num_of_nodes()}")
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
 
+    # Export to CSV (original functionality)
     export_to_csv(
         graph=graph,
         nodes_filepath="generated_nodes.csv",
         edges_filepath="generated_edges.csv"
     )
+
+    # Export to GraphML for visualization
+    print("Saving graph in GraphML format for visualization...")
+
+    # Convert enums to strings for GraphML compatibility
+    converted_graph = convert_enums_to_strings(graph)
+    nx.write_graphml(converted_graph, "generated_graph.graphml")
+
+    print("Graph saved as: generated_graph.graphml")
+
+    print("\nTo visualize the patterns, run:")
+    print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")
