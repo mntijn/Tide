@@ -5,12 +5,14 @@
 
 
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 from ..datastructures.enums import NodeType
+from ..datastructures.attributes import TransactionAttributes
 from .repeated_overseas_transfers import RepeatedOverseasTransfersPattern
 from .rapid_fund_movement import RapidFundMovementPattern
 from .front_business_activity import FrontBusinessPattern
+from .base import EntitySelection
 
 
 class PatternManager:
@@ -20,56 +22,19 @@ class PatternManager:
         self.graph_generator = graph_generator
         self.params = params
 
-        self.patterns = [
-            RepeatedOverseasTransfersPattern(graph_generator, params),
-            RapidFundMovementPattern(graph_generator, params),
-            FrontBusinessPattern(graph_generator, params),
-            # add new patterns here
-        ]
+        self.patterns: Dict[str, Any] = {
+            p.pattern_name: p for p in [
+                RepeatedOverseasTransfersPattern(graph_generator, params),
+                RapidFundMovementPattern(graph_generator, params),
+                FrontBusinessPattern(graph_generator, params),
+                # add new patterns here
+            ]}
 
         # Initialize entity selector (set by graph generator)
-        self.entity_selector = None
-
-    def inject_patterns(self):
-        """Inject specified number of patterns"""
-        num_patterns = self.params.get(
-            "pattern_frequency", {}).get("num_illicit_patterns", 5)
-
-        # Check if we have enough entities
-        all_entities = []
-        for node_type in NodeType:
-            all_entities.extend(
-                self.graph_generator.all_nodes.get(node_type, []))
-
-        if len(all_entities) < 10:
-            print("Warning: Not enough entities to inject patterns")
-            return
-
-        fraudulent_edges = []
-
-        for i in range(num_patterns):
-            selected_pattern = random.choice(self.patterns)
-            pattern_name = selected_pattern.pattern_name
-            required_entities_for_pattern = selected_pattern.num_required_entities
-
-            pattern_entities = self.entity_selector.select_entities_for_pattern(
-                pattern_name, required_entities_for_pattern
-            )
-
-            try:
-                edges = selected_pattern.inject_pattern(pattern_entities)
-                fraudulent_edges.extend(edges)
-                print(
-                    f"Injected {selected_pattern.pattern_name} with {len(edges)} edges")
-            except Exception as e:
-                print(
-                    f"Failed to inject {selected_pattern.pattern_name}: {e}")
-
-        print(f"Total fraudulent edges created: {len(fraudulent_edges)}")
-        return fraudulent_edges
+        # With Option 2, GraphGenerator *is* the selector. PatternManager just holds patterns.
+        # self.entity_selector = graph_generator # Deprecated: will be removed
 
     def get_available_patterns(self) -> List[str]:
         """Return list of available pattern names"""
-        available = [
-            pattern.pattern_name for pattern in self.patterns]
+        available = list(self.patterns.keys())
         return available

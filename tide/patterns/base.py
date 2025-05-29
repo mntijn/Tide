@@ -133,6 +133,80 @@ class StructuralComponent(ABC):
 
         return filtered
 
+    # ------------------------------------------------------------------
+    #  Convenience for fast entity retrieval
+    # ------------------------------------------------------------------
+    def get_cluster(self, name: str) -> List[str]:
+        """Return pre-computed entity cluster from the parent graph generator (if available)."""
+        if hasattr(self.graph_generator, "entity_clusters"):
+            return self.graph_generator.entity_clusters.get(name, [])
+        return []
+
+    def get_combined_clusters(self, cluster_names: List[str], deduplicate: bool = True) -> List[str]:
+        """Get entities from multiple clusters combined."""
+        combined = []
+        for cluster_name in cluster_names:
+            combined.extend(self.get_cluster(cluster_name))
+
+        if deduplicate:
+            return list(set(combined))
+        return combined
+
+    def get_high_risk_entities(self, include_super_high_risk: bool = True) -> List[str]:
+        """Get all high-risk entities across different risk factors."""
+        clusters_to_combine = [
+            "high_risk_countries",
+            "high_risk_business_categories",
+            "high_risk_age_groups",
+            "high_risk_occupations",
+            "high_risk_score"
+        ]
+
+        if include_super_high_risk:
+            clusters_to_combine.append("super_high_risk")
+
+        return self.get_combined_clusters(clusters_to_combine, deduplicate=True)
+
+    def get_entities_with_multiple_risk_factors(self) -> List[str]:
+        """Get entities that appear in multiple risk clusters (indicating compound risk)."""
+        risk_clusters = [
+            "high_risk_countries",
+            "high_risk_business_categories",
+            "high_risk_age_groups",
+            "high_risk_occupations",
+            "high_risk_score"
+        ]
+
+        entity_risk_count = {}
+        for cluster_name in risk_clusters:
+            for entity_id in self.get_cluster(cluster_name):
+                entity_risk_count[entity_id] = entity_risk_count.get(
+                    entity_id, 0) + 1
+
+        # Return entities with 2+ risk factors
+        return [entity_id for entity_id, count in entity_risk_count.items() if count >= 2]
+
+    def prioritize_by_risk_factors(self, entities: List[str]) -> List[str]:
+        """Sort entities by number of risk factors (highest risk first)."""
+        risk_clusters = [
+            "high_risk_countries",
+            "high_risk_business_categories",
+            "high_risk_age_groups",
+            "high_risk_occupations",
+            "high_risk_score"
+        ]
+
+        entity_risk_count = {}
+        for entity_id in entities:
+            count = 0
+            for cluster_name in risk_clusters:
+                if entity_id in self.get_cluster(cluster_name):
+                    count += 1
+            entity_risk_count[entity_id] = count
+
+        # Sort by risk count (descending), then by entity_id for stability
+        return sorted(entities, key=lambda x: (-entity_risk_count.get(x, 0), x))
+
 
 class TemporalComponent(ABC):
     """Base class for temporal components of patterns"""
@@ -235,31 +309,25 @@ class CompositePattern(PatternInjector):
         return self.structural.num_required_entities
 
     def inject_pattern(self, entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
-        """Main method to inject the complete pattern"""
-        fraudulent_edges = []
+        """Generate all edges for this pattern without mutating the master graph.
+        The caller (GraphGenerator) decides when to merge the resulting sub-graph."""
+
+        generated_edges: List[Tuple[str, str, TransactionAttributes]] = []
 
         try:
-            # Select entities based on structural requirements
+            # Entity selection
             entity_selection = self.structural.select_entities(entities)
-
             if not entity_selection.central_entities:
-                return fraudulent_edges
+                return generated_edges
 
-            # Generate transaction sequences based on temporal pattern
-            transaction_sequences = self.temporal.generate_transaction_sequences(
-                entity_selection)
-
-            # Execute all transactions
-            for sequence in transaction_sequences:
-                for src, dest, tx_attrs in sequence.transactions:
-                    self.graph_generator._add_edge(src, dest, tx_attrs)
-                    fraudulent_edges.append((src, dest, tx_attrs))
-
-            return fraudulent_edges
+            # Build sequences
+            for sequence in self.temporal.generate_transaction_sequences(entity_selection):
+                generated_edges.extend(sequence.transactions)
 
         except Exception as e:
-            print(f"Failed to inject {self.__class__.__name__}: {e}")
-            return fraudulent_edges
+            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
+
+        return generated_edges
 
     @property
     def pattern_name(self) -> str:

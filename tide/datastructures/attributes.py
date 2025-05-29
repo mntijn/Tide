@@ -16,7 +16,7 @@ from .enums import (
 class NodeAttributes:
     node_type: NodeType
     creation_date: Optional[datetime.datetime] = None
-    address: Optional[Dict[str, str]] = None
+    country_code: Optional[str] = None
     is_fraudulent: bool = False
     risk_score: Optional[float] = None
 

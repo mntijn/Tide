@@ -25,27 +25,57 @@ class FrontBusinessStructural(StructuralComponent):
         business_accounts_ids = []
         overseas_business_accounts_ids = []
 
-        potential_front_businesses = self.filter_entities_by_criteria(
-            available_entities,
-            {"node_type": NodeType.BUSINESS}
-        )
-        random.shuffle(potential_front_businesses)
+        # Use the new clustering logic to find better candidates for front businesses
+        # Priority order: super_high_risk -> offshore_candidates -> high_risk_business_categories -> all businesses
+        potential_front_businesses = []
 
-        # If no businesses in available_entities, consider all businesses in graph
+        # First try super high-risk entities (multiple risk factors)
+        super_high_risk = self.get_cluster("super_high_risk")
+        businesses_super_high_risk = self.filter_entities_by_criteria(
+            super_high_risk, {"node_type": NodeType.BUSINESS})
+        if businesses_super_high_risk:
+            potential_front_businesses.extend(businesses_super_high_risk)
+
+        # Then try businesses that are likely offshore candidates
+        if len(potential_front_businesses) < 10:  # If we need more candidates
+            offshore_candidates = self.get_cluster("offshore_candidates")
+            businesses_offshore = self.filter_entities_by_criteria(
+                offshore_candidates, {"node_type": NodeType.BUSINESS})
+            potential_front_businesses.extend(businesses_offshore)
+
+        # Then try high-risk business categories
+        if len(potential_front_businesses) < 10:
+            high_risk_biz = self.get_cluster("high_risk_business_categories")
+            potential_front_businesses.extend(high_risk_biz)
+
+        # Finally, use traditional filtering as fallback
+        if len(potential_front_businesses) < 5:
+            traditional_candidates = self.filter_entities_by_criteria(
+                available_entities, {"node_type": NodeType.BUSINESS})
+            potential_front_businesses.extend(traditional_candidates)
+
+        # Remove duplicates and prioritize by risk factors
+        potential_front_businesses = list(set(potential_front_businesses))
+        potential_front_businesses = self.prioritize_by_risk_factors(
+            potential_front_businesses)
+
+        # If still no businesses found, fall back to all businesses in graph
         if not potential_front_businesses:
             potential_front_businesses = list(
                 self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
-            random.shuffle(potential_front_businesses)
+
+        random.shuffle(potential_front_businesses)
 
         # Default values for pattern parameters
-        min_bus_accounts = self.params.get("front_business_pattern", {}).get(
+        pattern_config = self.params.get("frontBusiness", {})
+        min_bus_accounts = pattern_config.get(
             "min_accounts_for_front_business", 2)
-        num_front_business_accounts_to_use = self.params.get(
-            "front_business_pattern", {}).get("num_front_business_accounts_to_use", 3)
-        min_overseas_dest_bus_accounts = self.params.get(
-            "front_business_pattern", {}).get("min_overseas_destination_accounts", 2)
-        max_overseas_bus_accounts_for_front = self.params.get(
-            "front_business_pattern", {}).get("max_overseas_destination_accounts_for_front", 4)
+        num_front_business_accounts_to_use = pattern_config.get(
+            "num_front_business_accounts_to_use", 3)
+        min_overseas_dest_bus_accounts = pattern_config.get(
+            "min_overseas_destination_accounts", 2)
+        max_overseas_bus_accounts_for_front = pattern_config.get(
+            "max_overseas_destination_accounts_for_front", 4)
 
         for bus_id in potential_front_businesses:
             owned_accounts_data = [
@@ -59,7 +89,7 @@ class FrontBusinessStructural(StructuralComponent):
                 all_graph_accounts = self.graph_generator.all_nodes.get(
                     NodeType.ACCOUNT, [])
                 business_country = self.graph.nodes[bus_id].get(
-                    "address", {}).get("country")
+                    "country_code")  # Note: updated to use country_code instead of address.country
 
                 for acc_id in all_graph_accounts:
                     if acc_id in owned_accounts_data:  # Exclude accounts owned by the front business itself
@@ -67,7 +97,7 @@ class FrontBusinessStructural(StructuralComponent):
 
                     acc_node_data = self.graph.nodes[acc_id]
                     acc_country = acc_node_data.get(
-                        "address", {}).get("country")
+                        "country_code")  # Updated field name
 
                     # Ensure account has a country and it's different from the front business's country
                     if acc_country and acc_country != business_country:
@@ -98,8 +128,8 @@ class FrontBusinessStructural(StructuralComponent):
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         return EntitySelection(
-            central_entities=business_accounts_ids,
-            peripheral_entities=overseas_business_accounts_ids,
+            central_entities=[central_business_id],  # Business ID is central
+            peripheral_entities=business_accounts_ids + overseas_business_accounts_ids,
         )
 
 
@@ -114,15 +144,114 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
             return sequences
 
-        front_business_accounts = entity_selection.central_entities
-        overseas_dest_accounts = entity_selection.peripheral_entities
+        # central_entities is now a list with the main business ID
+        # peripheral_entities contains all related accounts (front's own and overseas)
+        # We need to differentiate them for the logic below.
 
-        # Default values for pattern parameters
-        min_deposit_cycles = 5
-        max_deposit_cycles = 15
+        front_business_id = entity_selection.central_entities[0]
+
+        # Re-fetch owned accounts for the front business
+        owned_accounts_ids = [
+            n for n in self.graph.neighbors(front_business_id)
+            if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
+        ]
+
+        # Determine which of the peripheral entities are the front's own vs overseas
+        # This assumes peripheral_entities was populated correctly by StructuralComponent
+        # (i.e., first its own accounts, then overseas ones, or we filter by country)
+
+        front_business_country = self.graph.nodes[front_business_id].get(
+            "country_code")
+
+        # Filter from peripheral_entities or re-select based on criteria if necessary
+        # For simplicity, let's assume structural component selected them appropriately
+        # and we just need to pick some for this cycle.
+
+        # It's safer to re-filter peripheral entities to distinguish them
+        potential_front_own_accounts_in_peripheral = []
+        potential_overseas_dest_accounts_in_peripheral = []
+
+        for acc_id in entity_selection.peripheral_entities:
+            acc_node_data = self.graph.nodes[acc_id]
+            acc_country = acc_node_data.get("country_code")
+
+            # Check if it's one of the front business's owned accounts
+            # This can be tricky if an overseas account is ALSO in owned_accounts_ids
+            # For now, we assume they are distinct sets initially in peripheral_entities
+            # A simpler way: owned_accounts are always domestic to the business.
+
+            is_owned_by_selected_front_business = False
+            for owner_id in self.graph.predecessors(acc_id):
+                if owner_id == front_business_id:
+                    is_owned_by_selected_front_business = True
+                    break
+
+            if is_owned_by_selected_front_business and acc_country == front_business_country:
+                potential_front_own_accounts_in_peripheral.append(acc_id)
+            elif acc_country and acc_country != front_business_country:
+                # Check if it's a business account (as per original logic)
+                is_business_account = False
+                for owner_id in self.graph.predecessors(acc_id):
+                    if self.graph.nodes[owner_id].get("node_type") == NodeType.BUSINESS:
+                        is_business_account = True
+                        break
+                if is_business_account:
+                    potential_overseas_dest_accounts_in_peripheral.append(
+                        acc_id)
+
+        # If structural component didn't provide enough distinct accounts in peripheral,
+        # we might need to fall back or log a warning.
+        # For now, we proceed with what we could filter.
+
+        # Ensure we use the accounts passed by EntitySelection, prioritizing those.
+        # The num_front_business_accounts_to_use logic from structural
+        # should already limit what's in peripheral_entities that are "own" accounts.
+
+        # Select actual accounts to use for this pattern instance from the filtered lists
+        front_business_accounts_to_use_count = self.params.get("frontBusiness", {}).get(
+            "num_front_business_accounts_to_use", 3)
+
+        front_business_accounts = random.sample(
+            potential_front_own_accounts_in_peripheral,
+            min(len(potential_front_own_accounts_in_peripheral),
+                front_business_accounts_to_use_count)
+        ) if potential_front_own_accounts_in_peripheral else []
+
+        max_overseas_dest_accounts_count = self.params.get("frontBusiness", {}).get(
+            "max_overseas_destination_accounts_for_front", 4)
+        min_overseas_dest_accounts_count = self.params.get("frontBusiness", {}).get(
+            "min_overseas_destination_accounts", 2)
+
+        num_overseas_to_select_for_cycle = random.randint(
+            min_overseas_dest_accounts_count,
+            max_overseas_dest_accounts_count
+        )
+
+        overseas_dest_accounts = random.sample(
+            potential_overseas_dest_accounts_in_peripheral,
+            min(len(potential_overseas_dest_accounts_in_peripheral),
+                num_overseas_to_select_for_cycle)
+        ) if potential_overseas_dest_accounts_in_peripheral else []
+
+        if not front_business_accounts or not overseas_dest_accounts:
+            # Not enough accounts of the required types, skip this pattern instance
+            # Or log a warning: print(f"Warning: Not enough suitable accounts for FrontBusiness temporal component for {front_business_id}")
+            return sequences
+
+        # Default values for pattern parameters from YAML
+        pattern_config_temporal = self.params.get(
+            "frontBusiness", {}).get("transaction_params", {})
+        min_deposit_cycles_yaml = pattern_config_temporal.get(
+            "min_deposit_cycles", 5)
+        max_deposit_cycles_yaml = pattern_config_temporal.get(
+            "max_deposit_cycles", 15)
+        deposit_amount_range_yaml = pattern_config_temporal.get(
+            "deposit_amount_range", [10000, 50000])
+        deposits_per_cycle_yaml = pattern_config_temporal.get(
+            "deposits_per_cycle", [1, 3])
 
         num_deposit_cycles = random.randint(
-            min_deposit_cycles, max_deposit_cycles)
+            min_deposit_cycles_yaml, max_deposit_cycles_yaml)
 
         if (self.time_span["end_date"] - self.time_span["start_date"]).days < 15:
             start_day_offset_range = max(

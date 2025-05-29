@@ -1,13 +1,15 @@
 from typing import Dict, Any
-from faker import Faker
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import HIGH_RISK_COUNTRIES
+from ..utils.faker_instance import get_faker_instance
+from ..utils.random_instance import random_instance
 
 
 class Entity:
     def __init__(self, params: Dict[str, Any]):
         self.params = params
-        self.faker = Faker()
+        self.faker = get_faker_instance()
+        self.random_instance = random_instance
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
         self.risk_config = self.params.get("high_risk_config", {})
@@ -18,7 +20,7 @@ class Entity:
         base_risk = self.risk_weights.get("base_risk", 0.05)
         score = base_risk
 
-        entity_country = common_attrs.get("address", {}).get("country")
+        entity_country = common_attrs.get("country_code")
         if entity_country in HIGH_RISK_COUNTRIES:
             country_weight = self.risk_weights.get("country", 0.20)
             country_factor = self.risk_config.get(

@@ -1,6 +1,13 @@
 from faker import Faker
 from typing import Optional, List, Tuple, Dict
 from ..datastructures.enums import AgeGroup
+from .faker_instance import get_faker_instance
+
+
+def get_random_business_category() -> str:
+    """Get a random business category using the singleton faker instance"""
+    faker = get_faker_instance()
+    return generate_business_category(faker)
 
 
 def generate_business_category(faker: Faker) -> str:
@@ -98,6 +105,7 @@ def map_occupation_to_business_category(occupation: str) -> Optional[str]:
         (["entrepreneur", "founder", "owner", "ceo",
          "business owner"], "Management Consulting"),
         (["real estate", "estate agent"], "Real Estate"),
+        (["unknown"], "Unknown"),
     ]
 
     for keywords, category in keyword_category_mapping:
@@ -126,3 +134,27 @@ def get_max_age_from_group(age_group: AgeGroup) -> int:
         AgeGroup.SIXTY_FIVE_PLUS: 75
     }
     return age_mapping.get(age_group, 18)
+
+
+def get_min_age_from_group(age_group: AgeGroup) -> int:
+    """
+    Returns the minimum age for a given age group.
+    """
+    age_mapping = {
+        AgeGroup.EIGHTEEN_TO_TWENTY_FOUR: 18,
+        AgeGroup.TWENTY_FIVE_TO_THIRTY_FOUR: 25,
+        AgeGroup.THIRTY_FIVE_TO_FORTY_NINE: 35,
+        AgeGroup.FIFTY_TO_SIXTY_FOUR: 50,
+        AgeGroup.SIXTY_FIVE_PLUS: 65
+    }
+    return age_mapping.get(age_group, 18)
+
+
+def get_random_age_from_group(age_group: AgeGroup) -> int:
+    """
+    Returns a random age within the given age group range.
+    """
+    from ..utils.random_instance import random_instance
+    min_age = get_min_age_from_group(age_group)
+    max_age = get_max_age_from_group(age_group)
+    return random_instance.randint(min_age, max_age)
