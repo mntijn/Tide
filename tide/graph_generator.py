@@ -25,6 +25,7 @@ from .patterns.base import StructuralComponent, EntitySelection
 from .utils.accounts import process_individual, process_business
 from .utils.random_instance import random_instance
 from .utils.faker_instance import reset_faker_seed
+from .utils.threading import run_patterns_in_parallel
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -503,6 +504,7 @@ class GraphGenerator:
             return
 
         total_edges_added = 0
+        all_nodes_list = list(self.graph.nodes)
 
         if is_random:
             # Random mode: randomly select num_illicit_patterns patterns
@@ -510,22 +512,33 @@ class GraphGenerator:
                 f"Injecting {self.num_aml_patterns} AML patterns randomly...")
             available_patterns = list(self.pattern_manager.patterns.values())
 
+            # Create pattern tasks for parallel execution
+            pattern_tasks = []
             for i in range(self.num_aml_patterns):
                 pattern_instance = self.random_instance.choice(
                     available_patterns)
                 logger.info(
                     f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
-                new_edges = pattern_instance.inject_pattern(
-                    list(self.graph.nodes))
-                for src, dest, attrs in new_edges:
+                # Create task tuple: (function, args, task_index)
+                task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
+                pattern_tasks.append(task)
+
+            # Run patterns in parallel with deterministic seeding
+            pattern_results = run_patterns_in_parallel(
+                pattern_tasks, self.random_seed)
+
+            # Merge all edges into the main graph
+            for edges in pattern_results:
+                for src, dest, attrs in edges:
                     self._add_edge(src, dest, attrs)
-                total_edges_added += len(new_edges)
+                total_edges_added += len(edges)
+
         else:
             # Fixed mode: use specific counts for each pattern type
             logger.info("Injecting AML patterns with specific counts...")
 
-            # Map config keys to pattern names (handle variations in naming)
+            # Map config keys to pattern names
             config_to_pattern_mapping = {}
             for pattern_name, pattern_instance in self.pattern_manager.patterns.items():
                 # Create multiple possible config keys for each pattern
@@ -537,7 +550,11 @@ class GraphGenerator:
                     config_to_pattern_mapping[normalized_name[:-8]
                                               ] = pattern_instance
 
+            # Collect all pattern tasks first
+            pattern_tasks = []
+            task_index = 0
             total_patterns_injected = 0
+
             # Only sort config keys in deterministic mode (when seed is defined)
             config_keys = (sorted(pattern_frequency_config.keys()) if self.random_seed
                            else pattern_frequency_config.keys())
@@ -550,8 +567,7 @@ class GraphGenerator:
 
                 if isinstance(count, int) and count > 0:
                     # Normalize the config key
-                    normalized_config_key = config_key.lower().replace(
-                        "_", "")
+                    normalized_config_key = config_key.lower().replace("_", "")
 
                     pattern_instance = config_to_pattern_mapping.get(
                         normalized_config_key)
@@ -559,11 +575,11 @@ class GraphGenerator:
                         logger.info(
                             f"Injecting {count} instances of {pattern_instance.pattern_name}")
                         for i in range(count):
-                            new_edges = pattern_instance.inject_pattern(
-                                list(self.graph.nodes))
-                            for src, dest, attrs in new_edges:
-                                self._add_edge(src, dest, attrs)
-                            total_edges_added += len(new_edges)
+                            # Create task tuple: (function, args, task_index)
+                            task = (pattern_instance.inject_pattern,
+                                    (all_nodes_list,), task_index)
+                            pattern_tasks.append(task)
+                            task_index += 1
                             total_patterns_injected += 1
                     else:
                         logger.warning(
@@ -572,6 +588,17 @@ class GraphGenerator:
             if total_patterns_injected == 0:
                 logger.warning(
                     "No patterns were injected. Check your pattern_frequency configuration.")
+                return
+
+            # Run all patterns in parallel with deterministic seeding
+            pattern_results = run_patterns_in_parallel(
+                pattern_tasks, self.random_seed)
+
+            # Merge all edges into the main graph
+            for edges in pattern_results:
+                for src, dest, attrs in edges:
+                    self._add_edge(src, dest, attrs)
+                total_edges_added += len(edges)
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
