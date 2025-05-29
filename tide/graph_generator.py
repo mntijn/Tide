@@ -37,12 +37,8 @@ logger = logging.getLogger(__name__)
 class GraphGenerator:
     def __init__(self, params: Dict[str, Any]):
         self.params = params
-        # ------------------------------------------------------------------
-        #  Reproducibility controls
-        # ------------------------------------------------------------------
         self.random_seed: Optional[int] = params.get("random_seed")
 
-        # ------------------------------------------------------------------
         self.graph = nx.DiGraph()
         self.node_counter = 0
         self.all_nodes: Dict[NodeType, List[str]] = {nt: [] for nt in NodeType}
