@@ -208,9 +208,17 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             timestamps = self.generate_timestamps(
                 base_start_time, temporal_type, num_transactions)
 
+        # Get destination account currency for proper structuring
+        # Sample a destination to determine currency (assuming all overseas accounts use similar currencies)
+        sample_destination_id = random.choice(overseas_account_ids)
+        destination_currency = self.graph.nodes[sample_destination_id].get(
+            "currency", "EUR")
+
         amounts = self.generate_structured_amounts(
-            num_transactions, base_amount=round(
-                random.uniform(amount_range[0], amount_range[1]), 2)
+            count=num_transactions,
+            base_amount=round(random.uniform(
+                amount_range[0], amount_range[1]), 2),
+            target_currency=destination_currency
         )
 
         transactions_for_sequence = []

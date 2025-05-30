@@ -120,9 +120,16 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         )
         inflow_timestamps = self.generate_timestamps(
             inflow_start_time, "high_frequency", num_incoming_transfers)
+
+        # Get the currency of the primary inflow account for proper structuring
+        inflow_account_currency = self.graph.nodes[primary_inflow_account].get(
+            "currency", "EUR")
+
         inflow_amounts = self.generate_structured_amounts(
-            num_incoming_transfers, base_amount=round(random.uniform(
-                inflow_amount_range[0], inflow_amount_range[1]), 2)
+            count=num_incoming_transfers,
+            base_amount=round(random.uniform(
+                inflow_amount_range[0], inflow_amount_range[1]), 2),
+            target_currency=inflow_account_currency
         )
 
         inflow_transactions = []
@@ -158,9 +165,18 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         withdrawal_timestamps = self.generate_timestamps(
             withdrawal_start_time, "high_frequency", num_withdrawals)
+
+        # Get the currency from the individual accounts for proper structuring
+        # Sample an account to determine currency (assuming all accounts have similar currencies)
+        sample_account = random.choice(individual_accounts)
+        account_currency = self.graph.nodes[sample_account].get(
+            "currency", "EUR")
+
         withdrawal_amounts = self.generate_structured_amounts(
-            num_withdrawals, base_amount=round(random.uniform(
-                withdrawal_amount_range[0], withdrawal_amount_range[1]), 2)
+            count=num_withdrawals,
+            base_amount=round(random.uniform(
+                withdrawal_amount_range[0], withdrawal_amount_range[1]), 2),
+            target_currency=account_currency
         )
 
         withdrawal_transactions = []

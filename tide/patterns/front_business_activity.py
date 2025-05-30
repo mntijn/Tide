@@ -274,8 +274,16 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
 
             deposit_timestamps = self.generate_timestamps(
                 current_time, "high_frequency", num_deposits_in_cycle)
+
+            # Get the currency of the target deposit account for proper structuring
+            deposit_account_currency = self.graph.nodes[target_deposit_account].get(
+                "currency", "EUR")
+
             deposit_amounts = self.generate_structured_amounts(
-                num_deposits_in_cycle, base_amount=random.randint(10000, 50000))
+                count=num_deposits_in_cycle,
+                base_amount=random.randint(10000, 50000),
+                target_currency=deposit_account_currency
+            )
 
             deposit_txs_this_cycle = []
             for j in range(min(num_deposits_in_cycle, len(deposit_timestamps))):
@@ -318,8 +326,17 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
             base_transfer_amount = (total_deposited_this_cycle / num_overseas_transfers_in_cycle * random.uniform(0.8, 1.0)
                                     if total_deposited_this_cycle > 0 and num_overseas_transfers_in_cycle > 0
                                     else round(random.uniform(5000, 20000), 2))
+
+            # Get the currency of a sample overseas destination account for proper structuring
+            sample_overseas_dest = random.choice(overseas_dest_accounts)
+            overseas_currency = self.graph.nodes[sample_overseas_dest].get(
+                "currency", "EUR")
+
             transfer_amounts = self.generate_structured_amounts(
-                num_overseas_transfers_in_cycle, base_amount=base_transfer_amount)
+                count=num_overseas_transfers_in_cycle,
+                base_amount=base_transfer_amount,
+                target_currency=overseas_currency
+            )
 
             transfer_txs_this_cycle = []
             source_for_transfer_account = target_deposit_account

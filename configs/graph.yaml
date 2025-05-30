@@ -29,6 +29,7 @@ pattern_frequency:
 
 # Reporting threshold for structuring amounts
 reporting_threshold: 10000
+reporting_currency: 'USD'
 # Base probability for high-risk business selection
 high_risk_business_probability: 0.05
 # Probability for creating a random business when occupation doesn't suggest one

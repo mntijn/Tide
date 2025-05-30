@@ -10,6 +10,15 @@ from ..datastructures.enums import (
 from ..datastructures.attributes import (
     TransactionAttributes, NodeAttributes
 )
+from ..utils.currency_conversion import (
+    convert_currency, generate_structured_amounts as generate_structured_amounts_util
+)
+
+try:
+    from forex_python.converter import CurrencyRates
+except ImportError:
+    print("Warning: forex-python not available. Currency conversion will be disabled.")
+    CurrencyRates = None
 
 
 @dataclass
@@ -274,21 +283,38 @@ class TemporalComponent(ABC):
                     start_time + datetime.timedelta(hours=offset_hours))
             return sorted(timestamps)
 
-    def generate_structured_amounts(self, count: int, base_amount: float = None) -> List[float]:
+    def convert_currency(self, amount: float, from_currency: str, to_currency: str,
+                         transaction_date: datetime.datetime = None) -> float:
+        """Convert amount from one currency to another using the utility module.
+
+        Args:
+            amount: Amount to convert
+            from_currency: Source currency code (e.g., 'EUR', 'GBP')
+            to_currency: Target currency code (e.g., 'USD')
+            transaction_date: Date for historical rates (unused - using current rates)
+
+        Returns:
+            Converted amount in target currency
+        """
+        return convert_currency(amount, from_currency, to_currency)
+
+    def generate_structured_amounts(self, count: int, base_amount: float = None,
+                                    target_currency: str = None,
+                                    transaction_date: datetime.datetime = None) -> List[float]:
         """Generate amounts that may be structured to avoid thresholds"""
-        if base_amount is None:
-            reporting_threshold = self.params.get("reporting_threshold", 10000)
-            base_amount = reporting_threshold * \
-                round(random.uniform(0.7, 0.95), 2)
 
-        amounts = []
-        for i in range(count):
-            # Add variation to avoid exact patterns
-            variation = round(random.uniform(-base_amount *
-                              0.15, base_amount * 0.15))
-            amounts.append(max(100, base_amount + variation))
+        # Get reporting threshold and currency from config
+        reporting_threshold = self.params.get("reporting_threshold", 10000)
+        reporting_currency = self.params.get("reporting_currency", "USD")
 
-        return amounts
+        # Use the utility function for structured amount generation
+        return generate_structured_amounts_util(
+            count=count,
+            reporting_threshold=reporting_threshold,
+            reporting_currency=reporting_currency,
+            target_currency=target_currency,
+            base_amount=base_amount
+        )
 
 
 class CompositePattern(PatternInjector):
