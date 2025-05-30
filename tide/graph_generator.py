@@ -45,6 +45,9 @@ class GraphGenerator:
         self.fraudulent_entities_map: Dict[NodeType, List[str]] = {
             nt: [] for nt in NodeType}
 
+        # Track transaction history for each entity
+        self.entity_transaction_history: Dict[str, datetime.datetime] = {}
+
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
         self.fraud_selection_config = params.get("fraud_selection_config", {})

@@ -69,12 +69,24 @@ class PatternInjector:
         elif self.graph.has_node(dest_id):
             currency = self.graph.nodes[dest_id].get("currency", currency)
 
+        # Compute time since previous transaction for this entity
+        time_since_previous = None
+        if hasattr(self.graph_generator, 'entity_transaction_history'):
+            last_tx_time = self.graph_generator.entity_transaction_history.get(
+                src_id)
+            if last_tx_time is not None:
+                time_since_previous = timestamp - last_tx_time
+
+            # Update the history
+            self.graph_generator.entity_transaction_history[src_id] = timestamp
+
         return TransactionAttributes(
             timestamp=timestamp,
             amount=amount,
             currency=currency,
             transaction_type=transaction_type,
-            is_fraudulent=is_fraudulent
+            is_fraudulent=is_fraudulent,
+            time_since_previous_transaction=time_since_previous
         )
 
 
