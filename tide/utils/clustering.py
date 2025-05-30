@@ -19,13 +19,14 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     - intermediaries: Money mules/fronts (often unwitting participants)
     - Basic single-factor clusters: Country, business category, age, occupation
 
-    Note: Clusters now include both entities AND their accounts for direct pattern usage.
+    Note: Clusters contain only entities (individuals and businesses).
+    Patterns find accounts by traversing the graph from these entities.
 
     Args:
         graph_generator: The GraphGenerator instance containing graph and configuration
 
     Returns:
-        Dict[str, List[str]]: Mapping of cluster names to lists of node IDs
+        Dict[str, List[str]]: Mapping of cluster names to lists of entity IDs
     """
     logger.info("Building entity clusters...")
     min_risk_score = graph_generator.fraud_selection_config.get(
@@ -48,29 +49,10 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
         "fraudulent": [],
     }
 
-    # Helper function to add entity and its accounts to clusters
-    def add_entity_and_accounts_to_cluster(cluster_name: str, entity_id: str):
-        """Add both the entity and all its accounts to the specified cluster"""
+    # Helper function to add entity to clusters
+    def add_entity_to_cluster(cluster_name: str, entity_id: str):
+        """Add the entity to the specified cluster"""
         clusters[cluster_name].append(entity_id)
-
-        # Find all accounts owned by this entity
-        for neighbor_id in graph_generator.graph.neighbors(entity_id):
-            neighbor_data = graph_generator.graph.nodes.get(neighbor_id, {})
-            if neighbor_data.get("node_type") == NodeType.ACCOUNT:
-                clusters[cluster_name].append(neighbor_id)
-
-        # Also check if this entity owns businesses that have accounts
-        if graph_generator.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
-            for owned_business_id in graph_generator.graph.neighbors(entity_id):
-                business_data = graph_generator.graph.nodes.get(
-                    owned_business_id, {})
-                if business_data.get("node_type") == NodeType.BUSINESS:
-                    # Add business accounts too
-                    for business_account_id in graph_generator.graph.neighbors(owned_business_id):
-                        business_account_data = graph_generator.graph.nodes.get(
-                            business_account_id, {})
-                        if business_account_data.get("node_type") == NodeType.ACCOUNT:
-                            clusters[cluster_name].append(business_account_id)
 
     # Single pass through all nodes to build all clusters
     for node_id, data in graph_generator.graph.nodes(data=True):
@@ -82,42 +64,42 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
         if risk_score is None:
             risk_score = 0.0
 
-        # Skip accounts for most clusters (focus on individuals/businesses)
-        if node_type == NodeType.ACCOUNT:
+        # Skip accounts and institutions for clustering (focus on individuals/businesses)
+        if node_type in [NodeType.ACCOUNT, NodeType.INSTITUTION]:
             continue
 
         risk_factors = []  # Track all risk factors for this entity
 
         # Check individual risk factors
         if country in HIGH_RISK_COUNTRIES:
-            add_entity_and_accounts_to_cluster("high_risk_countries", node_id)
+            add_entity_to_cluster("high_risk_countries", node_id)
             risk_factors.append("high_risk_country")
 
         if node_type == NodeType.BUSINESS and data.get("is_high_risk_category", False):
-            add_entity_and_accounts_to_cluster(
+            add_entity_to_cluster(
                 "high_risk_business_categories", node_id)
             risk_factors.append("high_risk_business")
 
         age_group = data.get("age_group")
         if age_group and str(age_group).upper() in HIGH_RISK_AGE_GROUPS:
-            add_entity_and_accounts_to_cluster("high_risk_age_groups", node_id)
+            add_entity_to_cluster("high_risk_age_groups", node_id)
             risk_factors.append("high_risk_age")
 
         occupation = data.get("occupation")
         if occupation and occupation in HIGH_RISK_OCCUPATIONS:
-            add_entity_and_accounts_to_cluster(
+            add_entity_to_cluster(
                 "high_risk_occupations", node_id)
             risk_factors.append("high_risk_occupation")
 
         if risk_score >= min_risk_score:
-            add_entity_and_accounts_to_cluster("high_risk_score", node_id)
+            add_entity_to_cluster("high_risk_score", node_id)
             risk_factors.append("high_risk_score")
 
         # Build composite clusters based on multiple risk factors
 
         # Super high risk: entities with 3+ risk factors
         if len(risk_factors) >= 3:
-            add_entity_and_accounts_to_cluster("super_high_risk", node_id)
+            add_entity_to_cluster("super_high_risk", node_id)
 
         # Intermediaries: comprehensive criteria for potential money mules/intermediaries
         is_intermediary = False
@@ -145,7 +127,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
             is_intermediary = True
 
         if is_intermediary:
-            add_entity_and_accounts_to_cluster("intermediaries", node_id)
+            add_entity_to_cluster("intermediaries", node_id)
 
         # Offshore candidates: entities likely to have or use offshore accounts
         is_offshore_candidate = False
@@ -170,7 +152,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
             is_offshore_candidate = True
 
         if is_offshore_candidate:
-            add_entity_and_accounts_to_cluster("offshore_candidates", node_id)
+            add_entity_to_cluster("offshore_candidates", node_id)
 
         # Structuring candidates: entities likely to engage in transaction structuring
         is_structuring_candidate = False
@@ -194,7 +176,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
             is_structuring_candidate = True
 
         if is_structuring_candidate:
-            add_entity_and_accounts_to_cluster(
+            add_entity_to_cluster(
                 "structuring_candidates", node_id)
 
     # Deduplicate all clusters (since entities might be added multiple times)
@@ -205,22 +187,15 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     cluster_summary = [(k, len(v)) for k, v in clusters.items() if v]
     logger.info(f"Built entity clusters: {cluster_summary}")
 
-    # Log breakdown of entities vs accounts in clusters
+    # Log entity counts in clusters (all cluster items are now entities)
     for cluster_name, entities in clusters.items():
         if entities:
-            entity_count = len([e for e in entities if graph_generator.graph.nodes.get(
-                e, {}).get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]])
-            account_count = len([e for e in entities if graph_generator.graph.nodes.get(
-                e, {}).get("node_type") == NodeType.ACCOUNT])
-            logger.info(
-                f"  {cluster_name}: {entity_count} entities + {account_count} accounts = {len(entities)} total")
+            logger.info(f"  {cluster_name}: {len(entities)} entities")
 
     # Log overlap statistics for insight
     total_entities = len([n for n, d in graph_generator.graph.nodes(data=True)
                           if d.get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]])
-    super_high_risk_entities = [e for e in clusters["super_high_risk"]
-                                if graph_generator.graph.nodes.get(e, {}).get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]]
-    super_high_risk_count = len(super_high_risk_entities)
+    super_high_risk_count = len(clusters["super_high_risk"])
     if total_entities > 0:
         logger.info(f"Super high-risk entities: {super_high_risk_count}/{total_entities} "
                     f"({super_high_risk_count/total_entities*100:.1f}%)")
