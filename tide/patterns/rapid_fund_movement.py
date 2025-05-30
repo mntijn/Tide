@@ -74,7 +74,8 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         primary_inflow_account = random.choice(individual_accounts)
 
         # Load parameters from YAML config
-        pattern_config = self.params.get("rapidMovement", {})
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("rapidMovement", {})
         tx_params = pattern_config.get("transaction_params", {})
         inflow_params = tx_params.get("inflows", {})
         withdrawal_params = tx_params.get("withdrawals", {})

@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 5
+  individuals: 500
   # businesses: 0
   institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
@@ -19,7 +19,7 @@ business_creation_date_range: [90, 5475]
 
 # Pattern generation settings
 pattern_frequency:
-  random: True
+  random: False
   num_illicit_patterns: 10
 
   # If random is false these values are used instead of num_illicit patterns

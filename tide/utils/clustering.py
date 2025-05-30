@@ -143,10 +143,6 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
                                                 "Trust Services", "Currency Exchange"]):
             is_offshore_candidate = True
 
-        # Entities from high-risk countries
-        elif country in HIGH_RISK_COUNTRIES:
-            is_offshore_candidate = True
-
         # High overall risk score
         elif risk_score >= 0.7:
             is_offshore_candidate = True

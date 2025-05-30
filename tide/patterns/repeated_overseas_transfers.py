@@ -24,35 +24,13 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
         # So, 1 central entity is the core requirement here.
         return 1
 
-    def _filter_entities_by_type(self, entities: List[str]) -> List[str]:
-        """Helper to filter entities to only individuals and businesses."""
-        filtered = []
-        for entity_id in entities:
-            try:
-                node_type = self.graph.nodes[entity_id].get("node_type")
-                if node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-                    filtered.append(entity_id)
-            except KeyError:
-                continue  # Skip entities that don't exist in graph
-        return filtered
-
-    def _is_account_owned_by_entity(self, account_id: str) -> bool:
-        """Check if account is owned by an individual or business entity."""
-        try:
-            return any(
-                self.graph.nodes.get(owner_id, {}).get("node_type") in [
-                    NodeType.INDIVIDUAL, NodeType.BUSINESS]
-                for owner_id in self.graph.predecessors(account_id)
-            )
-        except KeyError:
-            return False
-
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         central_owner_id = None
         source_account_id = None
         overseas_account_ids = []
 
-        pattern_config = self.params.get("repeatedOverseas", {})
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("repeatedOverseas", {})
         min_overseas_entities = pattern_config.get("min_overseas_entities", 2)
         max_overseas_entities = pattern_config.get("max_overseas_entities", 5)
 
@@ -62,25 +40,19 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
         # Priority 1: offshore_candidates and super_high_risk clusters
         for cluster_name in ["offshore_candidates", "super_high_risk"]:
             cluster_entities = self.get_cluster(cluster_name)
-            print(f"Cluster {cluster_name}: {cluster_entities}")
-            filtered_entities = self._filter_entities_by_type(cluster_entities)
-            print(f"Filtered entities: {filtered_entities}")
-            print("Difference: ", set(cluster_entities) - set(filtered_entities))
-            potential_source_entities.extend(filtered_entities)
+            potential_source_entities.extend(cluster_entities)
             if len(potential_source_entities) > 20:  # Gather a pool
                 break
 
         # Priority 2: high_risk_countries if pool is small
         if len(potential_source_entities) < 10:
             high_risk_entities = self.get_cluster("high_risk_countries")
-            filtered_entities = self._filter_entities_by_type(
-                high_risk_entities)
-            potential_source_entities.extend(filtered_entities)
+            potential_source_entities.extend(high_risk_entities)
 
         potential_source_entities = list(dict.fromkeys(
             potential_source_entities))  # Deduplicate
 
-        # Fallback if specific clusters are empty or yield too few candidates
+        # If specific clusters are empty or yield too few candidates
         if not potential_source_entities:
             raise ValueError(
                 "No potential source entities found. Please check the graph configuration.")
@@ -110,17 +82,16 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
                     owned_domestic_accounts)
 
                 # Search for overseas destination accounts
-                high_risk_candidates = list(
-                    self.get_cluster("high_risk_countries"))
+                high_risk_country_candidates = self.get_cluster(
+                    "high_risk_countries")
                 potential_overseas_accounts = []
 
-                for acc_id in high_risk_candidates:
+                for acc_id in high_risk_country_candidates:
                     try:
                         acc_node_data = self.graph.nodes[acc_id]
                         acc_country = acc_node_data.get("country_code")
 
-                        if (acc_country and acc_country != entity_country and
-                                self._is_account_owned_by_entity(acc_id)):
+                        if acc_country and acc_country != entity_country:
                             potential_overseas_accounts.append(acc_id)
                     except KeyError:
                         continue
@@ -168,7 +139,8 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             return sequences
 
         # Load parameters from YAML config
-        pattern_config = self.params.get("repeatedOverseas", {})
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("repeatedOverseas", {})
         tx_params = pattern_config.get("transaction_params", {})
 
         min_tx = tx_params.get("min_transactions", 10)

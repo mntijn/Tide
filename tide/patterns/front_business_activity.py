@@ -67,7 +67,8 @@ class FrontBusinessStructural(StructuralComponent):
         random.shuffle(potential_front_businesses)
 
         # Default values for pattern parameters
-        pattern_config = self.params.get("frontBusiness", {})
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("frontBusiness", {})
         min_bus_accounts = pattern_config.get(
             "min_accounts_for_front_business", 2)
         num_front_business_accounts_to_use = pattern_config.get(

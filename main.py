@@ -4,6 +4,7 @@ import yaml
 import networkx as nx
 from typing import Dict, Any
 from enum import Enum
+import json
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
@@ -129,6 +130,7 @@ def convert_enums_to_strings(graph: nx.DiGraph) -> nx.DiGraph:
 if __name__ == "__main__":
     # Load and merge configurations
     generator_parameters = load_configurations()
+    print('generator_parameters', generator_parameters)
 
     # Convert date strings to datetime objects
     generator_parameters["time_span"]["start_date"] = datetime.datetime.fromisoformat(
@@ -149,6 +151,23 @@ if __name__ == "__main__":
         nodes_filepath="generated_nodes.csv",
         edges_filepath="generated_edges.csv"
     )
+
+    # Export tracked patterns as JSON
+    patterns_data = {
+        'metadata': {
+            'generation_timestamp': datetime.datetime.now().isoformat(),
+            'total_patterns': len(aml_graph_gen.injected_patterns),
+            'graph_nodes': aml_graph_gen.num_of_nodes(),
+            'graph_edges': aml_graph_gen.num_of_edges()
+        },
+        'patterns': aml_graph_gen.injected_patterns
+    }
+
+    with open("generated_patterns.json", 'w') as f:
+        json.dump(patterns_data, f, indent=2, default=str)
+
+    print(
+        f"Exported {len(aml_graph_gen.injected_patterns)} tracked patterns to: generated_patterns.json")
 
     # # Export to GraphML for visualization
     # print("Saving graph in GraphML format for visualization...")

@@ -80,6 +80,9 @@ class GraphGenerator:
         self.pattern_manager = PatternManager(self, self.params)
         self.entity_clusters: Dict[str, List[str]] = {}
 
+        # PATTERN TRACKING: Track what patterns are actually injected
+        self.injected_patterns = []
+
         self.background_tx_rate_per_account_per_day = params.get(
             "transaction_rates", {}).get("per_account_per_day", 0.2)
         self.num_aml_patterns = params.get(
@@ -236,6 +239,26 @@ class GraphGenerator:
 
             pattern_results = run_patterns_in_parallel(pattern_tasks)
 
+            # TRACK PATTERNS: Record what patterns were actually created
+            pattern_index = 0
+            for config_key in config_keys:
+                count = pattern_frequency_config[config_key]
+                if config_key in ["random", "num_illicit_patterns"]:
+                    continue
+
+                if isinstance(count, int) and count > 0:
+                    pattern_instance = config_to_pattern_mapping.get(
+                        config_key)
+                    if pattern_instance:
+                        for i in range(count):
+                            if pattern_index < len(pattern_results):
+                                edges = pattern_results[pattern_index]
+                                if edges:  # Only track if pattern actually generated edges
+                                    pattern_data = self._analyze_pattern_edges(
+                                        pattern_instance.pattern_name, edges, pattern_instance)
+                                    self.injected_patterns.append(pattern_data)
+                                pattern_index += 1
+
             for edges in pattern_results:
                 for src, dest, attrs in edges:
                     self._add_edge(src, dest, attrs)
@@ -243,6 +266,141 @@ class GraphGenerator:
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
+        logger.info(
+            f"Tracked {len(self.injected_patterns)} actual pattern instances.")
+
+    def _analyze_pattern_edges(self, pattern_name: str, edges: List, pattern_instance) -> Dict:
+        """Analyze pattern edges to extract key characteristics for tracking"""
+        if not edges:
+            return {}
+
+        # Extract entities involved
+        entities = set()
+        transactions = []
+        amounts = []
+        countries = set()
+        timestamps = []
+
+        for src, dest, attrs in edges:
+            entities.add(src)
+            entities.add(dest)
+
+            # Convert attrs to dict if it's a dataclass
+            attrs_dict = attrs.__dict__ if hasattr(
+                attrs, '__dict__') else attrs
+
+            transactions.append({
+                'src': src,
+                'dest': dest,
+                'amount': attrs_dict.get('amount', 0),
+                'timestamp': attrs_dict.get('timestamp'),
+                'transaction_type': str(attrs_dict.get('transaction_type', '')),
+                'currency': attrs_dict.get('currency', 'EUR')
+            })
+
+            amounts.append(float(attrs_dict.get('amount', 0)))
+            if attrs_dict.get('timestamp'):
+                timestamps.append(attrs_dict['timestamp'])
+
+        # Get countries for involved entities
+        for entity_id in entities:
+            if self.graph.has_node(entity_id):
+                country = self.graph.nodes[entity_id].get('country_code')
+                if country:
+                    countries.add(country)
+
+        # Calculate pattern characteristics
+        total_amount = sum(amounts)
+        time_span = None
+        if len(timestamps) > 1:
+            time_span = (max(timestamps) - min(timestamps)
+                         ).total_seconds() / 3600  # hours
+
+        pattern_data = {
+            'pattern_type': pattern_name,
+            'pattern_id': f"{pattern_name}_{len(self.injected_patterns) + 1}",
+            'entities': list(entities),
+            'transactions': transactions,
+            'num_transactions': len(transactions),
+            'total_amount': total_amount,
+            'avg_amount': total_amount / len(amounts) if amounts else 0,
+            'countries': list(countries),
+            'time_span_hours': time_span,
+            'start_time': min(timestamps) if timestamps else None,
+            'end_time': max(timestamps) if timestamps else None,
+        }
+
+        # Add pattern-specific analysis
+        if pattern_name == 'RepeatedOverseasTransfers':
+            # Find source account and destination countries
+            sources = set(tx['src'] for tx in transactions)
+            if sources:
+                # Assume single source for this pattern
+                main_source = list(sources)[0]
+                dest_countries = set()
+                for tx in transactions:
+                    if self.graph.has_node(tx['dest']):
+                        dest_country = self.graph.nodes[tx['dest']].get(
+                            'country_code')
+                        if dest_country:
+                            dest_countries.add(dest_country)
+
+                pattern_data.update({
+                    'source_account': main_source,
+                    'destination_countries': list(dest_countries),
+                    'num_overseas_destinations': len(dest_countries)
+                })
+
+        elif pattern_name == 'RapidFundMovement':
+            # Analyze inflows vs outflows for central account
+            entity_txs = {}
+            for tx in transactions:
+                if tx['src'] not in entity_txs:
+                    entity_txs[tx['src']] = {'inflows': 0, 'outflows': 0}
+                if tx['dest'] not in entity_txs:
+                    entity_txs[tx['dest']] = {'inflows': 0, 'outflows': 0}
+
+                entity_txs[tx['dest']]['inflows'] += 1
+                entity_txs[tx['src']]['outflows'] += 1
+
+            # Find the account with both inflows and outflows (central account)
+            central_account = None
+            for entity, counts in entity_txs.items():
+                if counts['inflows'] > 0 and counts['outflows'] > 0:
+                    central_account = entity
+                    break
+
+            pattern_data.update({
+                'central_account': central_account,
+                'movement_speed_hours': time_span
+            })
+
+        elif pattern_name == 'FrontBusinessActivity':
+            # Find business entity and analyze deposit vs transfer flow
+            business_entity = None
+            deposits = [
+                tx for tx in transactions if 'deposit' in tx['transaction_type'].lower()]
+            transfers = [
+                tx for tx in transactions if 'transfer' in tx['transaction_type'].lower()]
+
+            # Find business among entities
+            for entity_id in entities:
+                if self.graph.has_node(entity_id):
+                    node_type = str(self.graph.nodes[entity_id].get(
+                        'node_type', '')).lower()
+                    if 'business' in node_type:
+                        business_entity = entity_id
+                        break
+
+            pattern_data.update({
+                'business_entity': business_entity,
+                'num_deposits': len(deposits),
+                'num_transfers': len(transfers),
+                'deposit_amount': sum(tx['amount'] for tx in deposits),
+                'transfer_amount': sum(tx['amount'] for tx in transfers)
+            })
+
+        return pattern_data
 
     def simulate_background_activity(self):
         """Generate realistic baseline transactions using the dedicated background pattern."""
