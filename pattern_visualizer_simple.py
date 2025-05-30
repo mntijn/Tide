@@ -630,7 +630,6 @@ def main():
 
     print(f"\n✅ Ground truth visualization completed!")
     print(f"📁 All outputs saved to: {args.output_dir}")
-    print(f"🎯 This shows exactly what was generated - no detection algorithms needed!")
 
 
 if __name__ == "__main__":
