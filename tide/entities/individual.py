@@ -17,10 +17,10 @@ class Individual(Entity):
         score = self._calculate_base_risk_score(common_attrs)
 
         if specific_attrs.get("age_group").name in HIGH_RISK_AGE_GROUPS:
-            score += self.risk_weights.get("age_group", 0.15)
+            score += self.risk_weights.get("age_group", 0.0)
 
         if specific_attrs.get("occupation") in HIGH_RISK_OCCUPATIONS:
-            score += self.risk_weights.get("occupation", 0.10)
+            score += self.risk_weights.get("occupation", 0.15)
 
         max_score = self.risk_weights.get("max_score", 0.9)
         return min(score, max_score)
