@@ -284,8 +284,6 @@ class GraphGenerator:
         for src, dest, attrs in edges:
             entities.add(src)
             entities.add(dest)
-            logger.info("Amount of entities for pattern %s: %d",
-                        pattern_name, len(entities))
 
             # Convert attrs to dict if it's a dataclass
             attrs_dict = attrs.__dict__ if hasattr(

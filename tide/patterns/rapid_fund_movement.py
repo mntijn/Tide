@@ -55,7 +55,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         potential_receivers = self.get_high_risk_individuals(
             cluster_names=receiver_clusters, max_entities=25)
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Found {len(potential_receivers)} potential receivers from clusters")
 
         # Fallback to all individuals if clusters yield too few
@@ -64,7 +64,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
                                if self.graph.nodes[e].get("node_type") == NodeType.INDIVIDUAL]
             potential_receivers.extend(all_individuals)
             potential_receivers = list(dict.fromkeys(potential_receivers))
-            logger.info(
+            logger.debug(
                 f"RapidFundMovement: Expanded to {len(potential_receivers)} total potential receivers")
 
         random_instance.shuffle(potential_receivers)
@@ -93,14 +93,14 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         potential_sender_entities = self.get_combined_clusters(
             sender_entity_clusters)
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Found {len(potential_sender_entities)} potential sender entities from clusters")
 
         # Limit the number of sender entities to prevent too many accounts
         random_instance.shuffle(potential_sender_entities)
         limited_sender_entities = potential_sender_entities[:max_sender_entities]
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Limited to {len(limited_sender_entities)} sender entities")
 
         # Get accounts owned by these limited high-risk entities
@@ -116,7 +116,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         # Remove duplicates
         potential_sender_accounts = list(set(potential_sender_accounts))
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Found {len(potential_sender_accounts)} potential sender accounts from high-risk entities")
 
         # If we don't have enough from clusters, expand to all accounts from high-risk countries
@@ -135,7 +135,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
                     potential_sender_accounts.append(account_id)
                     high_risk_accounts_added += 1
 
-            logger.info(
+            logger.debug(
                 f"RapidFundMovement: Added {high_risk_accounts_added} more accounts from high-risk countries")
 
         # Remove duplicates again

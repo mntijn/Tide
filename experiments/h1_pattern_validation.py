@@ -50,9 +50,9 @@ def create_h1_config():
         'business_creation_date_range': [90, 5475],
         'pattern_frequency': {
             'random': False,
-            'RapidFundMovement': 1,
-            'FrontBusinessActivity': 0,
-            'RepeatedOverseasTransfers': 0
+            'RapidFundMovement': 3,
+            'FrontBusinessActivity': 2,
+            'RepeatedOverseasTransfers': 3
         },
         'reporting_threshold': 10000,
         'reporting_currency': 'EUR',
@@ -95,7 +95,7 @@ def create_h1_config():
                     'inflows': {
                         'min_inflows': 5,
                         'max_inflows': 10,
-                        'amount_range': [500, 5000]
+                        'amount_range': [500, 6000]
                     },
                     'withdrawals': {
                         'min_withdrawals': 3,
@@ -103,6 +103,30 @@ def create_h1_config():
                         'amount_range': [100, 2000]
                     },
                     'inflow_to_withdrawal_delay': [1, 24]
+                },
+                'validation_params': {
+                    'outflow_ratio_range': [0.85, 0.95],
+                    'max_inflow_phase_duration_hours': 24,
+                    'min_phase_delay_hours': 1,
+                    'max_total_duration_hours': 72
+                }
+            },
+            'frontBusiness': {
+                'min_entities': 3,
+                'transaction_params': {
+                    'deposit_amount_range': [10000, 50000],
+                    'min_deposits': 5,
+                    'max_deposits': 15
+                }
+            },
+            'overseasTransfers': {
+                'min_destinations': 2,
+                'max_destinations': 5,
+                'transaction_params': {
+                    'transfer_amount_range': [5000, 20000],
+                    'min_transfers': 4,
+                    'max_transfers': 12,
+                    'interval_days': [7, 14, 30]
                 }
             }
         }
@@ -110,9 +134,27 @@ def create_h1_config():
     return config
 
 
-def validate_rapid_fund_movement(pattern_data):
+def validate_rapid_fund_movement(pattern_data, config):
     """Validate RapidFundMovement pattern structure and timing"""
     results = []
+
+    # Extract validation parameters from config
+    rapid_config = config.get('pattern_config', {}).get('rapidMovement', {})
+    tx_params = rapid_config.get('transaction_params', {})
+    inflow_params = tx_params.get('inflows', {})
+    withdrawal_params = tx_params.get('withdrawals', {})
+    validation_params = rapid_config.get('validation_params', {})
+
+    # Get ranges from config with fallbacks
+    inflow_amount_range = inflow_params.get('amount_range', [500, 6000])
+    withdrawal_amount_range = withdrawal_params.get(
+        'amount_range', [100, 2000])
+    outflow_ratio_range = validation_params.get(
+        'outflow_ratio_range', [0.85, 0.95])
+    max_inflow_duration = validation_params.get(
+        'max_inflow_phase_duration_hours', 24)
+    min_phase_delay = validation_params.get('min_phase_delay_hours', 1)
+    max_total_duration = validation_params.get('max_total_duration_hours', 72)
 
     for pattern in pattern_data:
         if pattern['pattern_type'] != 'RapidFundMovement':
@@ -133,41 +175,116 @@ def validate_rapid_fund_movement(pattern_data):
             validation['issues'].append(
                 f"Expected 6-11 entities, got {len(entities)}")
 
-        # 2. Transaction validation: Check amounts
+        # 2. Transaction validation: Check amounts using config values
         transactions = pattern['transactions']
         for tx in transactions:
-            if tx['transaction_type'] == 'inflow':
-                if not (500 <= tx['amount'] <= 5000):
+            if tx['transaction_type'] == 'TransactionType.TRANSFER':
+                if not (inflow_amount_range[0] <= tx['amount'] <= inflow_amount_range[1]):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
-                        f"Inflow amount {tx['amount']} outside range 500-5000")
-            elif tx['transaction_type'] == 'withdrawal':
-                if not (100 <= tx['amount'] <= 2000):
+                        f"Inflow amount {tx['amount']} outside range {inflow_amount_range[0]}-{inflow_amount_range[1]}")
+            elif tx['transaction_type'] == 'TransactionType.WITHDRAWAL':
+                if not (withdrawal_amount_range[0] <= tx['amount'] <= withdrawal_amount_range[1]):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
-                        f"Withdrawal amount {tx['amount']} outside range 100-2000")
+                        f"Withdrawal amount {tx['amount']} outside range {withdrawal_amount_range[0]}-{withdrawal_amount_range[1]}")
 
-        # 3. Temporal validation: Check timing constraints
+        # 3. Temporal validation: Check timing constraints and two-phase pattern
         if transactions:
+            # Separate inflows and withdrawals
+            inflows = [
+                tx for tx in transactions if tx['transaction_type'] == 'TransactionType.TRANSFER']
+            withdrawals = [
+                tx for tx in transactions if tx['transaction_type'] == 'TransactionType.WITHDRAWAL']
+
+            print(
+                f"    Pattern {validation['pattern_id']}: {len(inflows)} inflows, {len(withdrawals)} withdrawals")
+
+            if inflows and withdrawals:
+                # Convert timestamps to datetime objects
+                inflow_times = [datetime.datetime.fromisoformat(
+                    tx['timestamp'].replace('Z', '+00:00')) for tx in inflows]
+                withdrawal_times = [datetime.datetime.fromisoformat(
+                    tx['timestamp'].replace('Z', '+00:00')) for tx in withdrawals]
+
+                # Phase 1: Check inflow timing (using config value)
+                inflow_start = min(inflow_times)
+                inflow_end = max(inflow_times)
+                inflow_duration_hours = (
+                    inflow_end - inflow_start).total_seconds() / 3600
+
+                print(
+                    f"    Inflow phase: {inflow_duration_hours:.1f}h duration (limit: {max_inflow_duration}h)")
+
+                if inflow_duration_hours > max_inflow_duration:
+                    validation['temporal_validation'] = False
+                    validation['issues'].append(
+                        f"Inflow phase duration {inflow_duration_hours:.1f}h exceeds {max_inflow_duration}h limit")
+
+                # Phase 2: Check that withdrawals come after inflows (with delay)
+                earliest_withdrawal = min(withdrawal_times)
+                latest_inflow = max(inflow_times)
+
+                if earliest_withdrawal <= latest_inflow:
+                    validation['temporal_validation'] = False
+                    validation['issues'].append(
+                        "Withdrawals should occur after inflow phase completion")
+
+                # Check delay between phases (using config value)
+                phase_delay_hours = (
+                    earliest_withdrawal - latest_inflow).total_seconds() / 3600
+                print(
+                    f"    Phase delay: {phase_delay_hours:.1f}h (minimum: {min_phase_delay}h)")
+
+                if phase_delay_hours < min_phase_delay:
+                    validation['temporal_validation'] = False
+                    validation['issues'].append(
+                        f"Phase delay {phase_delay_hours:.1f}h is less than minimum {min_phase_delay}h")
+
+                # Check amount relationship: outflow should be within configured ratio
+                total_inflow = sum(tx['amount'] for tx in inflows)
+                total_outflow = sum(tx['amount'] for tx in withdrawals)
+
+                print(
+                    f"    Amounts: inflow={total_inflow:.2f}, outflow={total_outflow:.2f}")
+
+                if total_inflow > 0:
+                    outflow_ratio = total_outflow / total_inflow
+                    print(
+                        f"    Outflow ratio: {outflow_ratio:.3f} (expected: {outflow_ratio_range[0]}-{outflow_ratio_range[1]})")
+
+                    if not (outflow_ratio_range[0] <= outflow_ratio <= outflow_ratio_range[1]):
+                        validation['temporal_validation'] = False
+                        validation['issues'].append(
+                            f"Outflow ratio {outflow_ratio:.2f} not in range {outflow_ratio_range[0]}-{outflow_ratio_range[1]}")
+
+            # Overall duration check (using config value)
             start_time = min(datetime.datetime.fromisoformat(
                 tx['timestamp'].replace('Z', '+00:00')) for tx in transactions)
             end_time = max(datetime.datetime.fromisoformat(
                 tx['timestamp'].replace('Z', '+00:00')) for tx in transactions)
             duration_hours = (end_time - start_time).total_seconds() / 3600
 
-            if duration_hours > 72:
+            if duration_hours > max_total_duration:
                 validation['temporal_validation'] = False
                 validation['issues'].append(
-                    f"Pattern duration {duration_hours:.1f}h exceeds 72h limit")
+                    f"Pattern duration {duration_hours:.1f}h exceeds {max_total_duration}h limit")
 
         results.append(validation)
 
     return results
 
 
-def validate_front_business(pattern_data):
+def validate_front_business(pattern_data, config):
     """Validate FrontBusinessActivity pattern structure"""
     results = []
+
+    # Extract validation parameters from config
+    front_config = config.get('pattern_config', {}).get('frontBusiness', {})
+    tx_params = front_config.get('transaction_params', {})
+    deposit_amount_range = tx_params.get(
+        'deposit_amount_range', [10000, 50000])
+    min_entities = front_config.get('min_entities', 3)
 
     for pattern in pattern_data:
         if pattern['pattern_type'] != 'FrontBusinessActivity':
@@ -181,32 +298,40 @@ def validate_front_business(pattern_data):
             'issues': []
         }
 
-        # 1. Entity validation: Should have 3+ entities (simplified validation)
+        # 1. Entity validation: Should have 3+ entities (using config value)
         entities = pattern['entities']
-        # Note: entities is a list of entity IDs (strings), not objects
-        # For pattern validation, we focus on the structural requirement of having multiple entities
-        if len(entities) < 3:
+        if len(entities) < min_entities:
             validation['entity_validation'] = False
             validation['issues'].append(
-                f"Expected 3+ entities, got {len(entities)}")
+                f"Expected {min_entities}+ entities, got {len(entities)}")
 
-        # 2. Transaction validation: Check deposit amounts
+        # 2. Transaction validation: Check deposit amounts (using config values)
         transactions = pattern['transactions']
         for tx in transactions:
-            if tx['transaction_type'] in ['deposit', 'transfer']:
-                if not (10000 <= tx['amount'] <= 50000):
+            if tx['transaction_type'] in ['TransactionType.DEPOSIT', 'TransactionType.TRANSFER']:
+                if not (deposit_amount_range[0] <= tx['amount'] <= deposit_amount_range[1]):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
-                        f"Deposit amount {tx['amount']} outside range 10000-50000")
+                        f"Deposit amount {tx['amount']} outside range {deposit_amount_range[0]}-{deposit_amount_range[1]}")
 
         results.append(validation)
 
     return results
 
 
-def validate_overseas_transfers(pattern_data):
+def validate_overseas_transfers(pattern_data, config):
     """Validate RepeatedOverseasTransfers pattern structure"""
     results = []
+
+    # Extract validation parameters from config
+    overseas_config = config.get(
+        'pattern_config', {}).get('overseasTransfers', {})
+    tx_params = overseas_config.get('transaction_params', {})
+    transfer_amount_range = tx_params.get(
+        'transfer_amount_range', [5000, 20000])
+    interval_days = tx_params.get('interval_days', [7, 14, 30])
+    min_destinations = overseas_config.get('min_destinations', 2)
+    max_destinations = overseas_config.get('max_destinations', 5)
 
     for pattern in pattern_data:
         if pattern['pattern_type'] != 'RepeatedOverseasTransfers':
@@ -220,33 +345,35 @@ def validate_overseas_transfers(pattern_data):
             'issues': []
         }
 
-        # 1. Entity validation: Should have 1 source + 2-5 overseas destinations
+        # 1. Entity validation: Should have 1 source + 2-5 overseas destinations (using config values)
         entities = pattern['entities']
-        if len(entities) < 3 or len(entities) > 6:
+        expected_min = min_destinations + 1  # +1 for source
+        expected_max = max_destinations + 1  # +1 for source
+        if len(entities) < expected_min or len(entities) > expected_max:
             validation['entity_validation'] = False
             validation['issues'].append(
-                f"Expected 3-6 entities, got {len(entities)}")
+                f"Expected {expected_min}-{expected_max} entities, got {len(entities)}")
 
-        # 2. Transaction validation: Check transfer amounts
+        # 2. Transaction validation: Check transfer amounts (using config values)
         transactions = pattern['transactions']
         for tx in transactions:
-            if not (5000 <= tx['amount'] <= 20000):
+            if not (transfer_amount_range[0] <= tx['amount'] <= transfer_amount_range[1]):
                 validation['transaction_validation'] = False
                 validation['issues'].append(
-                    f"Transfer amount {tx['amount']} outside range 5000-20000")
+                    f"Transfer amount {tx['amount']} outside range {transfer_amount_range[0]}-{transfer_amount_range[1]}")
 
-        # 3. Temporal validation: Check intervals
+        # 3. Temporal validation: Check intervals (using config values)
         if len(transactions) >= 2:
             times = [datetime.datetime.fromisoformat(
                 tx['timestamp'].replace('Z', '+00:00')) for tx in transactions]
             times.sort()
 
             for i in range(1, len(times)):
-                interval_days = (times[i] - times[i-1]).days
-                if interval_days not in [7, 14, 30]:
+                interval_days_actual = (times[i] - times[i-1]).days
+                if interval_days_actual not in interval_days:
                     validation['temporal_validation'] = False
                     validation['issues'].append(
-                        f"Interval {interval_days} days not in [7, 14, 30]")
+                        f"Interval {interval_days_actual} days not in {interval_days}")
                     break
 
         results.append(validation)
@@ -310,7 +437,7 @@ def run_h1_experiment():
         all_passed = True
 
         # RapidFundMovement validation
-        rfm_results = validate_rapid_fund_movement(patterns)
+        rfm_results = validate_rapid_fund_movement(patterns, config)
         print("RapidFundMovement Patterns:")
         for result in rfm_results:
             status = "PASS" if all(
@@ -323,7 +450,7 @@ def run_h1_experiment():
         print()
 
         # FrontBusinessActivity validation
-        fb_results = validate_front_business(patterns)
+        fb_results = validate_front_business(patterns, config)
         print("FrontBusinessActivity Patterns:")
         for result in fb_results:
             status = "PASS" if all(
@@ -336,7 +463,7 @@ def run_h1_experiment():
         print()
 
         # RepeatedOverseasTransfers validation
-        rot_results = validate_overseas_transfers(patterns)
+        rot_results = validate_overseas_transfers(patterns, config)
         print("RepeatedOverseasTransfers Patterns:")
         for result in rot_results:
             status = "PASS" if all(
