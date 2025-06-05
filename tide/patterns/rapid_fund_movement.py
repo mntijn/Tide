@@ -1,6 +1,7 @@
-import random
+from ..utils.random_instance import random_instance
 import datetime
 from typing import List, Dict, Any, Tuple
+import logging
 
 from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -8,49 +9,156 @@ from .base import (
 )
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
+from ..utils.constants import HIGH_RISK_COUNTRIES
+
+logger = logging.getLogger(__name__)
 
 
 class IndividualWithMultipleAccountsStructural(StructuralComponent):
     """
-    Structural: An individual with multiple accounts (personal and/or business).
-    Focuses on identifying an individual who owns several accounts.
+    Structural: An individual with multiple accounts (personal and/or business) as receiver,
+    and multiple overseas entities from high-risk jurisdictions as senders.
     """
 
+    @property
+    def num_required_entities(self) -> int:
+        return 1  # One individual with multiple accounts
+
+    def _is_high_risk_jurisdiction(self, country_code: str) -> bool:
+        """Check if a country code represents a high-risk jurisdiction."""
+        return country_code in HIGH_RISK_COUNTRIES
+
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
-        central_individual_id = None
-        peripheral_account_ids = []
+        # Load pattern configuration
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("rapidMovement", {})
 
-        individual_ids = self.filter_entities_by_criteria(
-            available_entities, {"node_type": NodeType.INDIVIDUAL}
-        )
-        random.shuffle(individual_ids)
+        min_accounts_for_pattern = pattern_config.get(
+            "min_accounts_for_pattern", 2)
 
-        # Default for now
-        min_accounts_for_pattern = 2
+        # Get sender configuration from inflow params (each sender typically sends one inflow)
+        tx_params = pattern_config.get("transaction_params", {})
+        inflow_params = tx_params.get("inflows", {})
+        min_senders = inflow_params.get("min_inflows", 2)
+        max_senders = inflow_params.get("max_inflows", 7)
+        max_sender_entities = pattern_config.get("max_sender_entities", 20)
 
-        for ind_id in individual_ids:
-            owned_accounts = set()
-            for acc_node in self.graph.neighbors(ind_id):
-                if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
-                    owned_accounts.add(acc_node)
+        logger.info(
+            f"RapidFundMovement: min_accounts_for_pattern: {min_accounts_for_pattern}, min_senders: {min_senders}, max_senders: {max_senders}")
 
-            for owned_node_id in self.graph.neighbors(ind_id):
-                if self.graph.nodes[owned_node_id].get("node_type") == NodeType.BUSINESS:
-                    for acc_node in self.graph.neighbors(owned_node_id):
-                        if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
-                            owned_accounts.add(acc_node)
+        logger.info(
+            f"RapidFundMovement: Looking for individual with {min_accounts_for_pattern}+ accounts, {min_senders}-{max_senders} senders from max {max_sender_entities} entities")
+
+        # Select high-risk individual as receiver from the most risky clusters
+        receiver_clusters = ["super_high_risk",
+                             "high_risk_score", "structuring_candidates"]
+        potential_receivers = self.get_high_risk_individuals(
+            cluster_names=receiver_clusters, max_entities=25)
+
+        logger.info(
+            f"RapidFundMovement: Found {len(potential_receivers)} potential receivers from clusters")
+
+        # Fallback to all individuals if clusters yield too few
+        if len(potential_receivers) < 5:
+            all_individuals = [e for e in available_entities
+                               if self.graph.nodes[e].get("node_type") == NodeType.INDIVIDUAL]
+            potential_receivers.extend(all_individuals)
+            potential_receivers = list(dict.fromkeys(potential_receivers))
+            logger.info(
+                f"RapidFundMovement: Expanded to {len(potential_receivers)} total potential receivers")
+
+        random_instance.shuffle(potential_receivers)
+
+        # Find an individual with multiple accounts
+        selected_individual = None
+        for individual_id in potential_receivers:
+            owned_accounts = self._get_owned_accounts(individual_id)
 
             if len(owned_accounts) >= min_accounts_for_pattern:
-                central_individual_id = ind_id
-                peripheral_account_ids = list(owned_accounts)
+                selected_individual = individual_id
+                logger.info(
+                    f"RapidFundMovement: Selected individual {individual_id} with {len(owned_accounts)} accounts")
                 break
 
-        if not central_individual_id or not peripheral_account_ids:
+        if not selected_individual:
+            logger.info(
+                "RapidFundMovement: No individual found with sufficient accounts")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
+        # Get individual's accounts to exclude them from sender selection
+        individual_accounts = self._get_owned_accounts(selected_individual)
+
+        # Select overseas sender entities from high-risk clusters
+        sender_entity_clusters = ["high_risk_countries", "offshore_candidates"]
+        potential_sender_entities = self.get_combined_clusters(
+            sender_entity_clusters)
+
+        logger.info(
+            f"RapidFundMovement: Found {len(potential_sender_entities)} potential sender entities from clusters")
+
+        # Limit the number of sender entities to prevent too many accounts
+        random_instance.shuffle(potential_sender_entities)
+        limited_sender_entities = potential_sender_entities[:max_sender_entities]
+
+        logger.info(
+            f"RapidFundMovement: Limited to {len(limited_sender_entities)} sender entities")
+
+        # Get accounts owned by these limited high-risk entities
+        potential_sender_accounts = []
+        for entity_id in limited_sender_entities:
+            entity_accounts = self._get_owned_accounts(entity_id)
+            potential_sender_accounts.extend(entity_accounts)
+
+        # Remove any accounts owned by the selected individual
+        potential_sender_accounts = [acc for acc in potential_sender_accounts
+                                     if acc not in individual_accounts]
+
+        # Remove duplicates
+        potential_sender_accounts = list(set(potential_sender_accounts))
+
+        logger.info(
+            f"RapidFundMovement: Found {len(potential_sender_accounts)} potential sender accounts from high-risk entities")
+
+        # If we don't have enough from clusters, expand to all accounts from high-risk countries
+        if len(potential_sender_accounts) < min_senders:
+            all_accounts = [e for e in available_entities
+                            if self.graph.nodes[e].get("node_type") == NodeType.ACCOUNT]
+
+            high_risk_accounts_added = 0
+            for account_id in all_accounts:
+                if account_id in individual_accounts:
+                    continue
+
+                account_country = self.graph.nodes[account_id].get(
+                    "country_code", "US")
+                if self._is_high_risk_jurisdiction(account_country):
+                    potential_sender_accounts.append(account_id)
+                    high_risk_accounts_added += 1
+
+            logger.info(
+                f"RapidFundMovement: Added {high_risk_accounts_added} more accounts from high-risk countries")
+
+        # Remove duplicates again
+        potential_sender_accounts = list(set(potential_sender_accounts))
+
+        if not potential_sender_accounts:
+            logger.info("RapidFundMovement: No sender accounts found")
+            return EntitySelection(central_entities=[], peripheral_entities=[])
+
+        # Select sender accounts based on configuration
+        num_senders = random_instance.randint(min_senders, max_senders)
+        random_instance.shuffle(potential_sender_accounts)
+        selected_senders = potential_sender_accounts[:min(
+            num_senders, len(potential_sender_accounts))]
+
+        logger.info(
+            f"RapidFundMovement: Selected {len(selected_senders)} sender accounts")
+
+        # Only include the central individual and sender accounts in the entity selection
+        # The individual's accounts will be used in the temporal component but aren't part of the entity selection
         return EntitySelection(
-            central_entities=peripheral_account_ids,
-            peripheral_entities=[central_individual_id],
+            central_entities=[selected_individual],
+            peripheral_entities=selected_senders
         )
 
 
@@ -60,18 +168,47 @@ class RapidInflowOutflowTemporal(TemporalComponent):
     Withdrawals can be across multiple banks and structured.
     """
 
+    def _get_owned_accounts(self, entity_id: str) -> List[str]:
+        """Get all accounts owned by an entity (individual or business)"""
+        owned_accounts = []
+
+        # Direct accounts
+        for neighbor_id in self.graph.neighbors(entity_id):
+            if self.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
+                owned_accounts.append(neighbor_id)
+
+        # If entity is an individual, also check business accounts they own
+        if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
+            for neighbor_id in self.graph.neighbors(entity_id):
+                if self.graph.nodes[neighbor_id].get("node_type") == NodeType.BUSINESS:
+                    # Get accounts of owned businesses
+                    for business_neighbor in self.graph.neighbors(neighbor_id):
+                        if self.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
+                            owned_accounts.append(business_neighbor)
+
+        return list(set(owned_accounts))  # Remove duplicates
+
     def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
         sequences = []
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
+            logger.info(
+                f"RapidFundMovement: Missing entities - central: {len(entity_selection.central_entities)}, peripheral: {len(entity_selection.peripheral_entities)}")
             return sequences
 
         central_individual_id = entity_selection.central_entities[0]
-        individual_accounts = entity_selection.peripheral_entities
+        overseas_sender_accounts = entity_selection.peripheral_entities
 
+        # Get the individual's owned accounts for receiving funds and withdrawals
+        individual_accounts = self._get_owned_accounts(central_individual_id)
         if not individual_accounts:  # Need accounts to operate on
+            logger.info(
+                f"RapidFundMovement: Individual {central_individual_id} has no accounts")
             return sequences
 
-        primary_inflow_account = random.choice(individual_accounts)
+        logger.info(
+            f"RapidFundMovement: Generating transactions for individual {central_individual_id} with {len(individual_accounts)} accounts and {len(overseas_sender_accounts)} senders")
+
+        primary_inflow_account = random_instance.choice(individual_accounts)
 
         # Load parameters from YAML config
         pattern_config = self.params.get(
@@ -93,20 +230,15 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         delay_hours_range = tx_params.get(
             "inflow_to_withdrawal_delay", [1, 24])
 
-        num_incoming_transfers = random.randint(min_inflows, max_inflows)
-        num_withdrawals = random.randint(min_withdrawals, max_withdrawals)
+        num_incoming_transfers = random_instance.randint(
+            min_inflows, max_inflows)
+        num_withdrawals = random_instance.randint(
+            min_withdrawals, max_withdrawals)
 
-        all_accounts_in_graph = [
-            node_id for node_id, data in self.graph.nodes(data=True)
-            if data.get("node_type") == NodeType.ACCOUNT
-        ]
-        external_source_accounts = [
-            acc_id for acc_id in all_accounts_in_graph
-            if acc_id not in individual_accounts
-        ]
-
-        if not external_source_accounts:
-            print("Warning: No external accounts for RapidInflowOutflowTemporal inflows.")
+        # Use the overseas sender accounts from entity selection
+        if not overseas_sender_accounts:
+            logger.info(
+                "RapidFundMovement: No overseas sender accounts for RapidInflowOutflowTemporal inflows.")
             return sequences
 
         if (self.time_span["end_date"] - self.time_span["start_date"]).days < 10:
@@ -117,7 +249,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
                 self.time_span["end_date"] - self.time_span["start_date"]).days - 10
 
         inflow_start_time = self.time_span["start_date"] + datetime.timedelta(
-            days=random.randint(0, start_day_offset_range_inflow)
+            days=random_instance.randint(0, start_day_offset_range_inflow)
         )
         inflow_timestamps = self.generate_timestamps(
             inflow_start_time, "high_frequency", num_incoming_transfers)
@@ -128,7 +260,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         inflow_amounts = self.generate_structured_amounts(
             count=num_incoming_transfers,
-            base_amount=round(random.uniform(
+            base_amount=round(random_instance.uniform(
                 inflow_amount_range[0], inflow_amount_range[1]), 2),
             target_currency=inflow_account_currency
         )
@@ -139,9 +271,11 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             inflow_duration = inflow_timestamps[-1] - inflow_timestamps[0]
 
         for i in range(min(num_incoming_transfers, len(inflow_timestamps))):
-            source_external_account = random.choice(external_source_accounts)
+            # Select from overseas sender accounts (entity selection peripheral entities)
+            source_overseas_account = random_instance.choice(
+                overseas_sender_accounts)
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                src_id=source_external_account,
+                src_id=source_overseas_account,
                 dest_id=primary_inflow_account,
                 timestamp=inflow_timestamps[i],
                 amount=inflow_amounts[i],
@@ -149,7 +283,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
                 is_fraudulent=True
             )
             inflow_transactions.append(
-                (source_external_account, primary_inflow_account, tx_attrs))
+                (source_overseas_account, primary_inflow_account, tx_attrs))
 
         if inflow_transactions:
             sequences.append(TransactionSequence(
@@ -161,7 +295,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         last_inflow_time = inflow_timestamps[-1] if inflow_timestamps else inflow_start_time
         withdrawal_start_time = last_inflow_time + \
-            datetime.timedelta(hours=random.uniform(
+            datetime.timedelta(hours=random_instance.uniform(
                 delay_hours_range[0], delay_hours_range[1]))
 
         withdrawal_timestamps = self.generate_timestamps(
@@ -169,13 +303,13 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         # Get the currency from the individual accounts for proper structuring
         # Sample an account to determine currency (assuming all accounts have similar currencies)
-        sample_account = random.choice(individual_accounts)
+        sample_account = random_instance.choice(individual_accounts)
         account_currency = self.graph.nodes[sample_account].get(
             "currency", "EUR")
 
         withdrawal_amounts = self.generate_structured_amounts(
             count=num_withdrawals,
-            base_amount=round(random.uniform(
+            base_amount=round(random_instance.uniform(
                 withdrawal_amount_range[0], withdrawal_amount_range[1]), 2),
             target_currency=account_currency
         )
@@ -186,29 +320,19 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             withdrawal_duration = withdrawal_timestamps[-1] - \
                 withdrawal_timestamps[0]
 
-        # Locate the central individual to obtain their cash account
-        # central_individual_id = entity_selection.peripheral_entities[
-        #     0] if entity_selection.peripheral_entities else None # This was incorrect
-
         # Use the global cash account ID from graph_generator
         cash_account_id = self.graph_generator.cash_account_id
 
         if not cash_account_id:
-            print(
-                "Warning: Global cash_account_id not found for RapidInflowOutflowTemporal withdrawals.")
-            # Potentially fall back or skip: for now, if no cash account, cannot make withdrawals.
-            # This could happen if cash_account_id was not created in GraphGenerator.
-            # We might need to ensure it always exists or handle this more gracefully.
-            # If we proceed without it, _create_transaction_edge might fail or use a default.
-            # Let's assume for now that if it's None, we can't make these specific withdrawals.
-            # However, the pattern might still want to create other types of outflows if applicable.
-            # For this pattern, withdrawal to cash is key.
+            logger.info(
+                "RapidFundMovement: Global cash_account_id not found for RapidInflowOutflowTemporal withdrawals.")
             if inflow_transactions and not withdrawal_transactions:  # if only inflows happened
                 return sequences  # Or return only inflow sequence
             return []  # No transactions can be made if cash account is missing for withdrawal step
 
         for i in range(min(num_withdrawals, len(withdrawal_timestamps))):
-            account_for_withdrawal = random.choice(individual_accounts)
+            account_for_withdrawal = random_instance.choice(
+                individual_accounts)
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
                 src_id=account_for_withdrawal,
                 dest_id=cash_account_id,
@@ -227,94 +351,17 @@ class RapidInflowOutflowTemporal(TemporalComponent):
                 start_time=withdrawal_timestamps[0] if withdrawal_timestamps else withdrawal_start_time,
                 duration=withdrawal_duration
             ))
+
+        logger.info(
+            f"RapidFundMovement: Generated {len(sequences)} sequences with {sum(len(seq.transactions) for seq in sequences)} total transactions")
         return sequences
-
-
-class RapidFundMovementStructural(StructuralComponent):
-    """
-    Selects entities for rapid fund movement:
-    - A source account (individual or business).
-    - One or more intermediary accounts.
-    - A destination account.
-    """
-    @property
-    def num_required_entities(self) -> int:
-        # An individual and at least N accounts for them to use.
-        # The config "min_accounts_for_pattern" implies the N.
-        return 1  # The individual is the key central entity.
-
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
-        central_individual_id = None
-        peripheral_account_ids = []
-
-        # Configurable minimum number of accounts for this pattern
-        pattern_config = self.params.get("rapidMovement", {})
-        min_accounts_for_pattern = pattern_config.get(
-            "min_accounts_for_pattern", 2)
-
-        potential_individuals = []
-        # Prioritize individuals from relevant clusters
-        # Order: structuring_candidates -> intermediaries -> super_high_risk -> high_risk_score -> all individuals
-        for cluster_name in ["structuring_candidates", "intermediaries", "super_high_risk", "high_risk_score"]:
-            cluster_individuals = self.filter_entities_by_criteria(
-                self.get_cluster(cluster_name), {
-                    "node_type": NodeType.INDIVIDUAL}
-            )
-            potential_individuals.extend(cluster_individuals)
-            if len(potential_individuals) > 20:  # Gather a decent pool before stopping early
-                break
-
-        # Remove duplicates maintaining order somewhat by creating a set then list
-        potential_individuals = list(dict.fromkeys(potential_individuals))
-
-        # Fallback to all individuals if clusters yield too few
-        if len(potential_individuals) < 5:
-            all_individuals_in_graph = self.filter_entities_by_criteria(
-                available_entities, {"node_type": NodeType.INDIVIDUAL}
-            )
-            potential_individuals.extend(all_individuals_in_graph)
-            potential_individuals = list(dict.fromkeys(
-                potential_individuals))  # Deduplicate again
-
-        random.shuffle(potential_individuals)
-
-        for ind_id in potential_individuals:
-            owned_accounts = set()
-            # Direct accounts of the individual
-            for acc_node in self.graph.neighbors(ind_id):
-                if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
-                    owned_accounts.add(acc_node)
-
-            # Accounts of businesses owned by the individual
-            for owned_business_id in self.graph.neighbors(ind_id):
-                if self.graph.nodes[owned_business_id].get("node_type") == NodeType.BUSINESS:
-                    # Check if the edge from ind_id to owned_business_id is 'OWNS'
-                    # This requires checking edge attributes, assuming 'OWNS' implies ownership relation.
-                    # For simplicity, we assume any business neighbor is owned for now.
-                    # A more robust check would be: self.graph.edges[ind_id, owned_business_id].get('edge_type') == EdgeType.OWNERSHIP
-                    for acc_node in self.graph.neighbors(owned_business_id):
-                        if self.graph.nodes[acc_node].get("node_type") == NodeType.ACCOUNT:
-                            owned_accounts.add(acc_node)
-
-            if len(owned_accounts) >= min_accounts_for_pattern:
-                central_individual_id = ind_id
-                peripheral_account_ids = list(owned_accounts)
-                break
-
-        if not central_individual_id or not peripheral_account_ids:
-            return EntitySelection(central_entities=[], peripheral_entities=[])
-
-        return EntitySelection(
-            central_entities=[central_individual_id],  # Individual is central
-            peripheral_entities=peripheral_account_ids,  # Their accounts are peripheral
-        )
 
 
 class RapidFundMovementPattern(CompositePattern):
     """Injects rapid fund movement pattern"""
 
     def __init__(self, graph_generator, params: Dict[str, Any]):
-        structural_component = RapidFundMovementStructural(
+        structural_component = IndividualWithMultipleAccountsStructural(
             graph_generator, params)
         temporal_component = RapidInflowOutflowTemporal(
             graph_generator, params)

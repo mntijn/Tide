@@ -256,6 +256,7 @@ class GraphGenerator:
                                 if edges:  # Only track if pattern actually generated edges
                                     pattern_data = self._analyze_pattern_edges(
                                         pattern_instance.pattern_name, edges, pattern_instance)
+                                    logger.info("appending")
                                     self.injected_patterns.append(pattern_data)
                                 pattern_index += 1
 
@@ -280,10 +281,11 @@ class GraphGenerator:
         amounts = []
         countries = set()
         timestamps = []
-
         for src, dest, attrs in edges:
             entities.add(src)
             entities.add(dest)
+            logger.info("Amount of entities for pattern %s: %d",
+                        pattern_name, len(entities))
 
             # Convert attrs to dict if it's a dataclass
             attrs_dict = attrs.__dict__ if hasattr(
@@ -425,7 +427,7 @@ class GraphGenerator:
         self.initialize_entities()
         self.build_entity_clusters()
         self.inject_aml_patterns()
-        # self.simulate_background_activity()
+        self.simulate_background_activity()
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph

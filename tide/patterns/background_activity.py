@@ -1,4 +1,5 @@
 import datetime
+import numpy as np
 from typing import List, Dict, Any, Tuple
 
 from .base import (
@@ -36,64 +37,73 @@ class DailyRandomTransfersTemporal(TemporalComponent):
         start_date: datetime.datetime = self.time_span["start_date"]
         end_date: datetime.datetime = self.time_span["end_date"]
         total_days = max(1, (end_date - start_date).days)
+        total_seconds = total_days * 86400  # days to seconds
 
         tx_rate = self.params.get("transaction_rates", {}).get(
             "per_account_per_day", 0.2)
 
-        for acc_id in all_accounts:
-            # Slight randomness around the configured rate
-            expected_txs = int(tx_rate * total_days *
-                               random_instance.uniform(0.5, 1.5))
-            if expected_txs == 0:
-                continue
+        # Calculate total expected transactions across all accounts
+        total_expected_txs = int(
+            tx_rate * total_days * len(all_accounts) * random_instance.uniform(0.5, 1.5))
+        if total_expected_txs == 0:
+            return sequences
 
-            transactions: List[Tuple[str, str, TransactionAttributes]] = []
-            timestamps: List[datetime.datetime] = []
-            for _ in range(expected_txs):
-                # Pick a random moment within time span
-                random_day_offset = random_instance.randint(0, total_days)
-                random_second = random_instance.randint(0, 86_399)
-                ts = start_date + \
-                    datetime.timedelta(days=random_day_offset,
-                                       seconds=random_second)
-                timestamps.append(ts)
+        # Batch generate all timestamps at once
+        random_seconds = np.random.randint(
+            0, total_seconds, size=total_expected_txs)
+        timestamps = [
+            start_date + datetime.timedelta(seconds=int(s)) for s in random_seconds]
 
-                # Pick a random destination account (excluding self)
-                # Ensure there is more than one account to pick from to avoid infinite loop
-                if len(all_accounts) <= 1:
-                    continue  # Cannot make a transfer
+        # Batch generate all amounts at once
+        amount_range = self.params.get(
+            "background_amount_range", [10.0, 500.0])
+        amounts = np.random.uniform(
+            amount_range[0], amount_range[1], size=total_expected_txs)
+        amounts = np.round(amounts, 2)
 
-                dest_id = random_instance.choice(all_accounts)
-                while dest_id == acc_id:
-                    dest_id = random_instance.choice(all_accounts)
+        # Pre-generate all source-destination pairs
+        # We'll create a list of (src, dest) pairs where src != dest
+        src_indices = np.random.randint(
+            0, len(all_accounts), size=total_expected_txs)
+        dest_indices = np.random.randint(
+            0, len(all_accounts), size=total_expected_txs)
 
-                # Use background_amount_range from params (loaded from graph.yaml)
-                amount_range = self.params.get("background_amount_range", [
-                                               10.0, 500.0])  # Default if not in params
-                amount = round(random_instance.uniform(
-                    amount_range[0], amount_range[1]), 2)
+        # Ensure src != dest by adjusting dest indices where they match
+        mask = src_indices == dest_indices
+        dest_indices[mask] = (dest_indices[mask] + 1) % len(all_accounts)
 
-                tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                    src_id=acc_id,
-                    dest_id=dest_id,
-                    timestamp=ts,
-                    amount=amount,
-                    transaction_type=TransactionType.TRANSFER,
-                    is_fraudulent=False,
+        # Convert indices to actual account IDs
+        src_accounts = [all_accounts[i] for i in src_indices]
+        dest_accounts = [all_accounts[i] for i in dest_indices]
+
+        # Create all transactions in one go
+        transactions: List[Tuple[str, str, TransactionAttributes]] = []
+        pattern_injector = PatternInjector(self.graph_generator, self.params)
+
+        for i in range(total_expected_txs):
+            tx_attrs = pattern_injector._create_transaction_edge(
+                src_id=src_accounts[i],
+                dest_id=dest_accounts[i],
+                timestamp=timestamps[i],
+                amount=float(amounts[i]),
+                transaction_type=TransactionType.TRANSFER,
+                is_fraudulent=False,
+            )
+            transactions.append((src_accounts[i], dest_accounts[i], tx_attrs))
+
+        # Create a single sequence for all transactions
+        if transactions:
+            sequence_name = "background_activity_all"
+            timestamps_sorted = sorted(timestamps)
+            sequences.append(
+                TransactionSequence(
+                    transactions=transactions,
+                    sequence_name=sequence_name,
+                    start_time=timestamps_sorted[0],
+                    duration=timestamps_sorted[-1] - timestamps_sorted[0],
                 )
-                transactions.append((acc_id, dest_id, tx_attrs))
+            )
 
-            if transactions:
-                sequence_name = f"background_activity_{acc_id}"
-                timestamps_sorted = sorted(timestamps)
-                sequences.append(
-                    TransactionSequence(
-                        transactions=transactions,
-                        sequence_name=sequence_name,
-                        start_time=timestamps_sorted[0],
-                        duration=timestamps_sorted[-1] - timestamps_sorted[0],
-                    )
-                )
         return sequences
 
 

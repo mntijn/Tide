@@ -45,22 +45,24 @@ repeatedOverseas:
 rapidMovement:
   # Minimum number of accounts required for the pattern
   min_accounts_for_pattern: 2
+  # Maximum number of sender entities to consider
+  max_sender_entities: 15
   # Transaction parameters
   transaction_params:
     # Inflow parameters
     inflows:
       # Minimum number of incoming transfers
-      min_inflows: 15
+      min_inflows: 5
       # Maximum number of incoming transfers
-      max_inflows: 30
+      max_inflows: 10
       # Base amount range for inflows (min, max)
       amount_range: [500, 5000]
     # Withdrawal parameters
     withdrawals:
       # Minimum number of withdrawals
-      min_withdrawals: 20
+      min_withdrawals: 3
       # Maximum number of withdrawals
-      max_withdrawals: 50
+      max_withdrawals: 8
       # Base amount range for withdrawals (min, max)
       amount_range: [100, 2000]
     # Time between inflow and withdrawal (in hours)

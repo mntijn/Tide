@@ -130,29 +130,54 @@ class StructuralComponent(ABC):
                 if not attrs.get("is_high_risk_category", False):
                     continue
 
-            # Check if entity has multiple accounts
+            # Check if entity has multiple accounts (optimized)
             if criteria.get("multiple_accounts"):
-                # Count accounts owned by this entity
-                account_count = sum(1 for node_id in self.graph.nodes
-                                    if self.graph.nodes[node_id].get("node_type") == NodeType.ACCOUNT
-                                    and any(self.graph.has_edge(entity_id, node_id) for _ in [1]))
-                if account_count < criteria.get("min_accounts", 2):
+                min_accounts = criteria.get("min_accounts", 2)
+                owned_accounts = self._get_owned_accounts(entity_id)
+                if len(owned_accounts) < min_accounts:
                     continue
 
             # Check for overseas connections
             if criteria.get("overseas_connections"):
                 entity_country = attrs.get("address", {}).get("country")
-                has_overseas = any(
-                    self.graph.nodes[neighbor].get("address", {}).get(
-                        "country") != entity_country
-                    for neighbor in self.graph.neighbors(entity_id)
-                )
-                if not has_overseas:
+                if not self._has_overseas_connections(entity_id, entity_country):
                     continue
 
             filtered.append(entity_id)
 
         return filtered
+
+    def _get_owned_accounts(self, entity_id: str) -> List[str]:
+        """Efficiently get all accounts owned by an entity (individual or business)"""
+        owned_accounts = []
+
+        # Direct accounts
+        for neighbor_id in self.graph.neighbors(entity_id):
+            if self.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
+                owned_accounts.append(neighbor_id)
+
+        # If entity is an individual, also check business accounts they own
+        if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
+            for neighbor_id in self.graph.neighbors(entity_id):
+                if self.graph.nodes[neighbor_id].get("node_type") == NodeType.BUSINESS:
+                    # Get accounts of owned businesses
+                    for business_neighbor in self.graph.neighbors(neighbor_id):
+                        if self.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
+                            owned_accounts.append(business_neighbor)
+
+        return list(set(owned_accounts))  # Remove duplicates
+
+    def _has_overseas_connections(self, entity_id: str, entity_country: str) -> bool:
+        """Check if entity has connections to different countries"""
+        if not entity_country:
+            return False
+
+        for neighbor_id in self.graph.neighbors(entity_id):
+            neighbor_country = self.graph.nodes[neighbor_id].get(
+                "address", {}).get("country")
+            if neighbor_country and neighbor_country != entity_country:
+                return True
+        return False
 
     # ------------------------------------------------------------------
     #  Convenience for fast entity retrieval
@@ -187,6 +212,35 @@ class StructuralComponent(ABC):
             clusters_to_combine.append("super_high_risk")
 
         return self.get_combined_clusters(clusters_to_combine, deduplicate=True)
+
+    def get_high_risk_individuals(self, cluster_names: List[str] = None, max_entities: int = None) -> List[str]:
+        """Efficiently get high-risk individuals from specified clusters.
+
+        Args:
+            cluster_names: List of cluster names to search. Defaults to common high-risk clusters.
+            max_entities: Maximum number of entities to return (for performance)
+
+        Returns:
+            List of individual entity IDs, prioritized by risk level
+        """
+        if cluster_names is None:
+            cluster_names = ["structuring_candidates",
+                             "intermediaries", "super_high_risk", "high_risk_score"]
+
+        potential_individuals = []
+        for cluster_name in cluster_names:
+            # Get entities from existing clusters and filter to individuals
+            cluster_entities = self.get_cluster(cluster_name)
+            cluster_individuals = [e for e in cluster_entities
+                                   if self.graph.nodes[e].get("node_type") == NodeType.INDIVIDUAL]
+            potential_individuals.extend(cluster_individuals)
+
+            # Early stopping for performance
+            if max_entities and len(potential_individuals) > max_entities:
+                break
+
+        # Remove duplicates while preserving priority order
+        return list(dict.fromkeys(potential_individuals))
 
     def get_entities_with_multiple_risk_factors(self) -> List[str]:
         """Get entities that appear in multiple risk clusters (indicating compound risk)."""
