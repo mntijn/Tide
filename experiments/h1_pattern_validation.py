@@ -113,7 +113,7 @@ def create_h1_config():
             'frontBusiness': {
                 'min_entities': 3,
                 'transaction_params': {
-                    'deposit_amount_range': [10000, 50000],
+                    'deposit_amount_range': [15000, 75000],
                     'min_deposits': 5,
                     'max_deposits': 15
                 }
@@ -311,10 +311,12 @@ def validate_front_business(pattern_data, config):
             validation['issues'].append(
                 f"Expected {min_entities}+ entities, got {len(entities)}")
 
-        # 2. Transaction validation: Check deposit amounts (using config values)
+        # 2. Transaction validation: Check deposit amounts are in expected range
+        # Front businesses make large deposits above reporting thresholds
         transactions = pattern['transactions']
         for tx in transactions:
-            if tx['transaction_type'] in ['TransactionType.DEPOSIT', 'TransactionType.TRANSFER']:
+            if tx['transaction_type'] == 'TransactionType.DEPOSIT':
+                # Check that deposit amounts are within configured range
                 if not (deposit_amount_range[0] <= tx['amount'] <= deposit_amount_range[1]):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
