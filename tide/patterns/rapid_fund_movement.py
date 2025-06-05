@@ -208,7 +208,8 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         logger.info(
             f"RapidFundMovement: Generating transactions for individual {central_individual_id} with {len(individual_accounts)} accounts and {len(overseas_sender_accounts)} senders")
 
-        primary_inflow_account = random_instance.choice(individual_accounts)
+        # Select accounts that will receive inflows
+        receiving_accounts = individual_accounts.copy()
 
         # Load parameters from YAML config
         pattern_config = self.params.get(
@@ -223,8 +224,6 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         min_withdrawals = withdrawal_params.get("min_withdrawals", 20)
         max_withdrawals = withdrawal_params.get("max_withdrawals", 50)
-        withdrawal_amount_range = withdrawal_params.get(
-            "amount_range", [100, 2000])
 
         # inflow_to_withdrawal_delay_hours is also in YAML, e.g. [1, 24]
         delay_hours_range = tx_params.get(
@@ -254,8 +253,9 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         inflow_timestamps = self.generate_timestamps(
             inflow_start_time, "high_frequency", num_incoming_transfers)
 
-        # Get the currency of the primary inflow account for proper structuring
-        inflow_account_currency = self.graph.nodes[primary_inflow_account].get(
+        # Get currency for structuring (sample from receiving accounts)
+        sample_account = random_instance.choice(receiving_accounts)
+        inflow_account_currency = self.graph.nodes[sample_account].get(
             "currency", "EUR")
 
         inflow_amounts = self.generate_structured_amounts(
@@ -265,25 +265,39 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             target_currency=inflow_account_currency
         )
 
+        # Cap inflow amounts to respect the configured range
+        inflow_amounts = [min(max(amount, inflow_amount_range[0]), inflow_amount_range[1])
+                          for amount in inflow_amounts]
+
         inflow_transactions = []
         inflow_duration = datetime.timedelta(days=0)
         if inflow_timestamps:
             inflow_duration = inflow_timestamps[-1] - inflow_timestamps[0]
 
+        # Track which accounts receive money and how much
+        account_balances = {acc: 0.0 for acc in receiving_accounts}
+
         for i in range(min(num_incoming_transfers, len(inflow_timestamps))):
             # Select from overseas sender accounts (entity selection peripheral entities)
             source_overseas_account = random_instance.choice(
                 overseas_sender_accounts)
+
+            # Select destination account from receiving accounts (distribute across accounts)
+            dest_account = random_instance.choice(receiving_accounts)
+
+            # Track the money going into this account
+            account_balances[dest_account] += inflow_amounts[i]
+
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
                 src_id=source_overseas_account,
-                dest_id=primary_inflow_account,
+                dest_id=dest_account,
                 timestamp=inflow_timestamps[i],
                 amount=inflow_amounts[i],
                 transaction_type=TransactionType.TRANSFER,
                 is_fraudulent=True
             )
             inflow_transactions.append(
-                (source_overseas_account, primary_inflow_account, tx_attrs))
+                (source_overseas_account, dest_account, tx_attrs))
 
         if inflow_transactions:
             sequences.append(TransactionSequence(
@@ -301,18 +315,40 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         withdrawal_timestamps = self.generate_timestamps(
             withdrawal_start_time, "high_frequency", num_withdrawals)
 
-        # Get the currency from the individual accounts for proper structuring
-        # Sample an account to determine currency (assuming all accounts have similar currencies)
-        sample_account = random_instance.choice(individual_accounts)
-        account_currency = self.graph.nodes[sample_account].get(
-            "currency", "EUR")
+        # Calculate total inflow amount for proper outflow ratio
+        total_inflow = sum(inflow_amounts)
+
+        # Get validation parameters to determine target outflow ratio
+        validation_params = pattern_config.get('validation_params', {})
+        outflow_ratio_range = validation_params.get(
+            'outflow_ratio_range', [0.85, 0.95])
+        target_outflow_ratio = random_instance.uniform(
+            outflow_ratio_range[0], outflow_ratio_range[1])
+
+        # Calculate target total withdrawal amount based on inflow
+        target_total_withdrawal = total_inflow * target_outflow_ratio
+
+        # Generate structured withdrawal amounts (below reporting thresholds)
+        # Use a base amount that's reasonable for the withdrawal range
+        base_withdrawal_amount = (
+            inflow_amount_range[0] + inflow_amount_range[1]) / 2
 
         withdrawal_amounts = self.generate_structured_amounts(
             count=num_withdrawals,
-            base_amount=round(random_instance.uniform(
-                withdrawal_amount_range[0], withdrawal_amount_range[1]), 2),
-            target_currency=account_currency
+            base_amount=base_withdrawal_amount,
+            target_currency=inflow_account_currency
         )
+
+        # Scale all amounts proportionally to match the target total
+        current_total = sum(withdrawal_amounts)
+        if current_total > 0:
+            scale_factor = target_total_withdrawal / current_total
+            withdrawal_amounts = [
+                amount * scale_factor for amount in withdrawal_amounts]
+
+        # Round all amounts
+        withdrawal_amounts = [round(amount, 2)
+                              for amount in withdrawal_amounts]
 
         withdrawal_transactions = []
         withdrawal_duration = datetime.timedelta(days=0)
@@ -330,9 +366,20 @@ class RapidInflowOutflowTemporal(TemporalComponent):
                 return sequences  # Or return only inflow sequence
             return []  # No transactions can be made if cash account is missing for withdrawal step
 
+        # Only withdraw from accounts that actually received money
+        accounts_with_money = [
+            acc for acc, balance in account_balances.items() if balance > 0]
+
+        if not accounts_with_money:
+            logger.warning(
+                "RapidFundMovement: No accounts received money, cannot generate withdrawals")
+            return sequences
+
         for i in range(min(num_withdrawals, len(withdrawal_timestamps))):
+            # Only withdraw from accounts that received inflows
             account_for_withdrawal = random_instance.choice(
-                individual_accounts)
+                accounts_with_money)
+
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
                 src_id=account_for_withdrawal,
                 dest_id=cash_account_id,

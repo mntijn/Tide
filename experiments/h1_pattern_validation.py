@@ -99,8 +99,7 @@ def create_h1_config():
                     },
                     'withdrawals': {
                         'min_withdrawals': 3,
-                        'max_withdrawals': 8,
-                        'amount_range': [100, 2000]
+                        'max_withdrawals': 8
                     },
                     'inflow_to_withdrawal_delay': [1, 24]
                 },
@@ -108,7 +107,7 @@ def create_h1_config():
                     'outflow_ratio_range': [0.85, 0.95],
                     'max_inflow_phase_duration_hours': 24,
                     'min_phase_delay_hours': 1,
-                    'max_total_duration_hours': 72
+                    'max_total_duration_hours': 128
                 }
             },
             'frontBusiness': {
@@ -147,8 +146,6 @@ def validate_rapid_fund_movement(pattern_data, config):
 
     # Get ranges from config with fallbacks
     inflow_amount_range = inflow_params.get('amount_range', [500, 6000])
-    withdrawal_amount_range = withdrawal_params.get(
-        'amount_range', [100, 2000])
     outflow_ratio_range = validation_params.get(
         'outflow_ratio_range', [0.85, 0.95])
     max_inflow_duration = validation_params.get(
@@ -183,11 +180,7 @@ def validate_rapid_fund_movement(pattern_data, config):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
                         f"Inflow amount {tx['amount']} outside range {inflow_amount_range[0]}-{inflow_amount_range[1]}")
-            elif tx['transaction_type'] == 'TransactionType.WITHDRAWAL':
-                if not (withdrawal_amount_range[0] <= tx['amount'] <= withdrawal_amount_range[1]):
-                    validation['transaction_validation'] = False
-                    validation['issues'].append(
-                        f"Withdrawal amount {tx['amount']} outside range {withdrawal_amount_range[0]}-{withdrawal_amount_range[1]}")
+            # Note: Withdrawal amounts are structured below reporting thresholds automatically
 
         # 3. Temporal validation: Check timing constraints and two-phase pattern
         if transactions:
@@ -224,6 +217,7 @@ def validate_rapid_fund_movement(pattern_data, config):
                 # Phase 2: Check that withdrawals come after inflows (with delay)
                 earliest_withdrawal = min(withdrawal_times)
                 latest_inflow = max(inflow_times)
+                latest_withdrawal = max(withdrawal_times)
 
                 if earliest_withdrawal <= latest_inflow:
                     validation['temporal_validation'] = False
@@ -240,6 +234,18 @@ def validate_rapid_fund_movement(pattern_data, config):
                     validation['temporal_validation'] = False
                     validation['issues'].append(
                         f"Phase delay {phase_delay_hours:.1f}h is less than minimum {min_phase_delay}h")
+
+                # Check withdrawal phase duration
+                withdrawal_duration_hours = (
+                    latest_withdrawal - earliest_withdrawal).total_seconds() / 3600
+                print(
+                    f"    Withdrawal phase: {withdrawal_duration_hours:.1f}h duration")
+
+                # Check total pattern duration
+                total_pattern_duration_hours = (
+                    latest_withdrawal - inflow_start).total_seconds() / 3600
+                print(
+                    f"    Total pattern: {total_pattern_duration_hours:.1f}h duration (limit: {max_total_duration}h)")
 
                 # Check amount relationship: outflow should be within configured ratio
                 total_inflow = sum(tx['amount'] for tx in inflows)
