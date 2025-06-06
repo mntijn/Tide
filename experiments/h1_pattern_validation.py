@@ -52,7 +52,8 @@ def create_h1_config():
             'random': False,
             'RapidFundMovement': 3,
             'FrontBusinessActivity': 2,
-            'RepeatedOverseasTransfers': 3
+            'RepeatedOverseasTransfers': 3,
+            'UTurnTransactions': 3
         },
         'reporting_threshold': 10000,
         'reporting_currency': 'EUR',
@@ -126,6 +127,18 @@ def create_h1_config():
                     'min_transactions': 4,
                     'max_transactions': 12,
                     'transfer_interval_days': [7, 14, 30]
+                }
+            },
+            'uTurnTransactions': {
+                'min_intermediaries': 2,
+                'max_intermediaries': 5,
+                'transaction_params': {
+                    'initial_amount_range': [10000, 100000],
+                    'return_percentage_range': [0.7, 0.9],
+                    'international_delay_days': [1, 5]
+                },
+                'validation_params': {
+                    'fee_percentage_range': [0.01, 0.03]
                 }
             }
         }
@@ -409,6 +422,127 @@ def validate_overseas_transfers(pattern_data, config):
     return results
 
 
+def validate_u_turn_transactions(pattern_data, config):
+    """Validate UTurnTransactions pattern structure and timing"""
+    results = []
+
+    # Extract validation parameters from config
+    u_turn_config = config.get('pattern_config', {}).get(
+        'uTurnTransactions', {})
+    tx_params = u_turn_config.get('transaction_params', {})
+    validation_params = u_turn_config.get('validation_params', {})
+
+    min_intermediaries = u_turn_config.get('min_intermediaries', 2)
+    max_intermediaries = u_turn_config.get('max_intermediaries', 5)
+
+    delay_days_range = tx_params.get('international_delay_days', [1, 5])
+    fee_range = validation_params.get('fee_percentage_range', [0.01, 0.03])
+    return_percentage_range = tx_params.get(
+        'return_percentage_range', [0.7, 0.9])
+
+    for pattern in pattern_data:
+        print(pattern['pattern_type'])
+        if pattern['pattern_type'] != 'UTurnTransactions':
+            continue
+
+        validation = {
+            'pattern_id': pattern['pattern_id'],
+            'entity_validation': True,
+            'transaction_validation': True,
+            'temporal_validation': True,
+            'issues': []
+        }
+
+        # 1. Entity validation
+        entities = pattern['entities']
+        min_entities = min_intermediaries + 2
+        max_entities = max_intermediaries + 2
+        if not (min_entities <= len(entities) <= max_entities):
+            validation['entity_validation'] = False
+            validation['issues'].append(
+                f"Expected {min_entities}-{max_entities} entities, got {len(entities)}")
+
+        transactions = pattern['transactions']
+        expected_min_tx = min_intermediaries + 1  # +1 for return tx
+        if not transactions or len(transactions) < expected_min_tx:
+            if not transactions:
+                validation['issues'].append(
+                    "No transactions found in pattern.")
+            else:
+                validation['issues'].append(
+                    f"Not enough transactions. Expected at least {expected_min_tx}, found {len(transactions)}.")
+            validation['transaction_validation'] = False
+            results.append(validation)
+            continue
+
+        try:
+            transactions.sort(key=lambda tx: tx['timestamp'])
+        except KeyError:
+            validation['transaction_validation'] = False
+            validation['issues'].append(
+                "Transactions in pattern data are missing 'timestamp'.")
+            results.append(validation)
+            continue
+
+        # Check for source/destination IDs first. If not present, can't validate path and amounts between steps.
+        has_src_dest_ids = all(
+            'src' in tx and 'dest' in tx for tx in transactions)
+        if not has_src_dest_ids:
+            validation['transaction_validation'] = False
+            validation['issues'].append(
+                "Transactions are missing source_id/destination_id, cannot validate path.")
+            results.append(validation)
+            continue
+
+        # 2. Transaction and Temporal validation
+        for i in range(1, len(transactions)):
+            tx_prev = transactions[i-1]
+            tx_curr = transactions[i]
+
+            # Path continuity
+            if tx_prev['dest'] != tx_curr['src']:
+                validation['transaction_validation'] = False
+                validation['issues'].append(
+                    f"Transaction path broken at hop {i}: {tx_prev['dest']} -> {tx_curr['src']}")
+
+            # Time delay
+            t_prev = datetime.datetime.fromisoformat(
+                tx_prev['timestamp'].replace('Z', '+00:00'))
+            t_curr = datetime.datetime.fromisoformat(
+                tx_curr['timestamp'].replace('Z', '+00:00'))
+            delay_days = (t_curr - t_prev).total_seconds() / (24 * 3600)
+            if not (delay_days_range[0] <= delay_days <= delay_days_range[1]):
+                validation['temporal_validation'] = False
+                validation['issues'].append(
+                    f"Delay of {delay_days:.1f} days at hop {i} is outside range {delay_days_range[0]}-{delay_days_range[1]}")
+
+            # Amount change
+            if tx_prev['amount'] <= 0:
+                validation['transaction_validation'] = False
+                validation['issues'].append(
+                    f"Transaction amount for previous hop {i-1} is non-positive.")
+                continue
+
+            ratio = tx_curr['amount'] / tx_prev['amount']
+
+            if i < len(transactions) - 1:  # Intermediary hops
+                fee_percentage = 1 - ratio
+                if not (fee_range[0] <= fee_percentage <= fee_range[1]):
+                    validation['transaction_validation'] = False
+                    validation['issues'].append(
+                        f"Transaction fee at hop {i} is {fee_percentage:.3f}, outside range {fee_range[0]}-{fee_range[1]}")
+            else:  # Final return transaction
+                return_percentage = ratio
+                if not (return_percentage_range[0] <= return_percentage <= return_percentage_range[1]):
+                    validation['transaction_validation'] = False
+                    validation['issues'].append(
+                        f"Return amount percentage is {return_percentage:.3f}, outside range {return_percentage_range[0]}-{return_percentage_range[1]}")
+
+        results.append(validation)
+
+    return results
+
+
 def run_h1_experiment():
     """Run the H1 pattern validation experiment"""
     print("=== H1: Pattern Validation Experiment ===")
@@ -494,6 +628,19 @@ def run_h1_experiment():
         rot_results = validate_overseas_transfers(patterns, config)
         print("RepeatedOverseasTransfers Patterns:")
         for result in rot_results:
+            status = "PASS" if all(
+                [result['entity_validation'], result['transaction_validation'], result['temporal_validation']]) else "FAIL"
+            print(f"  Pattern {result['pattern_id']}: {status}")
+            if result['issues']:
+                for issue in result['issues']:
+                    print(f"    - {issue}")
+                all_passed = False
+        print()
+
+        # UTurnTransactions validation
+        utt_results = validate_u_turn_transactions(patterns, config)
+        print("UTurnTransactions Patterns:")
+        for result in utt_results:
             status = "PASS" if all(
                 [result['entity_validation'], result['transaction_validation'], result['temporal_validation']]) else "FAIL"
             print(f"  Pattern {result['pattern_id']}: {status}")

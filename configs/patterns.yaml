@@ -67,3 +67,23 @@ rapidMovement:
       amount_range: [100, 2000]
     # Time between inflow and withdrawal (in hours)
     inflow_to_withdrawal_delay: [1, 24]
+
+# U-Turn Transactions Pattern
+# Simulates funds being sent through intermediaries and returning to origin
+uTurnTransactions:
+  # Minimum number of intermediary accounts required
+  min_intermediaries: 2
+  # Maximum number of intermediary accounts to use
+  max_intermediaries: 5
+  # Transaction parameters
+  transaction_params:
+    # Base amount range for initial transfer (min, max)
+    initial_amount_range: [10000, 100000]
+    # Percentage of initial amount that returns (min, max)
+    return_percentage_range: [0.7, 0.9]
+    # Time between international transfers (in days)
+    international_delay_days: [1, 5]
+  # Validation parameters
+  validation_params:
+    # Fee percentage range for transactions (min, max)
+    fee_percentage_range: [0.01, 0.03]

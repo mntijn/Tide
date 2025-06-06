@@ -1,6 +1,6 @@
-import random
 import datetime
 from typing import List, Dict, Any, Tuple
+import logging
 
 from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -8,6 +8,9 @@ from .base import (
 )
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
+from ..utils.random_instance import random_instance
+
+logger = logging.getLogger(__name__)
 
 
 class UTurnTransactionsStructural(StructuralComponent):
@@ -22,10 +25,13 @@ class UTurnTransactionsStructural(StructuralComponent):
         return 3
 
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
+        logger.info("Starting entity selection for U-Turn Transactions pattern")
         pattern_config = self.params.get(
             "pattern_config", {}).get("uTurnTransactions", {})
         min_intermediaries = pattern_config.get("min_intermediaries", 2)
         max_intermediaries = pattern_config.get("max_intermediaries", 5)
+        logger.info(
+            f"Pattern config - min_intermediaries: {min_intermediaries}, max_intermediaries: {max_intermediaries}")
 
         # Find originator (individual or business with multiple accounts)
         originator_id = None
@@ -38,6 +44,8 @@ class UTurnTransactionsStructural(StructuralComponent):
         # Look for entities from high-risk clusters with multiple accounts
         for cluster_name in ["super_high_risk", "high_risk_score", "structuring_candidates"]:
             cluster_entities = self.get_cluster(cluster_name)
+            logger.info(
+                f"Found {len(cluster_entities)} entities in cluster {cluster_name}")
             for entity_id in cluster_entities:
                 if self.graph.nodes[entity_id].get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
                     # Count accounts
@@ -48,9 +56,11 @@ class UTurnTransactionsStructural(StructuralComponent):
                     if len(owned_accounts) >= 2:  # Need at least 2 accounts
                         potential_originators.append(
                             (entity_id, owned_accounts))
+                        logger.info(
+                            f"Found potential originator {entity_id} with {len(owned_accounts)} accounts")
 
         # Shuffle and try to find suitable originator
-        random.shuffle(potential_originators)
+        random_instance.shuffle(potential_originators)
 
         for entity_id, accounts in potential_originators:
             # Use one account for sending, another for receiving
@@ -62,11 +72,15 @@ class UTurnTransactionsStructural(StructuralComponent):
                 break
 
         if not originator_id:
+            logger.info(
+                "No suitable originator found in high-risk clusters, trying fallback")
             # Fallback: any entity with 2+ accounts
             all_entities = self.filter_entities_by_criteria(
                 available_entities, {"node_type": NodeType.INDIVIDUAL}
             )
-            random.shuffle(all_entities)
+            logger.info(
+                f"Found {len(all_entities)} potential fallback entities")
+            random_instance.shuffle(all_entities)
 
             for entity_id in all_entities:
                 owned_accounts = [
@@ -77,45 +91,110 @@ class UTurnTransactionsStructural(StructuralComponent):
                     originator_id = entity_id
                     originator_accounts = owned_accounts[:2]
                     return_account_id = owned_accounts[1]
+                    logger.info(
+                        f"Selected fallback originator {originator_id} with accounts {originator_accounts}")
                     break
 
         if not originator_id:
+            logger.info(
+                "Failed to find any suitable originator, returning empty selection")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         # Find intermediary accounts in high-risk jurisdictions
         intermediary_accounts = []
         originator_country = self.graph.nodes[originator_id].get(
             "country_code")
+        logger.info(f"Originator country: {originator_country}")
 
         # Look for accounts in high-risk countries
         high_risk_accounts = []
-        for acc_id in self.get_cluster("high_risk_countries"):
-            if self.graph.nodes[acc_id].get("node_type") == NodeType.ACCOUNT:
+        # Get entities from high-risk countries cluster
+        high_risk_entities = self.get_cluster("high_risk_countries")
+        logger.info(
+            f"Found {len(high_risk_entities)} entities in high-risk countries")
+
+        # For each entity, get their accounts
+        for entity_id in high_risk_entities:
+            entity_accounts = self._get_owned_accounts(entity_id)
+            for acc_id in entity_accounts:
                 acc_country = self.graph.nodes[acc_id].get("country_code")
                 if acc_country and acc_country != originator_country:
                     high_risk_accounts.append(acc_id)
+        logger.info(
+            f"Found {len(high_risk_accounts)} high-risk country accounts")
 
         # Also consider offshore candidates
         offshore_accounts = []
-        for acc_id in self.get_cluster("offshore_candidates"):
-            if self.graph.nodes[acc_id].get("node_type") == NodeType.ACCOUNT:
+        # Get entities from offshore candidates cluster
+        offshore_entities = self.get_cluster("offshore_candidates")
+        logger.info(
+            f"Found {len(offshore_entities)} offshore candidate entities")
+
+        # For each entity, get their accounts
+        for entity_id in offshore_entities:
+            entity_accounts = self._get_owned_accounts(entity_id)
+            for acc_id in entity_accounts:
                 acc_country = self.graph.nodes[acc_id].get("country_code")
                 if acc_country and acc_country != originator_country:
                     offshore_accounts.append(acc_id)
+        logger.info(
+            f"Found {len(offshore_accounts)} offshore candidate accounts")
 
         # Combine and deduplicate
         potential_intermediaries = list(
             set(high_risk_accounts + offshore_accounts))
-        random.shuffle(potential_intermediaries)
+        logger.info(
+            f"Total unique potential intermediaries: {len(potential_intermediaries)}")
+        random_instance.shuffle(potential_intermediaries)
 
         # Select intermediaries
-        num_to_select = random.randint(min_intermediaries,
-                                       min(len(potential_intermediaries), max_intermediaries))
-        intermediary_accounts = potential_intermediaries[:num_to_select]
+        if len(potential_intermediaries) >= min_intermediaries:
+            num_to_select = random_instance.randint(min_intermediaries,
+                                                    min(len(potential_intermediaries), max_intermediaries))
+            logger.info(
+                f"Attempting to select {num_to_select} intermediaries from {len(potential_intermediaries)} candidates")
+            intermediary_accounts = potential_intermediaries[:num_to_select]
+        else:
+            logger.info(
+                f"Not enough potential cross-country intermediaries ({len(potential_intermediaries)}) to meet minimum of {min_intermediaries}. Will proceed to fallback.")
+            intermediary_accounts = []
 
         if len(intermediary_accounts) < min_intermediaries:
+            logger.info(
+                "Not enough cross-country intermediaries found, trying fallback with same-country accounts")
+            # Fallback: allow same-country intermediaries if no cross-country found
+            all_potential_intermediaries = []
+            for cluster in ["high_risk_countries", "offshore_candidates"]:
+                for acc_id in self.get_cluster(cluster):
+                    if self.graph.nodes[acc_id].get("node_type") == NodeType.ACCOUNT:
+                        all_potential_intermediaries.append(acc_id)
+
+            potential_intermediaries = list(set(all_potential_intermediaries))
+            # Exclude originator's own accounts
+            potential_intermediaries = [
+                acc for acc in potential_intermediaries if acc not in originator_accounts]
+            logger.info(
+                f"Found {len(potential_intermediaries)} fallback intermediaries (including same-country)")
+            random_instance.shuffle(potential_intermediaries)
+
+            if len(potential_intermediaries) >= min_intermediaries:
+                num_to_select = random_instance.randint(
+                    min_intermediaries, min(len(potential_intermediaries), max_intermediaries))
+                logger.info(
+                    f"Attempting to select {num_to_select} fallback intermediaries")
+                intermediary_accounts = potential_intermediaries[:num_to_select]
+            else:
+                logger.info(
+                    f"Not enough fallback intermediaries to meet minimum of {min_intermediaries}.")
+                intermediary_accounts = []
+
+        if len(intermediary_accounts) < min_intermediaries:
+            logger.info(
+                f"Failed to find enough intermediaries (found {len(intermediary_accounts)}, need {min_intermediaries})")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
+        logger.info(
+            f"Successfully selected {len(intermediary_accounts)} intermediaries")
         return EntitySelection(
             # Send from first, return to second
             central_entities=[originator_accounts[0], return_account_id],
@@ -131,6 +210,7 @@ class UTurnTransactionsTemporal(TemporalComponent):
 
     def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
         sequences = []
+        logger.info(f"Generating U-Turn Transactions sequence")
 
         if not entity_selection.central_entities or len(entity_selection.central_entities) < 2:
             return sequences
@@ -159,13 +239,13 @@ class UTurnTransactionsTemporal(TemporalComponent):
         # Need enough time for full cycle
         max_start_offset = max(0, time_span_days -
                                len(intermediary_accounts) * 5 - 10)
-        start_day_offset = random.randint(0, max_start_offset)
+        start_day_offset = random_instance.randint(0, max_start_offset)
 
         current_time = self.time_span["start_date"] + \
             datetime.timedelta(days=start_day_offset)
 
         # Initial amount
-        initial_amount = random.uniform(
+        initial_amount = random_instance.uniform(
             initial_amount_range[0], initial_amount_range[1])
         current_amount = initial_amount
 
@@ -180,12 +260,12 @@ class UTurnTransactionsTemporal(TemporalComponent):
             dest = path[i + 1]
 
             # International transfer delay
-            delay_days = random.randint(
+            delay_days = random_instance.randint(
                 international_delay_days[0], international_delay_days[1])
             current_time += datetime.timedelta(days=delay_days)
 
             # Small fee/loss at each hop
-            fee_percentage = random.uniform(0.01, 0.03)
+            fee_percentage = random_instance.uniform(0.01, 0.03)
             current_amount *= (1 - fee_percentage)
 
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
@@ -204,12 +284,12 @@ class UTurnTransactionsTemporal(TemporalComponent):
             last_intermediary = intermediary_accounts[-1]
 
             # Delay before return
-            delay_days = random.randint(
+            delay_days = random_instance.randint(
                 international_delay_days[0], international_delay_days[1])
             current_time += datetime.timedelta(days=delay_days)
 
             # Return percentage of funds
-            return_percentage = random.uniform(
+            return_percentage = random_instance.uniform(
                 return_percentage_range[0], return_percentage_range[1])
             return_amount = current_amount * return_percentage
 
@@ -234,7 +314,6 @@ class UTurnTransactionsTemporal(TemporalComponent):
                 start_time=start_time,
                 duration=end_time - start_time
             ))
-
         return sequences
 
 

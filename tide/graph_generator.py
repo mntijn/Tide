@@ -220,8 +220,6 @@ class GraphGenerator:
                     pattern_instance = config_to_pattern_mapping.get(
                         config_key)
                     if pattern_instance:
-                        logger.info(
-                            f"Injecting {count} instances of {pattern_instance.pattern_name}")
                         for i in range(count):
                             task = (pattern_instance.inject_pattern,
                                     (all_nodes_list,), task_index)
@@ -256,7 +254,8 @@ class GraphGenerator:
                                 if edges:  # Only track if pattern actually generated edges
                                     pattern_data = self._analyze_pattern_edges(
                                         pattern_instance.pattern_name, edges, pattern_instance)
-                                    logger.info("appending")
+                                    logger.info(
+                                        f"appending {pattern_data['pattern_type']}")
                                     self.injected_patterns.append(pattern_data)
                                 pattern_index += 1
 
@@ -301,6 +300,10 @@ class GraphGenerator:
             amounts.append(float(attrs_dict.get('amount', 0)))
             if attrs_dict.get('timestamp'):
                 timestamps.append(attrs_dict['timestamp'])
+
+        if timestamps:
+            transactions.sort(key=lambda x: x['timestamp'])
+            timestamps.sort()
 
         # Get countries for involved entities
         for entity_id in entities:
@@ -399,6 +402,27 @@ class GraphGenerator:
                 'deposit_amount': sum(tx['amount'] for tx in deposits),
                 'transfer_amount': sum(tx['amount'] for tx in transfers)
             })
+
+        elif pattern_name == 'UTurnTransactions':
+            if transactions:
+                source_account = transactions[0]['src']
+                return_account = transactions[-1]['dest']
+
+                # Collect all unique entities in the path
+                path_entities = set()
+                for tx in transactions:
+                    path_entities.add(tx['src'])
+                    path_entities.add(tx['dest'])
+
+                intermediaries = list(
+                    path_entities - {source_account, return_account})
+
+                pattern_data.update({
+                    'source_account': source_account,
+                    'return_account': return_account,
+                    'intermediary_accounts': intermediaries,
+                    'num_intermediaries': len(intermediaries)
+                })
 
         return pattern_data
 

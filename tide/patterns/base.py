@@ -436,9 +436,11 @@ class CompositePattern(PatternInjector):
             entity_selection = self.structural.select_entities(entities)
             if not entity_selection.central_entities:
                 return generated_edges
-
+            print(f"entities done for {self.__class__.__name__}")
             # Build sequences
             for sequence in self.temporal.generate_transaction_sequences(entity_selection):
+                print(
+                    f"Generated sequence {sequence.sequence_name}, for pattern {self.__class__.__name__}")
                 generated_edges.extend(sequence.transactions)
 
         except Exception as e:
