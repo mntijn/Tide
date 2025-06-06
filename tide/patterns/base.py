@@ -297,6 +297,26 @@ class TemporalComponent(ABC):
         """Generate transaction sequences based on temporal pattern"""
         pass
 
+    def _get_owned_accounts(self, entity_id: str) -> List[str]:
+        """Get all accounts owned by an entity (individual or business)"""
+        owned_accounts = []
+
+        # Direct accounts
+        for neighbor_id in self.graph.neighbors(entity_id):
+            if self.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
+                owned_accounts.append(neighbor_id)
+
+        # If entity is an individual, also check business accounts they own
+        if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
+            for neighbor_id in self.graph.neighbors(entity_id):
+                if self.graph.nodes[neighbor_id].get("node_type") == NodeType.BUSINESS:
+                    # Get accounts of owned businesses
+                    for business_neighbor in self.graph.neighbors(neighbor_id):
+                        if self.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
+                            owned_accounts.append(business_neighbor)
+
+        return list(set(owned_accounts))  # Remove duplicates
+
     def generate_timestamps(self,
                             start_time: datetime.datetime,
                             pattern_type: str,

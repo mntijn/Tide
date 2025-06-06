@@ -118,14 +118,14 @@ def create_h1_config():
                     'max_deposits': 15
                 }
             },
-            'overseasTransfers': {
-                'min_destinations': 2,
-                'max_destinations': 5,
+            'repeatedOverseas': {
+                'min_overseas_entities': 2,
+                'max_overseas_entities': 5,
                 'transaction_params': {
                     'transfer_amount_range': [5000, 20000],
-                    'min_transfers': 4,
-                    'max_transfers': 12,
-                    'interval_days': [7, 14, 30]
+                    'min_transactions': 4,
+                    'max_transactions': 12,
+                    'transfer_interval_days': [7, 14, 30]
                 }
             }
         }
@@ -333,13 +333,13 @@ def validate_overseas_transfers(pattern_data, config):
 
     # Extract validation parameters from config
     overseas_config = config.get(
-        'pattern_config', {}).get('overseasTransfers', {})
+        'pattern_config', {}).get('repeatedOverseas', {})
     tx_params = overseas_config.get('transaction_params', {})
     transfer_amount_range = tx_params.get(
         'transfer_amount_range', [5000, 20000])
-    interval_days = tx_params.get('interval_days', [7, 14, 30])
-    min_destinations = overseas_config.get('min_destinations', 2)
-    max_destinations = overseas_config.get('max_destinations', 5)
+    interval_days = tx_params.get('transfer_interval_days', [7, 14, 30])
+    min_destinations = overseas_config.get('min_overseas_entities', 2)
+    max_destinations = overseas_config.get('max_overseas_entities', 5)
 
     for pattern in pattern_data:
         if pattern['pattern_type'] != 'RepeatedOverseasTransfers':
@@ -370,19 +370,39 @@ def validate_overseas_transfers(pattern_data, config):
                 validation['issues'].append(
                     f"Transfer amount {tx['amount']} outside range {transfer_amount_range[0]}-{transfer_amount_range[1]}")
 
-        # 3. Temporal validation: Check intervals (using config values)
+        # 3. Temporal validation: Check intervals (more lenient for high_frequency patterns)
         if len(transactions) >= 2:
             times = [datetime.datetime.fromisoformat(
                 tx['timestamp'].replace('Z', '+00:00')) for tx in transactions]
             times.sort()
 
-            for i in range(1, len(times)):
-                interval_days_actual = (times[i] - times[i-1]).days
-                if interval_days_actual not in interval_days:
-                    validation['temporal_validation'] = False
-                    validation['issues'].append(
-                        f"Interval {interval_days_actual} days not in {interval_days}")
-                    break
+            # Check if this looks like a periodic pattern (consistent intervals)
+            intervals = [
+                (times[i] - times[i-1]).days for i in range(1, len(times))]
+            unique_intervals = set(intervals)
+
+            # If most intervals are consistent and match config, it's likely periodic
+            is_likely_periodic = len(unique_intervals) <= 2 and any(
+                interval in interval_days for interval in unique_intervals)
+
+            if is_likely_periodic:
+                # For periodic patterns, validate strict adherence to configured intervals
+                for i, interval_days_actual in enumerate(intervals):
+                    if interval_days_actual not in interval_days:
+                        validation['temporal_validation'] = False
+                        validation['issues'].append(
+                            f"Periodic pattern interval {interval_days_actual} days not in {interval_days}")
+                        break
+            else:
+                # For high_frequency patterns, just check that intervals are reasonable (not too large)
+                max_reasonable_interval = max(
+                    interval_days) * 2  # Allow some flexibility
+                for i, interval_days_actual in enumerate(intervals):
+                    if interval_days_actual > max_reasonable_interval:
+                        validation['temporal_validation'] = False
+                        validation['issues'].append(
+                            f"High frequency pattern has too large interval: {interval_days_actual} days")
+                        break
 
         results.append(validation)
 

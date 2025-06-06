@@ -12,13 +12,13 @@ from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
 
 
-def load_configurations(config_file: str = "tide/configs/graph.yaml") -> Dict[str, Any]:
+def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, Any]:
     """Load and merge main config and patterns config"""
     with open(config_file, 'r') as f:
         main_config = yaml.safe_load(f)
 
     # Try to load patterns config if it exists
-    patterns_config_file = "tide/configs/patterns.yaml"
+    patterns_config_file = "configs/patterns.yaml"
     if os.path.exists(patterns_config_file):
         with open(patterns_config_file, 'r') as f:
             patterns_config = yaml.safe_load(f)
@@ -138,7 +138,7 @@ def convert_enums_to_strings(graph: nx.DiGraph) -> nx.DiGraph:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate synthetic AML dataset with Tide")
-    parser.add_argument("--config", default="tide/configs/graph.yaml",
+    parser.add_argument("--config", default="configs/graph.yaml",
                         help="Path to configuration file")
     parser.add_argument("--output-dir", default=".",
                         help="Output directory for generated files")
