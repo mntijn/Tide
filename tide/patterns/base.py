@@ -1,4 +1,3 @@
-import random
 import datetime
 from typing import List, Dict, Any, Tuple, Optional, Set
 from abc import ABC, abstractmethod
@@ -13,6 +12,8 @@ from ..datastructures.attributes import (
 from ..utils.currency_conversion import (
     convert_currency, generate_structured_amounts as generate_structured_amounts_util
 )
+
+from ..utils.random_instance import random_instance
 
 try:
     from forex_python.converter import CurrencyRates
@@ -327,7 +328,8 @@ class TemporalComponent(ABC):
             # Burst of transactions in short time window
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 1440)  # Within 24 hours
+                offset_minutes = random_instance.randint(
+                    0, 1440)  # Within 24 hours
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -336,7 +338,8 @@ class TemporalComponent(ABC):
             # The temporal component using this will handle synchronization across entities.
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 1440)  # Within 24 hours
+                offset_minutes = random_instance.randint(
+                    0, 1440)  # Within 24 hours
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -347,7 +350,8 @@ class TemporalComponent(ABC):
             current_time = start_time
             for i in range(count):
                 timestamps.append(current_time)
-                days_offset = random.choice([7, 14, 30])  # Weekly/monthly
+                days_offset = random_instance.choice(
+                    [7, 14, 30])  # Weekly/monthly
                 current_time += datetime.timedelta(days=days_offset)
             return timestamps
 
@@ -355,7 +359,8 @@ class TemporalComponent(ABC):
             # Quick sequence after initial trigger
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 30)  # Within 30 minutes
+                offset_minutes = random_instance.randint(
+                    0, 30)  # Within 30 minutes
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -364,7 +369,7 @@ class TemporalComponent(ABC):
             # Random spread
             timestamps = []
             for i in range(count):
-                offset_hours = random.randint(0, 168)  # Within a week
+                offset_hours = random_instance.randint(0, 168)  # Within a week
                 timestamps.append(
                     start_time + datetime.timedelta(hours=offset_hours))
             return sorted(timestamps)

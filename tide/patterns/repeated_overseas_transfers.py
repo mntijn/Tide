@@ -242,7 +242,7 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             "transfer_interval_days", [7, 14, 30])
 
         temporal_type = random_instance.choice(
-            ["periodic", "high_frequency"])
+            ["periodic"])
         num_transactions = random_instance.randint(min_tx, max_tx)
 
         # Transfers start after a short delay following the last deposit
@@ -255,13 +255,13 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
 
         transfer_timestamps = []
         if temporal_type == "periodic" and interval_days_options:
+            interval_days = random_instance.choice(interval_days_options)
             current_time = base_start_time
             for _ in range(num_transactions):
                 if current_time > self.time_span["end_date"]:
                     break
                 transfer_timestamps.append(current_time)
-                current_time += datetime.timedelta(
-                    days=random_instance.choice(interval_days_options))
+                current_time += datetime.timedelta(days=interval_days)
         else:
             transfer_timestamps = self.generate_timestamps(
                 base_start_time, temporal_type, num_transactions)
