@@ -449,7 +449,7 @@ class GraphGenerator:
         self.initialize_entities()
         self.build_entity_clusters()
         self.inject_aml_patterns()
-        self.simulate_background_activity()
+        # self.simulate_background_activity()
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph

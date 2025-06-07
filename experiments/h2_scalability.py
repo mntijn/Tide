@@ -88,120 +88,54 @@ def create_h2_config(scale_type):
         }
     }
 
-    if scale_type == "extra_small":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 1000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.08,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 1,
-                'FrontBusinessActivity': 1,
-                'RepeatedOverseasTransfers': 1
-            }
-        })
-    elif scale_type == "small":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 2000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.10,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 2,
-                'FrontBusinessActivity': 1,
-                'RepeatedOverseasTransfers': 3
-            }
-        })
-    elif scale_type == "small_medium":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 3500,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.12,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 4,
-                'FrontBusinessActivity': 2,
-                'RepeatedOverseasTransfers': 5
-            }
-        })
-    elif scale_type == "medium":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 5000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.15,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 5,
-                'FrontBusinessActivity': 3,
-                'RepeatedOverseasTransfers': 6
-            }
-        })
-    elif scale_type == "medium_large":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 8000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.17,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 8,
-                'FrontBusinessActivity': 4,
-                'RepeatedOverseasTransfers': 10
-            }
-        })
-    elif scale_type == "large":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 12000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.18,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 12,
-                'FrontBusinessActivity': 6,
-                'RepeatedOverseasTransfers': 15
-            }
-        })
-    elif scale_type == "extra_large":
-        base_config.update({
-            'graph_scale': {
-                'individuals': 20000,
-                'institutions_per_country': 3,
-                'individual_accounts_per_institution_range': [1, 3],
-                'business_accounts_per_institution_range': [1, 6]
-            },
-            'random_business_probability': 0.20,
-            'pattern_frequency': {
-                'random': False,
-                'RapidFundMovement': 20,
-                'FrontBusinessActivity': 10,
-                'RepeatedOverseasTransfers': 25
-            }
-        })
+    # Common configuration for all scales
+    common_config = {
+        'graph_scale': {
+            'institutions_per_country': 3,
+            'individual_accounts_per_institution_range': [1, 3],
+            'business_accounts_per_institution_range': [1, 6]
+        },
+        'random_business_probability': 0.15,  # 15% business creation probability
+        'pattern_frequency': {
+            'random': False,
+            'RapidFundMovement': 3,
+            'FrontBusinessActivity': 2,
+            'RepeatedOverseasTransfers': 3
+        }
+    }
 
-    return base_config
+    if scale_type == "extra_small":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 1000
+    elif scale_type == "small":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 2000
+    elif scale_type == "small_medium":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 3500
+    elif scale_type == "medium":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 5000
+    elif scale_type == "medium_large":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 8000
+    elif scale_type == "large":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 12000
+    elif scale_type == "extra_large":
+        config = base_config.copy()
+        config.update(common_config)
+        config['graph_scale']['individuals'] = 20000
+    else:
+        raise ValueError(f"Invalid scale type: {scale_type}")
+
+    return config
 
 
 def measure_performance(scale_type, config):

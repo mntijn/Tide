@@ -135,7 +135,12 @@ def create_h1_config():
                 'transaction_params': {
                     'initial_amount_range': [10000, 100000],
                     'return_percentage_range': [0.7, 0.9],
-                    'international_delay_days': [1, 5]
+                    'international_delay_days': [1, 5],
+                    'time_variability': {
+                        'business_hours': [9, 16],
+                        'include_minutes': True,
+                        'include_hours': True
+                    }
                 },
                 'validation_params': {
                     'fee_percentage_range': [0.01, 0.03]
@@ -383,7 +388,7 @@ def validate_overseas_transfers(pattern_data, config):
                 validation['issues'].append(
                     f"Transfer amount {tx['amount']} outside range {transfer_amount_range[0]}-{transfer_amount_range[1]}")
 
-        # 3. Temporal validation: Check intervals (more lenient for high_frequency patterns)
+        # 3. Temporal validation: Check intervals
         if len(transactions) >= 2:
             times = [datetime.datetime.fromisoformat(
                 tx['timestamp'].replace('Z', '+00:00')) for tx in transactions]

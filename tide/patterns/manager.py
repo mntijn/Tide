@@ -1,12 +1,13 @@
 # TODO: maybe give the pattern manager awareness of previously
 # selected fraudulent entities so it can bias its selection logic.
 
-import random
 from typing import Dict, Any, List
 
 from .repeated_overseas_transfers import RepeatedOverseasTransfersPattern
 from .rapid_fund_movement import RapidFundMovementPattern
 from .front_business_activity import FrontBusinessPattern
+from .synchronised_transactions import SynchronisedTransactionsPattern
+from .u_turn_transactions import UTurnTransactionsPattern
 
 
 class PatternManager:
@@ -21,6 +22,8 @@ class PatternManager:
                 RepeatedOverseasTransfersPattern(graph_generator, params),
                 RapidFundMovementPattern(graph_generator, params),
                 FrontBusinessPattern(graph_generator, params),
+                SynchronisedTransactionsPattern(graph_generator, params),
+                UTurnTransactionsPattern(graph_generator, params),
                 # add new patterns here
             ]}
 

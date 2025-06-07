@@ -10,6 +10,12 @@ from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
 
+# Initialize NumPy's random state with the same seed as random_instance
+np.random.seed(random_instance.getrandbits(32))
+
+print(
+    f"NumPy random state initialized with seed: {random_instance.getrandbits(32)}")
+
 
 class BackgroundActivityStructural(StructuralComponent):
     """Structural component: treat all supplied accounts as actors for daily activity."""

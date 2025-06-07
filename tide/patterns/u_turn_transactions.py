@@ -225,6 +225,11 @@ class UTurnTransactionsTemporal(TemporalComponent):
         pattern_config = self.params.get(
             "pattern_config", {}).get("uTurnTransactions", {})
         tx_params = pattern_config.get("transaction_params", {})
+        time_variability = tx_params.get("time_variability", {
+            "business_hours": [9, 16],
+            "include_minutes": True,
+            "include_hours": True
+        })
 
         initial_amount_range = tx_params.get(
             "initial_amount_range", [10000, 100000])
@@ -232,6 +237,11 @@ class UTurnTransactionsTemporal(TemporalComponent):
             "return_percentage_range", [0.7, 0.9])
         international_delay_days = tx_params.get(
             "international_delay_days", [1, 5])
+
+        # Get time variability parameters
+        business_hours = time_variability.get("business_hours", [9, 16])
+        include_minutes = time_variability.get("include_minutes", True)
+        include_hours = time_variability.get("include_hours", True)
 
         # Calculate start time
         time_span_days = (
@@ -241,8 +251,13 @@ class UTurnTransactionsTemporal(TemporalComponent):
                                len(intermediary_accounts) * 5 - 10)
         start_day_offset = random_instance.randint(0, max_start_offset)
 
+        # Start with a random time of day within business hours
+        start_hour = random_instance.randint(
+            business_hours[0], business_hours[1])
+        start_minute = random_instance.randint(0, 59) if include_minutes else 0
         current_time = self.time_span["start_date"] + \
-            datetime.timedelta(days=start_day_offset)
+            datetime.timedelta(days=start_day_offset,
+                               hours=start_hour, minutes=start_minute)
 
         # Initial amount
         initial_amount = random_instance.uniform(
@@ -259,10 +274,22 @@ class UTurnTransactionsTemporal(TemporalComponent):
             src = path[i]
             dest = path[i + 1]
 
-            # International transfer delay
-            delay_days = random_instance.randint(
+            # International transfer delay with configurable time variability
+            base_delay_days = random_instance.randint(
                 international_delay_days[0], international_delay_days[1])
-            current_time += datetime.timedelta(days=delay_days)
+
+            # Add random hours if enabled
+            delay_hours = random_instance.randint(
+                0, 23) if include_hours else 0
+            # Add random minutes if enabled
+            delay_minutes = random_instance.randint(
+                0, 59) if include_minutes else 0
+
+            current_time += datetime.timedelta(
+                days=base_delay_days,
+                hours=delay_hours,
+                minutes=delay_minutes
+            )
 
             # Small fee/loss at each hop
             fee_percentage = random_instance.uniform(0.01, 0.03)
@@ -283,10 +310,22 @@ class UTurnTransactionsTemporal(TemporalComponent):
         if intermediary_accounts:
             last_intermediary = intermediary_accounts[-1]
 
-            # Delay before return
-            delay_days = random_instance.randint(
+            # Delay before return with configurable time variability
+            base_delay_days = random_instance.randint(
                 international_delay_days[0], international_delay_days[1])
-            current_time += datetime.timedelta(days=delay_days)
+
+            # Add random hours if enabled
+            delay_hours = random_instance.randint(
+                0, 23) if include_hours else 0
+            # Add random minutes if enabled
+            delay_minutes = random_instance.randint(
+                0, 59) if include_minutes else 0
+
+            current_time += datetime.timedelta(
+                days=base_delay_days,
+                hours=delay_hours,
+                minutes=delay_minutes
+            )
 
             # Return percentage of funds
             return_percentage = random_instance.uniform(

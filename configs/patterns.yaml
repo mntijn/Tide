@@ -83,6 +83,14 @@ uTurnTransactions:
     return_percentage_range: [0.7, 0.9]
     # Time between international transfers (in days)
     international_delay_days: [1, 5]
+    # Time variability parameters
+    time_variability:
+      # Business hours range for transactions (start_hour, end_hour, 24-hour format)
+      business_hours: [9, 16]
+      # Whether to include random minutes in timing
+      include_minutes: true
+      # Whether to include random hours in delays
+      include_hours: true
   # Validation parameters
   validation_params:
     # Fee percentage range for transactions (min, max)
