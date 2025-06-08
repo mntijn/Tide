@@ -28,6 +28,9 @@ def initialize_entities(graph_generator):
         # Also reset global random module
         import random
         random.seed(graph_generator.random_seed)
+        # Reset NumPy random state for complete reproducibility
+        import numpy as np
+        np.random.seed(graph_generator.random_seed)
         # Reset Faker instance
         reset_faker_seed()
 

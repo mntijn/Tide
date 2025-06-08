@@ -113,8 +113,10 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         potential_sender_accounts = [acc for acc in potential_sender_accounts
                                      if acc not in individual_accounts]
 
-        # Remove duplicates
-        potential_sender_accounts = list(set(potential_sender_accounts))
+        # Remove duplicates deterministically
+        from .base import deduplicate_preserving_order
+        potential_sender_accounts = deduplicate_preserving_order(
+            potential_sender_accounts)
 
         logger.debug(
             f"RapidFundMovement: Found {len(potential_sender_accounts)} potential sender accounts from high-risk entities")
@@ -138,8 +140,9 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
             logger.debug(
                 f"RapidFundMovement: Added {high_risk_accounts_added} more accounts from high-risk countries")
 
-        # Remove duplicates again
-        potential_sender_accounts = list(set(potential_sender_accounts))
+        # Remove duplicates again deterministically
+        potential_sender_accounts = deduplicate_preserving_order(
+            potential_sender_accounts)
 
         if not potential_sender_accounts:
             logger.info("RapidFundMovement: No sender accounts found")

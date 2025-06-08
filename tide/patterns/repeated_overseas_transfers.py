@@ -67,7 +67,7 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
 
                 # Find domestic accounts owned by this entity
                 owned_domestic_accounts = []
-                for acc_id in self.graph.neighbors(entity_id):
+                for acc_id in sorted(self.graph.neighbors(entity_id)):
                     try:
                         acc_data = self.graph.nodes[acc_id]
                         if (acc_data.get("node_type") == NodeType.ACCOUNT and
@@ -108,8 +108,9 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
 
                 # If not enough, expand to any overseas account
                 if len(potential_overseas_accounts) < min_overseas_entities:
-                    all_account_ids = [nid for nid, ndata in self.graph.nodes(
-                        data=True) if ndata.get("node_type") == NodeType.ACCOUNT]
+                    # Sort nodes for deterministic order
+                    all_account_ids = [nid for nid, ndata in sorted(self.graph.nodes(
+                        data=True)) if ndata.get("node_type") == NodeType.ACCOUNT]
                     random_instance.shuffle(all_account_ids)
 
                     for acc_id in all_account_ids:
@@ -122,7 +123,7 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
                             acc_node_data = self.graph.nodes[acc_id]
                             acc_country = acc_node_data.get("country_code")
                             if acc_country and acc_country != entity_country:
-                                for owner_id in self.graph.predecessors(acc_id):
+                                for owner_id in sorted(self.graph.predecessors(acc_id)):
                                     owner_data = self.graph.nodes[owner_id]
                                     if owner_data.get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
                                         potential_overseas_accounts.append(

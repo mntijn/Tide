@@ -1,4 +1,3 @@
-import random
 import datetime
 from typing import List, Dict, Any, Tuple
 
@@ -8,6 +7,7 @@ from .base import (
 )
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
+from ..utils.random_instance import random_instance
 
 
 class SynchronisedTransactionsStructural(StructuralComponent):
@@ -50,9 +50,11 @@ class SynchronisedTransactionsStructural(StructuralComponent):
             high_risk_countries = self.get_cluster("high_risk_countries")
             potential_recipients.extend(high_risk_countries)
 
-        # Remove duplicates and shuffle
-        potential_recipients = list(set(potential_recipients))
-        random.shuffle(potential_recipients)
+        # Remove duplicates deterministically and shuffle
+        from .base import deduplicate_preserving_order
+        potential_recipients = deduplicate_preserving_order(
+            potential_recipients)
+        random_instance.shuffle(potential_recipients)
 
         # Find a recipient with at least one account
         for entity_id in potential_recipients:
@@ -64,14 +66,14 @@ class SynchronisedTransactionsStructural(StructuralComponent):
 
             if owned_accounts:
                 recipient_id = entity_id
-                recipient_account_id = random.choice(owned_accounts)
+                recipient_account_id = random_instance.choice(owned_accounts)
                 break
 
         if not recipient_id or not recipient_account_id:
             # Fallback: pick any entity with an account
             all_entities = [e for e in available_entities
                             if self.graph.nodes[e].get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]]
-            random.shuffle(all_entities)
+            random_instance.shuffle(all_entities)
 
             for entity_id in all_entities:
                 owned_accounts = [
@@ -80,7 +82,8 @@ class SynchronisedTransactionsStructural(StructuralComponent):
                 ]
                 if owned_accounts:
                     recipient_id = entity_id
-                    recipient_account_id = random.choice(owned_accounts)
+                    recipient_account_id = random_instance.choice(
+                        owned_accounts)
                     break
 
         if not recipient_id:
@@ -98,7 +101,7 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         # Prioritize those with risk factors
         potential_coordinators = self.prioritize_by_risk_factors(
             potential_coordinators)
-        random.shuffle(potential_coordinators)
+        random_instance.shuffle(potential_coordinators)
 
         for ind_id in potential_coordinators:
             if ind_id == recipient_id:  # Skip the recipient
@@ -112,7 +115,8 @@ class SynchronisedTransactionsStructural(StructuralComponent):
 
             if owned_accounts:
                 coordinating_entities.append(ind_id)
-                coordinating_accounts.append(random.choice(owned_accounts))
+                coordinating_accounts.append(
+                    random_instance.choice(owned_accounts))
 
                 if len(coordinating_entities) >= max_coordinating_entities:
                     break
@@ -121,8 +125,8 @@ class SynchronisedTransactionsStructural(StructuralComponent):
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         # Trim to desired number
-        num_to_use = random.randint(min_coordinating_entities,
-                                    min(len(coordinating_entities), max_coordinating_entities))
+        num_to_use = random_instance.randint(min_coordinating_entities,
+                                             min(len(coordinating_entities), max_coordinating_entities))
         coordinating_entities = coordinating_entities[:num_to_use]
         coordinating_accounts = coordinating_accounts[:num_to_use]
 
@@ -160,13 +164,15 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
         # Calculate start time
         time_span_days = (
             self.time_span["end_date"] - self.time_span["start_date"]).days
-        start_day_offset = random.randint(0, max(0, time_span_days - 1))
+        start_day_offset = random_instance.randint(
+            0, max(0, time_span_days - 1))
         base_start_time = self.time_span["start_date"] + \
             datetime.timedelta(days=start_day_offset)
 
         # Generate synchronized deposit timestamps
         sync_base_time = base_start_time + \
-            datetime.timedelta(hours=random.randint(9, 15))  # Business hours
+            datetime.timedelta(
+                hours=random_instance.randint(9, 15))  # Business hours
 
         deposit_transactions = []
         total_deposited = 0
@@ -179,7 +185,7 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
         # Each coordinating account makes a cash deposit within the sync window
         for account_id in coordinating_accounts:
             # Small random offset within sync window
-            offset_minutes = random.randint(0, sync_window_hours * 60)
+            offset_minutes = random_instance.randint(0, sync_window_hours * 60)
             deposit_time = sync_base_time + \
                 datetime.timedelta(minutes=offset_minutes)
 
@@ -190,7 +196,7 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
             # Generate structured amount
             amounts = self.generate_structured_amounts(
                 count=1,
-                base_amount=random.uniform(
+                base_amount=random_instance.uniform(
                     deposit_amount_range[0], deposit_amount_range[1]),
                 target_currency=account_currency
             )
@@ -223,7 +229,7 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
         last_deposit_time = max(
             [tx[2].timestamp for tx in deposit_transactions])
         transfer_start_time = last_deposit_time + datetime.timedelta(
-            hours=random.uniform(
+            hours=random_instance.uniform(
                 transfer_delay_hours[0], transfer_delay_hours[1])
         )
 
@@ -232,11 +238,11 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
         # Each account transfers to the recipient
         for i, account_id in enumerate(coordinating_accounts):
             transfer_time = transfer_start_time + \
-                datetime.timedelta(minutes=random.randint(0, 30))
+                datetime.timedelta(minutes=random_instance.randint(0, 30))
 
             # Transfer most of what was deposited
             transfer_amount = deposit_transactions[i][2].amount * \
-                random.uniform(0.85, 0.95)
+                random_instance.uniform(0.85, 0.95)
 
             tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
                 src_id=account_id,

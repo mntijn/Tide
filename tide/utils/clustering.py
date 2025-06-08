@@ -155,7 +155,8 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     clusters: Dict[str, Set[str]] = {name: set() for name in all_cluster_names}
 
     # Single pass through all nodes to build all clusters
-    for node_id, data in graph_generator.graph.nodes(data=True):
+    # Sort nodes for deterministic iteration order
+    for node_id, data in sorted(graph_generator.graph.nodes(data=True)):
         # Skip accounts and institutions for clustering (focus on individuals/businesses)
         if data.get("node_type") in [NodeType.ACCOUNT, NodeType.INSTITUTION]:
             continue
@@ -166,8 +167,8 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
         for cluster_name in entity_clusters:
             clusters[cluster_name].add(node_id)
 
-    # Convert sets to lists for return value
-    result_clusters = {name: list(cluster_set)
+    # Convert sets to sorted lists for deterministic order
+    result_clusters = {name: sorted(list(cluster_set))
                        for name, cluster_set in clusters.items()}
 
     # Log cluster sizes for debugging

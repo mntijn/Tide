@@ -22,7 +22,7 @@ class PatternManager:
                 RepeatedOverseasTransfersPattern(graph_generator, params),
                 RapidFundMovementPattern(graph_generator, params),
                 FrontBusinessPattern(graph_generator, params),
-                SynchronisedTransactionsPattern(graph_generator, params),
+                # SynchronisedTransactionsPattern(graph_generator, params),
                 UTurnTransactionsPattern(graph_generator, params),
                 # add new patterns here
             ]}

@@ -10,12 +10,6 @@ from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
 
-# Initialize NumPy's random state with the same seed as random_instance
-np.random.seed(random_instance.getrandbits(32))
-
-print(
-    f"NumPy random state initialized with seed: {random_instance.getrandbits(32)}")
-
 
 class BackgroundActivityStructural(StructuralComponent):
     """Structural component: treat all supplied accounts as actors for daily activity."""
@@ -54,29 +48,28 @@ class DailyRandomTransfersTemporal(TemporalComponent):
         if total_expected_txs == 0:
             return sequences
 
-        # Batch generate all timestamps at once
-        random_seconds = np.random.randint(
-            0, total_seconds, size=total_expected_txs)
+        # Generate all timestamps using random_instance for reproducibility
+        random_seconds = [random_instance.randint(0, total_seconds - 1)
+                          for _ in range(total_expected_txs)]
         timestamps = [
-            start_date + datetime.timedelta(seconds=int(s)) for s in random_seconds]
+            start_date + datetime.timedelta(seconds=s) for s in random_seconds]
 
-        # Batch generate all amounts at once
+        # Generate all amounts using random_instance for reproducibility
         amount_range = self.params.get(
             "background_amount_range", [10.0, 500.0])
-        amounts = np.random.uniform(
-            amount_range[0], amount_range[1], size=total_expected_txs)
-        amounts = np.round(amounts, 2)
+        amounts = [round(random_instance.uniform(amount_range[0], amount_range[1]), 2)
+                   for _ in range(total_expected_txs)]
 
-        # Pre-generate all source-destination pairs
-        # We'll create a list of (src, dest) pairs where src != dest
-        src_indices = np.random.randint(
-            0, len(all_accounts), size=total_expected_txs)
-        dest_indices = np.random.randint(
-            0, len(all_accounts), size=total_expected_txs)
+        # Pre-generate all source-destination pairs using random_instance
+        src_indices = [random_instance.randint(0, len(all_accounts) - 1)
+                       for _ in range(total_expected_txs)]
+        dest_indices = [random_instance.randint(0, len(all_accounts) - 1)
+                        for _ in range(total_expected_txs)]
 
         # Ensure src != dest by adjusting dest indices where they match
-        mask = src_indices == dest_indices
-        dest_indices[mask] = (dest_indices[mask] + 1) % len(all_accounts)
+        for i in range(total_expected_txs):
+            if src_indices[i] == dest_indices[i]:
+                dest_indices[i] = (dest_indices[i] + 1) % len(all_accounts)
 
         # Convert indices to actual account IDs
         src_accounts = [all_accounts[i] for i in src_indices]

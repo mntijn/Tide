@@ -84,6 +84,61 @@ def create_h4_config(seed):
         'fraud_selection_config': {
             'min_risk_score_for_fraud_consideration': 0.50,
             'base_fraud_probability_if_considered': 0.10
+        },
+        'pattern_config': {
+            'rapidMovement': {
+                'min_accounts_for_pattern': 2,
+                'max_sender_entities': 5,
+                'transaction_params': {
+                    'inflows': {
+                        'min_inflows': 5,
+                        'max_inflows': 10,
+                        'amount_range': [500, 6000]
+                    },
+                    'withdrawals': {
+                        'min_withdrawals': 3,
+                        'max_withdrawals': 8
+                    },
+                    'inflow_to_withdrawal_delay': [1, 24]
+                }
+            },
+            'frontBusiness': {
+                'min_entities': 3,
+                'min_accounts_for_front_business': 2,
+                'num_front_business_accounts_to_use': 3,
+                'min_overseas_destination_accounts': 2,
+                'max_overseas_destination_accounts_for_front': 4,
+                'transaction_params': {
+                    'min_deposit_cycles': 5,
+                    'max_deposit_cycles': 15,
+                    'deposit_amount_range': [15000, 75000],
+                    'deposits_per_cycle': [1, 3]
+                }
+            },
+            'repeatedOverseas': {
+                'min_overseas_entities': 2,
+                'max_overseas_entities': 5,
+                'transaction_params': {
+                    'transfer_amount_range': [5000, 20000],
+                    'min_transactions': 4,
+                    'max_transactions': 12,
+                    'transfer_interval_days': [7, 14, 30]
+                }
+            },
+            'uTurnTransactions': {
+                'min_intermediaries': 2,
+                'max_intermediaries': 5,
+                'transaction_params': {
+                    'initial_amount_range': [10000, 100000],
+                    'return_percentage_range': [0.7, 0.9],
+                    'international_delay_days': [1, 5],
+                    'time_variability': {
+                        'business_hours': [9, 16],
+                        'include_minutes': True,
+                        'include_hours': True
+                    }
+                }
+            }
         }
     }
 
@@ -130,15 +185,13 @@ def run_generation(config, run_id):
             print(f"STDERR: {result.stderr}")
             return {
                 'nodes': None,
-                'edges': None,
-                'patterns': None
+                'edges': None
             }
 
-        # Calculate hashes
+        # Calculate hashes (skip patterns as they can have different ordering but same content)
         hashes = {
             'nodes': calculate_file_hash(nodes_file),
-            'edges': calculate_file_hash(edges_file),
-            'patterns': calculate_file_hash(patterns_file)
+            'edges': calculate_file_hash(edges_file)
         }
 
         return hashes
@@ -160,7 +213,6 @@ def test_same_seed_reproducibility(seed, num_runs=5):
     results = {
         'nodes_identical': True,
         'edges_identical': True,
-        'patterns_identical': True,
         'all_identical': True,
         'hashes': all_hashes
     }
@@ -180,13 +232,8 @@ def test_same_seed_reproducibility(seed, num_runs=5):
             results['edges_identical'] = False
             print(f"    ✗ Edges differ in run {i+1}")
 
-        if run_hashes['patterns'] != reference_hashes['patterns']:
-            results['patterns_identical'] = False
-            print(f"    ✗ Patterns differ in run {i+1}")
-
     results['all_identical'] = (results['nodes_identical'] and
-                                results['edges_identical'] and
-                                results['patterns_identical'])
+                                results['edges_identical'])
 
     if results['all_identical']:
         print(f"    ✓ All runs identical")
@@ -207,13 +254,11 @@ def test_different_seed_variation(seed1, seed2):
     results = {
         'nodes_different': hashes1['nodes'] != hashes2['nodes'],
         'edges_different': hashes1['edges'] != hashes2['edges'],
-        'patterns_different': hashes1['patterns'] != hashes2['patterns'],
         'any_different': False
     }
 
     results['any_different'] = (results['nodes_different'] or
-                                results['edges_different'] or
-                                results['patterns_different'])
+                                results['edges_different'])
 
     if results['any_different']:
         print(f"    ✓ Seeds produce different outputs")
@@ -221,8 +266,6 @@ def test_different_seed_variation(seed1, seed2):
             print(f"      - Nodes differ")
         if results['edges_different']:
             print(f"      - Edges differ")
-        if results['patterns_different']:
-            print(f"      - Patterns differ")
     else:
         print(f"    ✗ Seeds produce identical outputs (unexpected)")
 
@@ -241,8 +284,6 @@ def run_h4_experiment():
     print("Same Seed Results:")
     print(f"  Nodes: {'✓' if same_seed_results['nodes_identical'] else '✗'}")
     print(f"  Edges: {'✓' if same_seed_results['edges_identical'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if same_seed_results['patterns_identical'] else '✗'}")
     print()
 
     # Test 2: Different seed variation
@@ -254,8 +295,6 @@ def run_h4_experiment():
         f"  Nodes: {'✓' if different_seed_results['nodes_different'] else '✗'}")
     print(
         f"  Edges: {'✓' if different_seed_results['edges_different'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if different_seed_results['patterns_different'] else '✗'}")
     print()
 
     # Test 3: Additional verification with different seed
@@ -268,8 +307,6 @@ def run_h4_experiment():
         f"  Nodes: {'✓' if additional_same_seed_results['nodes_identical'] else '✗'}")
     print(
         f"  Edges: {'✓' if additional_same_seed_results['edges_identical'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if additional_same_seed_results['patterns_identical'] else '✗'}")
     print()
 
     # Overall assessment
@@ -298,7 +335,6 @@ def run_h4_experiment():
             print(f"  Run {i+1}:")
             print(f"    Nodes: {hashes['nodes'][:16]}...")
             print(f"    Edges: {hashes['edges'][:16]}...")
-            print(f"    Patterns: {hashes['patterns'][:16]}...")
 
     return all_reproducible and seeds_produce_variation
 

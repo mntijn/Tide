@@ -22,6 +22,17 @@ except ImportError:
     CurrencyRates = None
 
 
+def deduplicate_preserving_order(items: List[str]) -> List[str]:
+    """Remove duplicates while preserving order deterministically"""
+    seen = set()
+    result = []
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
 @dataclass
 class EntitySelection:
     """Represents a selection of entities for a pattern"""
@@ -152,21 +163,22 @@ class StructuralComponent(ABC):
         """Efficiently get all accounts owned by an entity (individual or business)"""
         owned_accounts = []
 
-        # Direct accounts
-        for neighbor_id in self.graph.neighbors(entity_id):
+        # Direct accounts - sort neighbors to ensure deterministic order
+        for neighbor_id in sorted(self.graph.neighbors(entity_id)):
             if self.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
                 owned_accounts.append(neighbor_id)
 
         # If entity is an individual, also check business accounts they own
         if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
-            for neighbor_id in self.graph.neighbors(entity_id):
+            for neighbor_id in sorted(self.graph.neighbors(entity_id)):
                 if self.graph.nodes[neighbor_id].get("node_type") == NodeType.BUSINESS:
                     # Get accounts of owned businesses
-                    for business_neighbor in self.graph.neighbors(neighbor_id):
+                    for business_neighbor in sorted(self.graph.neighbors(neighbor_id)):
                         if self.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
                             owned_accounts.append(business_neighbor)
 
-        return list(set(owned_accounts))  # Remove duplicates
+        # Use deduplicate_preserving_order instead of set to maintain deterministic order
+        return deduplicate_preserving_order(owned_accounts)
 
     def _has_overseas_connections(self, entity_id: str, entity_country: str) -> bool:
         """Check if entity has connections to different countries"""
@@ -196,7 +208,7 @@ class StructuralComponent(ABC):
             combined.extend(self.get_cluster(cluster_name))
 
         if deduplicate:
-            return list(set(combined))
+            return deduplicate_preserving_order(combined)
         return combined
 
     def get_high_risk_entities(self, include_super_high_risk: bool = True) -> List[str]:
@@ -302,21 +314,22 @@ class TemporalComponent(ABC):
         """Get all accounts owned by an entity (individual or business)"""
         owned_accounts = []
 
-        # Direct accounts
-        for neighbor_id in self.graph.neighbors(entity_id):
+        # Direct accounts - sort neighbors to ensure deterministic order
+        for neighbor_id in sorted(self.graph.neighbors(entity_id)):
             if self.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
                 owned_accounts.append(neighbor_id)
 
         # If entity is an individual, also check business accounts they own
         if self.graph.nodes[entity_id].get("node_type") == NodeType.INDIVIDUAL:
-            for neighbor_id in self.graph.neighbors(entity_id):
+            for neighbor_id in sorted(self.graph.neighbors(entity_id)):
                 if self.graph.nodes[neighbor_id].get("node_type") == NodeType.BUSINESS:
                     # Get accounts of owned businesses
-                    for business_neighbor in self.graph.neighbors(neighbor_id):
+                    for business_neighbor in sorted(self.graph.neighbors(neighbor_id)):
                         if self.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
                             owned_accounts.append(business_neighbor)
 
-        return list(set(owned_accounts))  # Remove duplicates
+        # Remove duplicates deterministically
+        return deduplicate_preserving_order(owned_accounts)
 
     def generate_timestamps(self,
                             start_time: datetime.datetime,

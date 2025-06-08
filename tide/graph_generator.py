@@ -170,7 +170,8 @@ class GraphGenerator:
             return
 
         total_edges_added = 0
-        all_nodes_list = list(self.graph.nodes)
+        # Sort nodes for deterministic order when passing to patterns
+        all_nodes_list = sorted(list(self.graph.nodes))
 
         if is_random:
             # Random mode: randomly select <num_illicit_patterns> patterns

@@ -55,7 +55,9 @@ class FrontBusinessStructural(StructuralComponent):
             potential_front_businesses.extend(traditional_candidates)
 
         # Remove duplicates and prioritize by risk factors
-        potential_front_businesses = list(set(potential_front_businesses))
+            from .base import deduplicate_preserving_order
+            potential_front_businesses = deduplicate_preserving_order(
+                potential_front_businesses)
         potential_front_businesses = self.prioritize_by_risk_factors(
             potential_front_businesses)
 
@@ -80,7 +82,7 @@ class FrontBusinessStructural(StructuralComponent):
 
         for bus_id in potential_front_businesses:
             owned_accounts_data = [
-                n for n in self.graph.neighbors(bus_id)
+                n for n in sorted(self.graph.neighbors(bus_id))
                 if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
             ]
 
@@ -104,7 +106,7 @@ class FrontBusinessStructural(StructuralComponent):
                     if acc_country and acc_country != business_country:
                         # Check if this account is owned by any business
                         is_owned_by_business = False
-                        for owner_id in self.graph.predecessors(acc_id):
+                        for owner_id in sorted(self.graph.predecessors(acc_id)):
                             if self.graph.nodes[owner_id].get("node_type") == NodeType.BUSINESS:
                                 is_owned_by_business = True
                                 break
@@ -153,7 +155,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
 
         # Re-fetch owned accounts for the front business
         owned_accounts_ids = [
-            n for n in self.graph.neighbors(front_business_id)
+            n for n in sorted(self.graph.neighbors(front_business_id))
             if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
         ]
 
