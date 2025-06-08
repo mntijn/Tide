@@ -289,6 +289,9 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             scale_factor = target_total_transfer / current_total
             amounts = [round(amount * scale_factor, 2)
                        for amount in raw_amounts]
+            # Ensure all scaled amounts stay within the configured range
+            amounts = [min(max(amount, amount_range[0]), amount_range[1])
+                       for amount in amounts]
         else:
             amounts = raw_amounts
 

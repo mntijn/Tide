@@ -56,7 +56,7 @@ class UTurnTransactionsStructural(StructuralComponent):
                     if len(owned_accounts) >= 2:  # Need at least 2 accounts
                         potential_originators.append(
                             (entity_id, owned_accounts))
-                        logger.info(
+                        logger.debug(
                             f"Found potential originator {entity_id} with {len(owned_accounts)} accounts")
 
         # Shuffle and try to find suitable originator
@@ -275,8 +275,8 @@ class UTurnTransactionsTemporal(TemporalComponent):
             dest = path[i + 1]
 
             # International transfer delay with configurable time variability
-            base_delay_days = random_instance.randint(
-                international_delay_days[0], international_delay_days[1])
+            base_delay_days = random_instance.uniform(
+                international_delay_days[0], international_delay_days[1] - 0.1)  # Subtract 0.1 to avoid hitting exactly 5.0
 
             # Add random hours if enabled
             delay_hours = random_instance.randint(
@@ -284,6 +284,27 @@ class UTurnTransactionsTemporal(TemporalComponent):
             # Add random minutes if enabled
             delay_minutes = random_instance.randint(
                 0, 59) if include_minutes else 0
+
+            # Ensure total delay doesn't exceed the maximum configured days
+            total_delay_hours = base_delay_days * 24 + delay_hours
+            max_allowed_hours = international_delay_days[1] * 24
+            if total_delay_hours > max_allowed_hours:
+                # Adjust to stay within bounds
+                total_delay_hours = max_allowed_hours
+                base_delay_days = total_delay_hours // 24
+                delay_hours = total_delay_hours % 24
+
+            # For boundary cases, ensure we're strictly less than the max
+            total_delay_seconds = base_delay_days * 24 * \
+                3600 + delay_hours * 3600 + delay_minutes * 60
+            max_delay_seconds = international_delay_days[1] * 24 * 3600
+            if total_delay_seconds >= max_delay_seconds:
+                # Reduce by a small amount to stay strictly under the boundary
+                total_delay_seconds = max_delay_seconds - 60  # 1 minute less
+                base_delay_days = total_delay_seconds // (24 * 3600)
+                remaining_seconds = total_delay_seconds % (24 * 3600)
+                delay_hours = remaining_seconds // 3600
+                delay_minutes = (remaining_seconds % 3600) // 60
 
             current_time += datetime.timedelta(
                 days=base_delay_days,
@@ -311,8 +332,8 @@ class UTurnTransactionsTemporal(TemporalComponent):
             last_intermediary = intermediary_accounts[-1]
 
             # Delay before return with configurable time variability
-            base_delay_days = random_instance.randint(
-                international_delay_days[0], international_delay_days[1])
+            base_delay_days = random_instance.uniform(
+                international_delay_days[0], international_delay_days[1] - 0.1)  # Subtract 0.1 to avoid hitting exactly 5.0
 
             # Add random hours if enabled
             delay_hours = random_instance.randint(
@@ -320,6 +341,27 @@ class UTurnTransactionsTemporal(TemporalComponent):
             # Add random minutes if enabled
             delay_minutes = random_instance.randint(
                 0, 59) if include_minutes else 0
+
+            # Ensure total delay doesn't exceed the maximum configured days
+            total_delay_hours = base_delay_days * 24 + delay_hours
+            max_allowed_hours = international_delay_days[1] * 24
+            if total_delay_hours > max_allowed_hours:
+                # Adjust to stay within bounds
+                total_delay_hours = max_allowed_hours
+                base_delay_days = total_delay_hours // 24
+                delay_hours = total_delay_hours % 24
+
+            # For boundary cases, ensure we're strictly less than the max
+            total_delay_seconds = base_delay_days * 24 * \
+                3600 + delay_hours * 3600 + delay_minutes * 60
+            max_delay_seconds = international_delay_days[1] * 24 * 3600
+            if total_delay_seconds >= max_delay_seconds:
+                # Reduce by a small amount to stay strictly under the boundary
+                total_delay_seconds = max_delay_seconds - 60  # 1 minute less
+                base_delay_days = total_delay_seconds // (24 * 3600)
+                remaining_seconds = total_delay_seconds % (24 * 3600)
+                delay_hours = remaining_seconds // 3600
+                delay_minutes = (remaining_seconds % 3600) // 60
 
             current_time += datetime.timedelta(
                 days=base_delay_days,

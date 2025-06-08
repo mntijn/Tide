@@ -446,7 +446,6 @@ def validate_u_turn_transactions(pattern_data, config):
         'return_percentage_range', [0.7, 0.9])
 
     for pattern in pattern_data:
-        print(pattern['pattern_type'])
         if pattern['pattern_type'] != 'UTurnTransactions':
             continue
 
@@ -574,12 +573,12 @@ def run_h1_experiment():
             '--patterns-file', 'generated_patterns.json'
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=False, text=True)
 
         # Print the captured output
-        if result.stdout:
-            print("Generation output:")
-            print(result.stdout)
+        # if result.stdout:
+        #     print("Generation output:")
+        #     print(result.stdout)
         if result.stderr:
             print("Generation warnings/errors:")
             print(result.stderr)

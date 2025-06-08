@@ -36,6 +36,16 @@ except ImportError:
 # Add the parent directory to path to import main
 sys.path.append(str(Path(__file__).parent.parent))
 
+# Import the generation logic directly instead of using subprocess
+try:
+    import datetime
+    from tide.graph_generator import GraphGenerator
+    from tide.outputs import export_to_csv
+    DIRECT_IMPORT_AVAILABLE = True
+except ImportError:
+    DIRECT_IMPORT_AVAILABLE = False
+    print("Warning: Could not import tide modules. Falling back to subprocess.")
+
 
 def create_h2_config(scale_type):
     """Create configuration for different scales"""
@@ -157,29 +167,78 @@ def measure_performance(scale_type, config):
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         start_time = time.time()
 
-        # Run generation using subprocess
-        main_script = str(Path(__file__).parent.parent / "main.py")
+        success = False
 
-        cmd = [
-            sys.executable, main_script,
-            '--config', config_file,
-            '--output-dir', temp_dir,
-            '--patterns-file', 'generated_patterns.json',
-            '--nodes-file', 'generated_nodes.csv',
-            '--edges-file', 'generated_edges.csv'
-        ]
+        if DIRECT_IMPORT_AVAILABLE:
+            # Use direct function call for accurate memory measurement
+            try:
+                # Load configuration
+                generator_parameters = config.copy()
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+                # Convert date strings to datetime objects
+                generator_parameters["time_span"]["start_date"] = datetime.datetime.fromisoformat(
+                    generator_parameters["time_span"]["start_date"])
+                generator_parameters["time_span"]["end_date"] = datetime.datetime.fromisoformat(
+                    generator_parameters["time_span"]["end_date"])
+
+                # Generate graph
+                aml_graph_gen = GraphGenerator(params=generator_parameters)
+                graph = aml_graph_gen.generate_graph()
+
+                # Export to CSV
+                export_to_csv(
+                    graph=graph,
+                    nodes_filepath=nodes_file,
+                    edges_filepath=edges_file
+                )
+
+                # Export patterns as JSON
+                patterns_data = {
+                    'metadata': {
+                        'generation_timestamp': datetime.datetime.now().isoformat(),
+                        'total_patterns': len(aml_graph_gen.injected_patterns),
+                        'graph_nodes': aml_graph_gen.num_of_nodes(),
+                        'graph_edges': aml_graph_gen.num_of_edges(),
+                        'config_file': config_file,
+                        'output_directory': temp_dir
+                    },
+                    'patterns': aml_graph_gen.injected_patterns
+                }
+
+                with open(patterns_file, 'w') as f:
+                    json.dump(patterns_data, f, indent=2, default=str)
+
+                success = True
+            except Exception as e:
+                print(
+                    f"ERROR: Direct generation failed for {scale_type} scale: {e}")
+                success = False
+        else:
+            # Fallback to subprocess
+            main_script = str(Path(__file__).parent.parent / "main.py")
+            cmd = [
+                sys.executable, main_script,
+                '--config', config_file,
+                '--output-dir', temp_dir,
+                '--patterns-file', 'generated_patterns.json',
+                '--nodes-file', 'generated_nodes.csv',
+                '--edges-file', 'generated_edges.csv'
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            success = result.returncode == 0
+            if not success:
+                print(
+                    f"ERROR: Subprocess generation failed for {scale_type} scale")
+                print(f"STDERR: {result.stderr}")
 
         # Measure results
         end_time = time.time()
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         wall_time = end_time - start_time
-        peak_memory = final_memory - initial_memory
+        # Ensure memory usage is non-negative
+        peak_memory = max(0, final_memory - initial_memory)
 
-        if result.returncode != 0:
-            print(f"ERROR: Generation failed for {scale_type} scale")
-            print(f"STDERR: {result.stderr}")
+        if not success:
             return {
                 'scale_type': scale_type,
                 'wall_time_seconds': wall_time,
