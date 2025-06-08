@@ -292,7 +292,7 @@ class TemporalComponent(ABC):
 
 
 class CompositePattern(PatternInjector):
-    """Base class for patterns composed of structural and temporal components"""
+    """Base class for composite patterns that combine structural and temporal components."""
 
     def __init__(self,
                  structural_component: StructuralComponent,
@@ -305,31 +305,28 @@ class CompositePattern(PatternInjector):
 
     @property
     def num_required_entities(self) -> int:
-        """Number of entities required, delegated to the structural component."""
+        """Minimum number of entities required for this pattern."""
         return self.structural.num_required_entities
 
-    def inject_pattern(self, entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
-        """Generate all edges for this pattern without mutating the master graph.
-        The caller (GraphGenerator) decides when to merge the resulting sub-graph."""
+    def inject_pattern(self, entities: List[str]) -> Tuple[List[Tuple[str, str, TransactionAttributes]], EntitySelection]:
+        """Injects the pattern and returns the generated edges and selected entities."""
+        entity_selection = self.structural.select_entities(entities)
 
-        generated_edges: List[Tuple[str, str, TransactionAttributes]] = []
+        if not entity_selection.central_entities and not entity_selection.peripheral_entities:
+            return [], entity_selection
 
-        try:
-            # Entity selection
-            entity_selection = self.structural.select_entities(entities)
-            if not entity_selection.central_entities:
-                return generated_edges
+        # Generate transaction sequences based on the selected entities
+        sequences = self.temporal.generate_transaction_sequences(
+            entity_selection)
 
-            # Build sequences
-            for sequence in self.temporal.generate_transaction_sequences(entity_selection):
-                generated_edges.extend(sequence.transactions)
+        # Collect all transaction edges from all sequences
+        all_edges = []
+        for seq in sequences:
+            all_edges.extend(seq.transactions)
 
-        except Exception as e:
-            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
-
-        return generated_edges
+        return all_edges, entity_selection
 
     @property
     def pattern_name(self) -> str:
-        """Return a descriptive name for this pattern"""
-        return f"{self.structural.__class__.__name__}_{self.temporal.__class__.__name__}"
+        """Name of the pattern, must be overridden."""
+        raise NotImplementedError

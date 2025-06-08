@@ -10,15 +10,19 @@ from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
 
 
-class BackgroundActivityStructural(StructuralComponent):
+class RandomTransactionsStructural(StructuralComponent):
     """Structural component: treat all supplied accounts as actors for daily activity."""
 
     @property
     def num_required_entities(self) -> int:
-        return 1  # At least one account
+        return 1
 
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
-        # We expect available_entities to be account IDs. Use them directly.
+        random_config = self.params.get("background_activity", {}).get(
+            "patterns", {}).get("random_transfers", {})
+        if not random_config.get("enabled", False):
+            return EntitySelection(central_entities=[], peripheral_entities=[])
+
         if not available_entities:
             return EntitySelection(central_entities=[], peripheral_entities=[])
         return EntitySelection(central_entities=available_entities, peripheral_entities=[])
@@ -36,72 +40,83 @@ class DailyRandomTransfersTemporal(TemporalComponent):
         start_date: datetime.datetime = self.time_span["start_date"]
         end_date: datetime.datetime = self.time_span["end_date"]
         total_days = max(1, (end_date - start_date).days)
+        total_seconds = total_days * 86400
 
         tx_rate = self.params.get("transaction_rates", {}).get(
             "per_account_per_day", 0.2)
 
-        for acc_id in all_accounts:
-            # Slight randomness around the configured rate
-            expected_txs = int(tx_rate * total_days *
-                               random_instance.uniform(0.5, 1.5))
-            if expected_txs == 0:
-                continue
+        total_expected_txs = int(
+            tx_rate * total_days * len(all_accounts) * random_instance.uniform(0.5, 1.5))
+        if total_expected_txs == 0:
+            return sequences
 
-            transactions: List[Tuple[str, str, TransactionAttributes]] = []
-            timestamps: List[datetime.datetime] = []
-            for _ in range(expected_txs):
-                # Pick a random moment within time span
-                random_day_offset = random_instance.randint(0, total_days)
-                random_second = random_instance.randint(0, 86_399)
-                ts = start_date + \
-                    datetime.timedelta(days=random_day_offset,
-                                       seconds=random_second)
-                timestamps.append(ts)
+        random_seconds = [random_instance.randint(0, total_seconds - 1)
+                          for _ in range(total_expected_txs)]
+        timestamps = [
+            start_date + datetime.timedelta(seconds=s) for s in random_seconds]
 
-                # Pick a random destination account (excluding self)
-                # Ensure there is more than one account to pick from to avoid infinite loop
-                if len(all_accounts) <= 1:
-                    continue  # Cannot make a transfer
+        amount_range = self.params.get(
+            "background_amount_range", [10.0, 500.0])
+        high_value_amount_range = self.params.get(
+            "high_value_amount_range", [5000.0, 50000.0])
+        high_value_ratio = self.params.get(
+            "high_transaction_amount_ratio", 0.05)
 
-                dest_id = random_instance.choice(all_accounts)
-                while dest_id == acc_id:
-                    dest_id = random_instance.choice(all_accounts)
+        amounts = []
+        for _ in range(total_expected_txs):
+            if random_instance.random() < high_value_ratio:
+                amount = random_instance.uniform(
+                    high_value_amount_range[0], high_value_amount_range[1])
+            else:
+                amount = random_instance.uniform(
+                    amount_range[0], amount_range[1])
+            amounts.append(round(amount, 2))
 
-                # Use background_amount_range from params (loaded from graph.yaml)
-                amount_range = self.params.get("background_amount_range", [
-                                               10.0, 500.0])  # Default if not in params
-                amount = round(random_instance.uniform(
-                    amount_range[0], amount_range[1]), 2)
+        src_indices = [random_instance.randint(0, len(all_accounts) - 1)
+                       for _ in range(total_expected_txs)]
+        dest_indices = [random_instance.randint(0, len(all_accounts) - 1)
+                        for _ in range(total_expected_txs)]
 
-                tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                    src_id=acc_id,
-                    dest_id=dest_id,
-                    timestamp=ts,
-                    amount=amount,
-                    transaction_type=TransactionType.TRANSFER,
-                    is_fraudulent=False,
+        for i in range(total_expected_txs):
+            if src_indices[i] == dest_indices[i]:
+                dest_indices[i] = (dest_indices[i] + 1) % len(all_accounts)
+
+        src_accounts = [all_accounts[i] for i in src_indices]
+        dest_accounts = [all_accounts[i] for i in dest_indices]
+
+        transactions: List[Tuple[str, str, TransactionAttributes]] = []
+        pattern_injector = PatternInjector(self.graph_generator, self.params)
+
+        for i in range(total_expected_txs):
+            tx_attrs = pattern_injector._create_transaction_edge(
+                src_id=src_accounts[i],
+                dest_id=dest_accounts[i],
+                timestamp=timestamps[i],
+                amount=float(amounts[i]),
+                transaction_type=TransactionType.TRANSFER,
+                is_fraudulent=False,
+            )
+            transactions.append((src_accounts[i], dest_accounts[i], tx_attrs))
+
+        if transactions:
+            sequence_name = "random_background_activity"
+            timestamps_sorted = sorted(timestamps)
+            sequences.append(
+                TransactionSequence(
+                    transactions=transactions,
+                    sequence_name=sequence_name,
+                    start_time=timestamps_sorted[0],
+                    duration=timestamps_sorted[-1] - timestamps_sorted[0],
                 )
-                transactions.append((acc_id, dest_id, tx_attrs))
-
-            if transactions:
-                sequence_name = f"background_activity_{acc_id}"
-                timestamps_sorted = sorted(timestamps)
-                sequences.append(
-                    TransactionSequence(
-                        transactions=transactions,
-                        sequence_name=sequence_name,
-                        start_time=timestamps_sorted[0],
-                        duration=timestamps_sorted[-1] - timestamps_sorted[0],
-                    )
-                )
+            )
         return sequences
 
 
-class BackgroundActivityPattern(CompositePattern):
+class RandomTransfersPattern(CompositePattern):
     """Composite pattern wrapper for baseline activity."""
 
     def __init__(self, graph_generator, params: Dict[str, Any]):
-        structural_component = BackgroundActivityStructural(
+        structural_component = RandomTransactionsStructural(
             graph_generator, params)
         temporal_component = DailyRandomTransfersTemporal(
             graph_generator, params)
@@ -109,7 +124,7 @@ class BackgroundActivityPattern(CompositePattern):
 
     @property
     def pattern_name(self) -> str:
-        return "BackgroundActivity"
+        return "RandomTransfers"
 
     @property
     def num_required_entities(self) -> int:

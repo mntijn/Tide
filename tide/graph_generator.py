@@ -1,3 +1,7 @@
+from .patterns.background_manager import BackgroundPatternManager
+from .utils.clustering import build_entity_clusters
+from .utils.entity_initialization import initialize_entities
+from .utils.threading import run_patterns_in_parallel
 import networkx as nx
 import datetime
 import csv
@@ -76,6 +80,8 @@ class GraphGenerator:
         self.random_instance = random_instance
 
         self.pattern_manager = PatternManager(self, self.params)
+        self.background_pattern_manager = BackgroundPatternManager(
+            self, self.params)
         self.entity_clusters: Dict[str, List[str]] = {}
 
         self.background_tx_rate_per_account_per_day = params.get(
@@ -516,11 +522,28 @@ class GraphGenerator:
                 logger.info(
                     f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
-                new_edges = pattern_instance.inject_pattern(
-                    list(self.graph.nodes))
-                for src, dest, attrs in new_edges:
+                task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
+                pattern_tasks.append(task)
+
+            pattern_results = run_patterns_in_parallel(pattern_tasks)
+            all_fraudulent_entities = set()
+
+            # Merge all edges into the main graph and collect entities
+            for edges, entity_selection in pattern_results:
+                for src, dest, attrs in edges:
                     self._add_edge(src, dest, attrs)
-                total_edges_added += len(new_edges)
+                total_edges_added += len(edges)
+                if entity_selection:
+                    all_fraudulent_entities.update(
+                        entity_selection.central_entities)
+                    all_fraudulent_entities.update(
+                        entity_selection.peripheral_entities)
+
+            # Mark entities as fraudulent
+            for entity_id in all_fraudulent_entities:
+                if self.graph.has_node(entity_id):
+                    self.graph.nodes[entity_id]["is_fraudulent"] = True
+
         else:
             # Fixed mode: use specific counts for each pattern type
             logger.info("Injecting AML patterns with specific counts...")
@@ -573,33 +596,102 @@ class GraphGenerator:
                 logger.warning(
                     "No patterns were injected. Check your pattern_frequency configuration.")
 
+            pattern_results = run_patterns_in_parallel(pattern_tasks)
+            all_fraudulent_entities = set()
+
+            # TRACK PATTERNS: Record what patterns were actually created
+            pattern_index = 0
+            for config_key in config_keys:
+                count = pattern_frequency_config[config_key]
+                if config_key in ["random", "num_illicit_patterns"]:
+                    continue
+
+                if isinstance(count, int) and count > 0:
+                    pattern_instance = config_to_pattern_mapping.get(
+                        config_key)
+                    if pattern_instance:
+                        for i in range(count):
+                            if pattern_index < len(pattern_results):
+                                edges, entity_selection = pattern_results[pattern_index]
+                                if edges:  # Only track if pattern actually generated edges
+                                    pattern_data = self._analyze_pattern_edges(
+                                        pattern_instance.pattern_name, edges, pattern_instance)
+                                    logger.info(
+                                        f"appending {pattern_data['pattern_type']}")
+                                    self.injected_patterns.append(
+                                        pattern_data)
+                                    if entity_selection:
+                                        all_fraudulent_entities.update(
+                                            entity_selection.central_entities)
+                                        all_fraudulent_entities.update(
+                                            entity_selection.peripheral_entities)
+                                pattern_index += 1
+
+            for entity_id in all_fraudulent_entities:
+                if self.graph.has_node(entity_id):
+                    self.graph.nodes[entity_id]['is_fraudulent'] = True
+
+            for edges, _ in pattern_results:
+                for src, dest, attrs in edges:
+                    self._add_edge(src, dest, attrs)
+                total_edges_added += len(edges)
+
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
 
-    def simulate_background_activity(self):
-        """Generate realistic baseline transactions using the dedicated background pattern."""
+    def update_fraudulent_cluster(self):
+        """Finds all fraudulent entities and adds them to the 'fraudulent' cluster."""
+        logger.info("Updating fraudulent entity cluster...")
+        fraudulent_entities = [
+            n for n, d in self.graph.nodes(data=True) if d.get("is_fraudulent")
+        ]
+        self.entity_clusters["fraudulent"] = fraudulent_entities
         logger.info(
-            "Simulating background financial activity via BackgroundActivityPattern…")
+            f"Found {len(fraudulent_entities)} fraudulent entities for clustering.")
 
-        try:
-            from .patterns.background_activity import BackgroundActivityPattern
+    def inject_background_patterns(self):
+        """Generates all background activity by running patterns in parallel."""
+        logger.info("Injecting background activity patterns...")
 
-            bg_pattern = BackgroundActivityPattern(self, self.params)
-            all_accounts = list(self.all_nodes.get(NodeType.ACCOUNT, []))
-            bg_edges = bg_pattern.inject_pattern(all_accounts)
-            for src, dest, attrs in bg_edges:
+        bg_config = self.params.get("background_activity", {})
+        if not bg_config.get("enabled", False):
+            logger.info("Background activity generation is disabled.")
+            return
+
+        pattern_tasks = []
+        task_index = 0
+        all_nodes_list = sorted(list(self.graph.nodes))
+
+        for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
+            logger.info(f"Queueing background pattern: {pattern_name}")
+            # The actual selection of entities to act on is handled within each pattern
+            task = (pattern_instance.inject_pattern,
+                    (all_nodes_list,), task_index)
+            pattern_tasks.append(task)
+            task_index += 1
+
+        if not pattern_tasks:
+            logger.warning("No background patterns were queued.")
+            return
+
+        pattern_results = run_patterns_in_parallel(pattern_tasks)
+
+        total_edges_added = 0
+        for edges, _ in pattern_results:
+            for src, dest, attrs in edges:
                 self._add_edge(src, dest, attrs)
-            logger.info(
-                f"Background activity injected: {len(bg_edges)} edges.")
-        except Exception as e:
-            logger.error(f"Failed to inject background activity: {e}")
+            total_edges_added += len(edges)
+
+        logger.info(
+            f"Background activity injected: {total_edges_added} edges.")
 
     def generate_graph(self):
         logger.info("Starting graph generation...")
         self.initialize_entities()
         self.build_entity_clusters()
         self.inject_aml_patterns()
-        # self.simulate_background_activity()
+        self.update_fraudulent_cluster()
+        self.inject_background_patterns()
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph
