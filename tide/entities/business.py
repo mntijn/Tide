@@ -24,7 +24,7 @@ class Business(Entity):
         # Add risk score for business category
         business_category = specific_attrs.get("business_category")
         if business_category in HIGH_RISK_BUSINESS_CATEGORIES:
-            category_weight = self.risk_weights.get("business_category", 0.25)
+            category_weight = self.risk_weights.get("business_category", 0.30)
             category_factor = self.risk_config.get(
                 "business_categories_weight_factor", 1.0)
             score += category_weight * category_factor
@@ -32,7 +32,7 @@ class Business(Entity):
         # Add risk score for company location
         company_country = common_attrs.get("address", {}).get("country")
         if company_country in HIGH_RISK_COUNTRIES:
-            country_weight = self.risk_weights.get("country", 0.20)
+            country_weight = self.risk_weights.get("country", 0.25)
             country_factor = self.risk_config.get(
                 "countries_weight_factor", 1.0)
             score += country_weight * country_factor
@@ -43,7 +43,7 @@ class Business(Entity):
             "company_size_thresholds", {})
 
         if num_employees <= company_size_thresholds.get("very_small_max", 5):
-            score += self.risk_weights.get("very_small_company", 0.10)
+            score += self.risk_weights.get("very_small_company", 0.05)
 
         max_score = self.risk_weights.get("max_score", 0.9)
         return min(score, max_score)

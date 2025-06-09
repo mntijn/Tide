@@ -66,6 +66,7 @@ class TransactionAttributes(EdgeAttributes):
     transaction_type: TransactionType = field(kw_only=True)
     is_fraudulent: bool = False
     edge_type: EdgeType = EdgeType.TRANSACTION
+    time_since_previous_transaction: Optional[datetime.timedelta] = None
 
 
 @dataclass

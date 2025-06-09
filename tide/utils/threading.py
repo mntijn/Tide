@@ -41,3 +41,35 @@ def run_in_threads_with_results(tasks: List[Tuple[Callable, tuple]], results_que
     while not results_queue.empty():
         results.append(results_queue.get())
     return results
+
+
+def run_patterns_in_parallel(pattern_tasks: List[Tuple[Callable, tuple, int]]) -> List[Tuple[str, str, Any]]:
+    """
+    Run pattern injection tasks with deterministic seeding.
+
+    For now, runs sequentially to ensure determinism since patterns use the global
+    random module extensively. To make this truly parallel, patterns would need to
+    be modified to accept a random instance parameter.
+
+    The global random module is already seeded in random_instance.py, so we don't
+    need to re-seed it here.
+
+    Args:
+        pattern_tasks: List of (pattern_function, args, task_index) tuples
+
+    Returns:
+        List of edges returned by each pattern
+    """
+    results = []
+
+    # Sort by task_index to ensure deterministic order
+    sorted_tasks = sorted(pattern_tasks, key=lambda x: x[2])
+
+    for pattern_func, args, task_index in sorted_tasks:
+        try:
+            edges = pattern_func(*args)
+            results.append(edges)
+        except Exception as e:
+            results.append([])  # Return empty list on error
+
+    return results

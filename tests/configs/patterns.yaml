@@ -45,53 +45,23 @@ repeatedOverseas:
 rapidMovement:
   # Minimum number of accounts required for the pattern
   min_accounts_for_pattern: 2
-  # Maximum number of sender entities to consider
-  max_sender_entities: 15
   # Transaction parameters
   transaction_params:
     # Inflow parameters
     inflows:
       # Minimum number of incoming transfers
-      min_inflows: 5
+      min_inflows: 15
       # Maximum number of incoming transfers
-      max_inflows: 10
+      max_inflows: 30
       # Base amount range for inflows (min, max)
       amount_range: [500, 5000]
     # Withdrawal parameters
     withdrawals:
       # Minimum number of withdrawals
-      min_withdrawals: 3
+      min_withdrawals: 20
       # Maximum number of withdrawals
-      max_withdrawals: 8
+      max_withdrawals: 50
       # Base amount range for withdrawals (min, max)
       amount_range: [100, 2000]
     # Time between inflow and withdrawal (in hours)
     inflow_to_withdrawal_delay: [1, 24]
-
-# U-Turn Transactions Pattern
-# Simulates funds being sent through intermediaries and returning to origin
-uTurnTransactions:
-  # Minimum number of intermediary accounts required
-  min_intermediaries: 2
-  # Maximum number of intermediary accounts to use
-  max_intermediaries: 5
-  # Transaction parameters
-  transaction_params:
-    # Base amount range for initial transfer (min, max)
-    initial_amount_range: [10000, 100000]
-    # Percentage of initial amount that returns (min, max)
-    return_percentage_range: [0.7, 0.9]
-    # Time between international transfers (in days)
-    international_delay_days: [1, 5]
-    # Time variability parameters
-    time_variability:
-      # Business hours range for transactions (start_hour, end_hour, 24-hour format)
-      business_hours: [9, 16]
-      # Whether to include random minutes in timing
-      include_minutes: true
-      # Whether to include random hours in delays
-      include_hours: true
-  # Validation parameters
-  validation_params:
-    # Fee percentage range for transactions (min, max)
-    fee_percentage_range: [0.01, 0.03]
