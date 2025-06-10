@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Set, Callable
 
 from ..datastructures.enums import NodeType
-from ..utils.constants import HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS, HIGH_RISK_OCCUPATIONS
+from ..utils.constants import HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS, HIGH_RISK_OCCUPATIONS, HIGH_PAID_OCCUPATIONS
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,10 @@ SINGLE_FACTOR_CLUSTERS = {
     "high_risk_occupations": {
         "condition": lambda data: data.get("occupation") in HIGH_RISK_OCCUPATIONS,
         "risk_factor": "high_risk_occupation"
+    },
+    "high_paid_occupations": {
+        "condition": lambda data: data.get("occupation") in HIGH_PAID_OCCUPATIONS,
+        "risk_factor": "high_paid_occupation"
     },
     "high_risk_score": {
         "condition": lambda data, min_score: (data.get("risk_score", 0.0) or 0.0) >= min_score,
