@@ -256,6 +256,23 @@ class GraphGenerator:
                             if pattern_index < len(pattern_results):
                                 edges = pattern_results[pattern_index]
                                 if edges:  # Only track if pattern actually generated edges
+                                    # Mark nodes as fraudulent before analyzing pattern
+                                    fraudulent_nodes = set()
+                                    for src, dest, _ in edges:
+                                        fraudulent_nodes.add(src)
+                                        fraudulent_nodes.add(dest)
+
+                                    # Update node attributes to mark as fraudulent
+                                    for node_id in fraudulent_nodes:
+                                        if self.graph.has_node(node_id):
+                                            self.graph.nodes[node_id]['is_fraudulent'] = True
+                                            # Track in fraudulent entities map
+                                            node_type = self.graph.nodes[node_id].get(
+                                                'node_type')
+                                            if node_type:
+                                                self.fraudulent_entities_map[node_type].append(
+                                                    node_id)
+
                                     pattern_data = self._analyze_pattern_edges(
                                         pattern_instance.pattern_name, edges, pattern_instance)
                                     logger.info(

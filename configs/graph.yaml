@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 5000
+  individuals: 100
   # businesses: 0
   institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
