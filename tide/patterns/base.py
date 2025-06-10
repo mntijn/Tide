@@ -1,4 +1,3 @@
-import random
 import datetime
 from typing import List, Dict, Any, Tuple, Optional, Set
 from abc import ABC, abstractmethod
@@ -10,6 +9,7 @@ from ..datastructures.enums import (
 from ..datastructures.attributes import (
     TransactionAttributes, NodeAttributes
 )
+from ..utils.random_instance import random_instance
 
 
 @dataclass
@@ -232,7 +232,8 @@ class TemporalComponent(ABC):
             # Burst of transactions in short time window
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 1440)  # Within 24 hours
+                offset_minutes = random_instance.randint(
+                    0, 1440)  # Within 24 hours
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -241,7 +242,8 @@ class TemporalComponent(ABC):
             # The temporal component using this will handle synchronization across entities.
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 1440)  # Within 24 hours
+                offset_minutes = random_instance.randint(
+                    0, 1440)  # Within 24 hours
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -252,7 +254,8 @@ class TemporalComponent(ABC):
             current_time = start_time
             for i in range(count):
                 timestamps.append(current_time)
-                days_offset = random.choice([7, 14, 30])  # Weekly/monthly
+                days_offset = random_instance.choice(
+                    [7, 14, 30])  # Weekly/monthly
                 current_time += datetime.timedelta(days=days_offset)
             return timestamps
 
@@ -260,7 +263,8 @@ class TemporalComponent(ABC):
             # Quick sequence after initial trigger
             timestamps = []
             for i in range(count):
-                offset_minutes = random.randint(0, 30)  # Within 30 minutes
+                offset_minutes = random_instance.randint(
+                    0, 30)  # Within 30 minutes
                 timestamps.append(
                     start_time + datetime.timedelta(minutes=offset_minutes))
             return sorted(timestamps)
@@ -269,22 +273,23 @@ class TemporalComponent(ABC):
             # Random spread
             timestamps = []
             for i in range(count):
-                offset_hours = random.randint(0, 168)  # Within a week
+                offset_hours = random_instance.randint(
+                    0, 168)  # Within a week
                 timestamps.append(
                     start_time + datetime.timedelta(hours=offset_hours))
             return sorted(timestamps)
 
-    def generate_structured_amounts(self, count: int, base_amount: float = None) -> List[float]:
+    def generate_structured_amounts(self, count: int, base_amount: float = None, target_currency: str = None) -> List[float]:
         """Generate amounts that may be structured to avoid thresholds"""
         if base_amount is None:
             reporting_threshold = self.params.get("reporting_threshold", 10000)
             base_amount = reporting_threshold * \
-                round(random.uniform(0.7, 0.95), 2)
+                round(random_instance.uniform(0.7, 0.95), 2)
 
         amounts = []
         for i in range(count):
             # Add variation to avoid exact patterns
-            variation = round(random.uniform(-base_amount *
+            variation = round(random_instance.uniform(-base_amount *
                               0.15, base_amount * 0.15))
             amounts.append(max(100, base_amount + variation))
 

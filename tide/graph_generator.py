@@ -1,4 +1,4 @@
-from .patterns.background_manager import BackgroundPatternManager
+from .patterns.background.manager import BackgroundPatternManager
 from .utils.clustering import build_entity_clusters
 from .utils.entity_initialization import initialize_entities
 from .utils.threading import run_patterns_in_parallel
@@ -509,12 +509,14 @@ class GraphGenerator:
             return
 
         total_edges_added = 0
+        all_fraudulent_entities = set()
 
         if is_random:
             # Random mode: randomly select num_illicit_patterns patterns
             logger.info(
                 f"Injecting {self.num_aml_patterns} AML patterns randomly...")
             available_patterns = list(self.pattern_manager.patterns.values())
+            all_nodes_list = list(self.graph.nodes)
 
             for i in range(self.num_aml_patterns):
                 pattern_instance = self.random_instance.choice(
@@ -522,27 +524,20 @@ class GraphGenerator:
                 logger.info(
                     f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
-                task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
-                pattern_tasks.append(task)
+                edges, entity_selection = pattern_instance.inject_pattern(
+                    all_nodes_list)
 
-            pattern_results = run_patterns_in_parallel(pattern_tasks)
-            all_fraudulent_entities = set()
-
-            # Merge all edges into the main graph and collect entities
-            for edges, entity_selection in pattern_results:
+                # Add edges to graph
                 for src, dest, attrs in edges:
                     self._add_edge(src, dest, attrs)
                 total_edges_added += len(edges)
+
+                # Collect fraudulent entities
                 if entity_selection:
                     all_fraudulent_entities.update(
                         entity_selection.central_entities)
                     all_fraudulent_entities.update(
                         entity_selection.peripheral_entities)
-
-            # Mark entities as fraudulent
-            for entity_id in all_fraudulent_entities:
-                if self.graph.has_node(entity_id):
-                    self.graph.nodes[entity_id]["is_fraudulent"] = True
 
         else:
             # Fixed mode: use specific counts for each pattern type
@@ -573,8 +568,7 @@ class GraphGenerator:
 
                 if isinstance(count, int) and count > 0:
                     # Normalize the config key
-                    normalized_config_key = config_key.lower().replace(
-                        "_", "")
+                    normalized_config_key = config_key.lower().replace("_", "")
 
                     pattern_instance = config_to_pattern_mapping.get(
                         normalized_config_key)
@@ -582,12 +576,21 @@ class GraphGenerator:
                         logger.info(
                             f"Injecting {count} instances of {pattern_instance.pattern_name}")
                         for i in range(count):
-                            new_edges = pattern_instance.inject_pattern(
+                            edges, entity_selection = pattern_instance.inject_pattern(
                                 list(self.graph.nodes))
-                            for src, dest, attrs in new_edges:
+
+                            # Add edges to graph
+                            for src, dest, attrs in edges:
                                 self._add_edge(src, dest, attrs)
-                            total_edges_added += len(new_edges)
+                            total_edges_added += len(edges)
                             total_patterns_injected += 1
+
+                            # Collect fraudulent entities
+                            if entity_selection:
+                                all_fraudulent_entities.update(
+                                    entity_selection.central_entities)
+                                all_fraudulent_entities.update(
+                                    entity_selection.peripheral_entities)
                     else:
                         logger.warning(
                             f"Pattern for config key '{config_key}' not found. Available patterns: {list(config_to_pattern_mapping.keys())}")
@@ -596,45 +599,10 @@ class GraphGenerator:
                 logger.warning(
                     "No patterns were injected. Check your pattern_frequency configuration.")
 
-            pattern_results = run_patterns_in_parallel(pattern_tasks)
-            all_fraudulent_entities = set()
-
-            # TRACK PATTERNS: Record what patterns were actually created
-            pattern_index = 0
-            for config_key in config_keys:
-                count = pattern_frequency_config[config_key]
-                if config_key in ["random", "num_illicit_patterns"]:
-                    continue
-
-                if isinstance(count, int) and count > 0:
-                    pattern_instance = config_to_pattern_mapping.get(
-                        config_key)
-                    if pattern_instance:
-                        for i in range(count):
-                            if pattern_index < len(pattern_results):
-                                edges, entity_selection = pattern_results[pattern_index]
-                                if edges:  # Only track if pattern actually generated edges
-                                    pattern_data = self._analyze_pattern_edges(
-                                        pattern_instance.pattern_name, edges, pattern_instance)
-                                    logger.info(
-                                        f"appending {pattern_data['pattern_type']}")
-                                    self.injected_patterns.append(
-                                        pattern_data)
-                                    if entity_selection:
-                                        all_fraudulent_entities.update(
-                                            entity_selection.central_entities)
-                                        all_fraudulent_entities.update(
-                                            entity_selection.peripheral_entities)
-                                pattern_index += 1
-
-            for entity_id in all_fraudulent_entities:
-                if self.graph.has_node(entity_id):
-                    self.graph.nodes[entity_id]['is_fraudulent'] = True
-
-            for edges, _ in pattern_results:
-                for src, dest, attrs in edges:
-                    self._add_edge(src, dest, attrs)
-                total_edges_added += len(edges)
+        # Mark entities as fraudulent
+        for entity_id in all_fraudulent_entities:
+            if self.graph.has_node(entity_id):
+                self.graph.nodes[entity_id]["is_fraudulent"] = True
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
