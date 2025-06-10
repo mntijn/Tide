@@ -131,6 +131,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     Other Roles:
     - intermediaries: Money mules/fronts (often unwitting participants)
     - Basic single-factor clusters: Country, business category, age, occupation
+    - legit: Non-fraudulent entities (populated by default, updated during fraud injection)
 
     Note: Clusters contain only entities (individuals and businesses).
     Patterns find accounts by traversing the graph from these entities.
@@ -145,12 +146,12 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     min_risk_score = graph_generator.fraud_selection_config.get(
         "min_risk_score_for_fraud_consideration", 0.30)
 
-    # Initialize all clusters
+    # Initialize all clusters (including legit which will be populated later)
     all_cluster_names = (
         list(SINGLE_FACTOR_CLUSTERS.keys()) +
         ["super_high_risk"] +
         list(COMPOSITE_CLUSTERS.keys()) +
-        ["fraudulent"]
+        ["fraudulent", "legit"]
     )
     clusters: Dict[str, Set[str]] = {name: set() for name in all_cluster_names}
 

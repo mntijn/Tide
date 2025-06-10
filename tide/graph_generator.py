@@ -136,6 +136,7 @@ class GraphGenerator:
 
         node_attributes_data = {
             "node_type": node_type,
+            "is_fraudulent": False,
             **common_attrs
         }
         if creation_date is not None:
@@ -146,6 +147,13 @@ class GraphGenerator:
         self.graph.add_node(node_id, **final_node_attrs,
                             **specific_attrs, **kwargs)
         self.all_nodes[node_type].append(node_id)
+
+        # Add entities to legit cluster by default (skip accounts/institutions)
+        if node_type in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
+            if "legit" not in self.entity_clusters:
+                self.entity_clusters["legit"] = []
+            self.entity_clusters["legit"].append(node_id)
+
         return node_id
 
     def _add_edge(self, src_id: str, dest_id: str, attributes: EdgeAttributes):
@@ -227,18 +235,21 @@ class GraphGenerator:
         total_edges_added = 0
         fraudulent_cluster_set = set(
             self.entity_clusters.get("fraudulent", []))
+        legit_cluster_set = set(self.entity_clusters.get("legit", []))
 
         for i, edges in enumerate(pattern_results):
             if not edges:
                 continue
 
-            # Mark nodes as fraudulent and add to cluster
+            # Mark nodes as fraudulent and update clusters
             fraudulent_nodes = {src for src, _, _ in edges}.union(
                 {dest for _, dest, _ in edges})
             for node_id in fraudulent_nodes:
                 if self.graph.has_node(node_id):
                     self.graph.nodes[node_id]['is_fraudulent'] = True
                     fraudulent_cluster_set.add(node_id)
+                    # Remove from legit cluster if it was there
+                    legit_cluster_set.discard(node_id)
 
             # Analyze and track the injected pattern
             pattern_instance = task_index_to_pattern[i]
@@ -251,9 +262,11 @@ class GraphGenerator:
                 self._add_edge(src, dest, attrs)
             total_edges_added += len(edges)
 
-        # Update the fraudulent cluster in entity_clusters
+        # Update both fraudulent and legit clusters in entity_clusters
         self.entity_clusters["fraudulent"] = sorted(
             list(fraudulent_cluster_set))
+        self.entity_clusters["legit"] = sorted(
+            list(legit_cluster_set))
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
