@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from .background_activity import RandomPaymentsPattern
 from .salary_payments import SalaryPaymentsPattern
 from .fraudster_background import FraudsterBackgroundPattern
+from .legitimate_high_payments import LegitimateHighPaymentsPattern
 
 
 class BackgroundPatternManager:
@@ -17,6 +18,7 @@ class BackgroundPatternManager:
                 RandomPaymentsPattern(graph_generator, params),
                 SalaryPaymentsPattern(graph_generator, params),
                 FraudsterBackgroundPattern(graph_generator, params),
+                LegitimateHighPaymentsPattern(graph_generator, params),
                 # add new background patterns here
             ]}
 
