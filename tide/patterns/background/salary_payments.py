@@ -29,10 +29,9 @@ class SalaryPaymentsStructural(StructuralComponent):
         individual_entities = []
 
         for entity_id in legit_entities:
-            if self.graph_generator.graph.has_node(entity_id):
-                node_data = self.graph_generator.graph.nodes[entity_id]
-                if node_data.get("node_type") == NodeType.BUSINESS:
-                    business_entities.append(entity_id)
+            node_data = self.graph_generator.graph.nodes[entity_id]
+            if node_data.get("node_type") == NodeType.BUSINESS:
+                business_entities.append(entity_id)
                 elif node_data.get("node_type") == NodeType.INDIVIDUAL:
                     individual_entities.append(entity_id)
 

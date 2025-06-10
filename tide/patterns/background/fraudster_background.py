@@ -28,10 +28,9 @@ class FraudsterBackgroundStructural(StructuralComponent):
         fraudster_accounts = []
 
         for fraudster_id in fraudulent_entities:
-            if self.graph_generator.graph.has_node(fraudster_id):
-                fraudster_account_ids = self._get_owned_accounts(fraudster_id)
-                for account_id in fraudster_account_ids:
-                    fraudster_accounts.append((account_id, fraudster_id))
+            fraudster_account_ids = self._get_owned_accounts(fraudster_id)
+            for account_id in fraudster_account_ids:
+                fraudster_accounts.append((account_id, fraudster_id))
 
         if not fraudster_accounts:
             return EntitySelection(central_entities=[], peripheral_entities=[])
@@ -41,10 +40,9 @@ class FraudsterBackgroundStructural(StructuralComponent):
         legit_accounts = []
 
         for legit_id in legit_entities:
-            if self.graph_generator.graph.has_node(legit_id):
-                legit_account_ids = self._get_owned_accounts(legit_id)
-                for account_id in legit_account_ids:
-                    legit_accounts.append((account_id, legit_id))
+            legit_account_ids = self._get_owned_accounts(legit_id)
+            for account_id in legit_account_ids:
+                legit_accounts.append((account_id, legit_id))
 
         # Central = fraudster accounts, Peripheral = legitimate accounts (counterparts)
         return EntitySelection(

@@ -27,25 +27,20 @@ class LegitimateHighPaymentsPattern:
             "high_paid_occupations", [])
         legit_entities = self.graph_generator.entity_clusters.get("legit", [])
 
-        # Find large businesses (>50 employees) from legit entities
+        # Find large businesses
         large_businesses = []
         for entity_id in legit_entities:
-            if self.graph_generator.graph.has_node(entity_id):
-                node_data = self.graph_generator.graph.nodes[entity_id]
-                if (node_data.get("node_type") == NodeType.BUSINESS and
-                        node_data.get("number_of_employees", 0) > 10):
-                    large_businesses.append(entity_id)
+            node_data = self.graph_generator.graph.nodes[entity_id]
+            if (node_data.get("node_type") == NodeType.BUSINESS and
+                    node_data.get("number_of_employees", 0) > 10):
+                large_businesses.append(entity_id)
 
-        # Collect all accounts for high-value transactors
         all_high_value_accounts = []
-
         for entity_id in high_paid_individuals + large_businesses:
-            # Get accounts owned by this entity
             for neighbor in self.graph_generator.graph.neighbors(entity_id):
-                if self.graph_generator.graph.has_node(neighbor):
-                    neighbor_data = self.graph_generator.graph.nodes[neighbor]
-                    if neighbor_data.get("node_type") == NodeType.ACCOUNT:
-                        all_high_value_accounts.append((neighbor, entity_id))
+                neighbor_data = self.graph_generator.graph.nodes[neighbor]
+                if neighbor_data.get("node_type") == NodeType.ACCOUNT:
+                    all_high_value_accounts.append((neighbor, entity_id))
 
         if len(all_high_value_accounts) < 2:
             return []
