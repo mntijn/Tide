@@ -165,7 +165,11 @@ class GraphGenerator:
 
     def build_entity_clusters(self):
         """Build entity clusters using the helper function."""
+        # Keep the existing legit cluster that was built during entity creation
+        existing_legit = self.entity_clusters.get("legit", [])
         self.entity_clusters = build_entity_clusters(self)
+        # Restore the legit cluster
+        self.entity_clusters["legit"] = existing_legit
 
     def inject_aml_patterns(self):
         """Inject AML patterns: each pattern builds its own transactions using the
@@ -432,20 +436,37 @@ class GraphGenerator:
 
     def simulate_background_activity(self):
         """Generate realistic baseline transactions using the dedicated background pattern."""
-        logger.info(
-            "Simulating background financial activity via BackgroundPatternManager…")
 
         try:
-            all_accounts = list(self.all_nodes.get(NodeType.ACCOUNT, []))
+            background_tasks = []
+            task_index = 0
 
-            # Use all available background patterns from the manager
             for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
-                logger.info(f"Injecting background pattern: {pattern_name}")
-                bg_edges = pattern_instance.inject_pattern(all_accounts)
-                for src, dest, attrs in bg_edges:
-                    self._add_edge(src, dest, attrs)
-                logger.info(
-                    f"Background pattern '{pattern_name}' injected: {len(bg_edges)} edges.")
+                logger.info(f"Preparing background pattern: {pattern_name}")
+                task = (pattern_instance.inject_pattern, ([],), task_index)
+                background_tasks.append(task)
+                task_index += 1
+
+            if not background_tasks:
+                logger.warning("No background patterns available.")
+                return
+
+            background_results = run_patterns_in_parallel(background_tasks)
+
+            # Process results and add edges to graph
+            total_bg_edges_added = 0
+            for i, bg_edges in enumerate(background_results):
+                if bg_edges:
+                    for src, dest, attrs in bg_edges:
+                        self._add_edge(src, dest, attrs)
+                    pattern_name = list(
+                        self.background_pattern_manager.patterns.keys())[i]
+                    logger.info(
+                        f"Background pattern '{pattern_name}' injected: {len(bg_edges)} edges.")
+                    total_bg_edges_added += len(bg_edges)
+
+            logger.info(
+                f"Background activity simulation complete. Added {total_bg_edges_added} baseline transaction edges.")
 
         except Exception as e:
             logger.error(f"Failed to inject background activity: {e}")

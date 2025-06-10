@@ -21,20 +21,20 @@ class NonFraudulentRandomStructural(StructuralComponent):
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
         # Filter to get only legitimate entities and their accounts
         legit_entities = self.graph_generator.entity_clusters.get("legit", [])
+
         if not legit_entities:
+            print("DEBUG [RandomPayments]: No legit entities found!")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
-        # Find accounts belonging to legitimate entities
+        # Get accounts belonging to legitimate entities using the helper function
         legit_accounts = []
-        for node_id, data in self.graph_generator.graph.nodes(data=True):
-            if data.get("node_type") == NodeType.ACCOUNT:
-                # Check if this account belongs to a legitimate entity
-                for neighbor in self.graph_generator.graph.neighbors(node_id):
-                    neighbor_data = self.graph_generator.graph.nodes[neighbor]
-                    if (neighbor in legit_entities and
-                            neighbor_data.get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]):
-                        legit_accounts.append(node_id)
-                        break
+        for entity_id in legit_entities:
+            entity_accounts = self._get_owned_accounts(entity_id)
+            legit_accounts.extend(entity_accounts)
+
+        # Remove duplicates while preserving order
+        from ..base import deduplicate_preserving_order
+        legit_accounts = deduplicate_preserving_order(legit_accounts)
 
         return EntitySelection(central_entities=legit_accounts, peripheral_entities=[])
 
@@ -158,7 +158,6 @@ class RandomPaymentsTemporal(TemporalComponent):
                     duration=max(timestamps) - min(timestamps),
                 )
             )
-
         return sequences
 
 

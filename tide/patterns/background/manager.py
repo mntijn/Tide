@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 
 from .background_activity import RandomPaymentsPattern
+from .salary_payments import SalaryPaymentsPattern
 
 
 class BackgroundPatternManager:
@@ -13,6 +14,7 @@ class BackgroundPatternManager:
         self.patterns: Dict[str, Any] = {
             p.pattern_name: p for p in [
                 RandomPaymentsPattern(graph_generator, params),
+                SalaryPaymentsPattern(graph_generator, params),
                 # add new background patterns here
             ]}
 
