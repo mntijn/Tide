@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "generation_timestamp": "2025-06-10T11:00:29.481826",
+    "generation_timestamp": "2025-06-10T11:40:31.597494",
     "total_patterns": 11,
     "graph_nodes": 557,
-    "graph_edges": 1132,
+    "graph_edges": 496,
     "config_file": "configs/graph.yaml",
     "output_directory": "."
   },
@@ -13,11 +13,11 @@
       "pattern_id": "FrontBusinessActivity_1",
       "entities": [
         "account_486",
-        "account_482",
-        "account_550",
+        "account_556",
         "account_483",
         "account_478",
-        "account_556"
+        "account_482",
+        "account_550"
       ],
       "transactions": [
         {
@@ -361,10 +361,10 @@
       "total_amount": 1327252.7000000002,
       "avg_amount": 31601.254761904765,
       "countries": [
-        "SC",
-        "CASH",
+        "KY",
         "BB",
-        "KY"
+        "CASH",
+        "SC"
       ],
       "time_span_hours": 1201.9790343008333,
       "start_time": "2023-01-03 04:27:00",
@@ -379,12 +379,12 @@
       "pattern_type": "FrontBusinessActivity",
       "pattern_id": "FrontBusinessActivity_2",
       "entities": [
+        "account_556",
         "account_517",
-        "account_534",
-        "account_472",
-        "account_518",
         "account_516",
-        "account_556"
+        "account_534",
+        "account_518",
+        "account_472"
       ],
       "transactions": [
         {
@@ -560,10 +560,10 @@
       "total_amount": 610366.43,
       "avg_amount": 29065.068095238097,
       "countries": [
-        "JP",
         "IM",
-        "DE",
-        "CASH"
+        "JP",
+        "CASH",
+        "DE"
       ],
       "time_span_hours": 700.569414733889,
       "start_time": "2023-02-09 07:21:00",
@@ -578,18 +578,18 @@
       "pattern_type": "RapidFundMovement",
       "pattern_id": "RapidFundMovement_3",
       "entities": [
-        "account_198",
-        "account_487",
-        "account_491",
-        "account_490",
-        "account_524",
-        "account_206",
-        "account_484",
-        "account_357",
-        "account_513",
-        "account_488",
         "account_492",
-        "account_556"
+        "account_524",
+        "account_556",
+        "account_488",
+        "account_357",
+        "account_491",
+        "account_484",
+        "account_513",
+        "account_198",
+        "account_490",
+        "account_206",
+        "account_487"
       ],
       "transactions": [
         {
@@ -717,11 +717,11 @@
       "total_amount": 40133.39000000001,
       "avg_amount": 2675.5593333333336,
       "countries": [
-        "CASH",
-        "SG",
         "USA",
-        "BB",
+        "SG",
         "HK",
+        "BB",
+        "CASH",
         "BM"
       ],
       "time_span_hours": 45.9826245475,
@@ -734,17 +734,17 @@
       "pattern_type": "RapidFundMovement",
       "pattern_id": "RapidFundMovement_4",
       "entities": [
-        "account_203",
-        "account_191",
+        "account_556",
         "account_506",
+        "account_191",
+        "account_203",
+        "account_470",
+        "account_189",
+        "account_276",
+        "account_197",
         "account_192",
         "account_190",
-        "account_470",
-        "account_276",
-        "account_189",
-        "account_507",
-        "account_197",
-        "account_556"
+        "account_507"
       ],
       "transactions": [
         {
@@ -864,12 +864,12 @@
       "total_amount": 70292.38,
       "avg_amount": 5020.884285714286,
       "countries": [
-        "SC",
-        "CASH",
-        "CH",
-        "NL",
+        "MT",
         "BS",
-        "MT"
+        "CASH",
+        "NL",
+        "CH",
+        "SC"
       ],
       "time_span_hours": 40.598370683055556,
       "start_time": "2023-01-10 00:47:00",
@@ -881,14 +881,14 @@
       "pattern_type": "RapidFundMovement",
       "pattern_id": "RapidFundMovement_5",
       "entities": [
+        "account_492",
+        "account_549",
+        "account_533",
+        "account_556",
         "account_191",
         "account_199",
-        "account_533",
-        "account_192",
-        "account_549",
         "account_538",
-        "account_492",
-        "account_556"
+        "account_192"
       ],
       "transactions": [
         {
@@ -976,12 +976,12 @@
       "total_amount": 8337.67,
       "avg_amount": 833.767,
       "countries": [
-        "SC",
-        "CASH",
+        "IM",
+        "BS",
         "SG",
         "BB",
-        "BS",
-        "IM"
+        "CASH",
+        "SC"
       ],
       "time_span_hours": 43.95712830888889,
       "start_time": "2023-01-06 00:15:00",
@@ -993,13 +993,13 @@
       "pattern_type": "RapidFundMovement",
       "pattern_id": "RapidFundMovement_6",
       "entities": [
+        "account_556",
         "account_297",
-        "account_389",
-        "account_555",
-        "account_180",
         "account_478",
+        "account_389",
         "account_299",
-        "account_556"
+        "account_180",
+        "account_555"
       ],
       "transactions": [
         {
@@ -1119,11 +1119,11 @@
       "total_amount": 45688.64000000001,
       "avg_amount": 3263.474285714286,
       "countries": [
-        "SC",
-        "CASH",
-        "USA",
         "DE",
-        "KY"
+        "USA",
+        "KY",
+        "CASH",
+        "SC"
       ],
       "time_span_hours": 41.901799697777776,
       "start_time": "2023-01-05 03:09:00",
@@ -1135,10 +1135,10 @@
       "pattern_type": "RepeatedOverseasTransfers",
       "pattern_id": "RepeatedOverseasTransfers_7",
       "entities": [
-        "account_257",
-        "account_531",
+        "account_408",
         "individual_128",
-        "account_408"
+        "account_257",
+        "account_531"
       ],
       "transactions": [
         {
@@ -1226,18 +1226,18 @@
       "total_amount": 124502.6,
       "avg_amount": 12450.26,
       "countries": [
+        "KY",
         "SC",
-        "MT",
-        "KY"
+        "MT"
       ],
       "time_span_hours": 1582.3333333333333,
       "start_time": "2023-02-26 01:34:00",
       "end_time": "2023-05-02 23:54:00",
-      "source_account": "individual_128",
+      "source_account": "account_408",
       "destination_countries": [
+        "KY",
         "SC",
-        "MT",
-        "KY"
+        "MT"
       ],
       "num_overseas_destinations": 3
     },
@@ -1245,10 +1245,10 @@
       "pattern_type": "RepeatedOverseasTransfers",
       "pattern_id": "RepeatedOverseasTransfers_8",
       "entities": [
-        "account_230",
         "individual_59",
-        "account_511",
-        "account_532"
+        "account_230",
+        "account_532",
+        "account_511"
       ],
       "transactions": [
         {
@@ -1337,17 +1337,17 @@
       "avg_amount": 8984.757000000001,
       "countries": [
         "MT",
-        "LU",
-        "HK"
+        "HK",
+        "LU"
       ],
       "time_span_hours": 1407.3333333333333,
       "start_time": "2023-03-15 06:37:00",
       "end_time": "2023-05-12 21:57:00",
-      "source_account": "account_230",
+      "source_account": "individual_59",
       "destination_countries": [
         "MT",
-        "LU",
-        "HK"
+        "HK",
+        "LU"
       ],
       "num_overseas_destinations": 3
     },
@@ -1355,9 +1355,9 @@
       "pattern_type": "RepeatedOverseasTransfers",
       "pattern_id": "RepeatedOverseasTransfers_9",
       "entities": [
-        "individual_37",
         "account_233",
-        "account_177"
+        "account_177",
+        "individual_37"
       ],
       "transactions": [
         {
@@ -1437,16 +1437,16 @@
       "total_amount": 110508.49000000002,
       "avg_amount": 12278.721111111114,
       "countries": [
-        "SC",
-        "MT"
+        "MT",
+        "SC"
       ],
       "time_span_hours": 1505.1,
       "start_time": "2023-03-05 00:42:00",
       "end_time": "2023-05-06 17:48:00",
-      "source_account": "individual_37",
+      "source_account": "account_177",
       "destination_countries": [
-        "SC",
-        "MT"
+        "MT",
+        "SC"
       ],
       "num_overseas_destinations": 2
     },
@@ -1454,12 +1454,12 @@
       "pattern_type": "RepeatedOverseasTransfers",
       "pattern_id": "RepeatedOverseasTransfers_10",
       "entities": [
-        "individual_82",
+        "account_176",
         "account_314",
+        "account_511",
         "account_431",
         "account_290",
-        "account_176",
-        "account_511"
+        "individual_82"
       ],
       "transactions": [
         {
@@ -1651,22 +1651,22 @@
       "total_amount": 239371.2900000001,
       "avg_amount": 10407.447391304351,
       "countries": [
-        "SC",
-        "CH",
+        "MT",
         "VU",
         "HK",
-        "MT"
+        "CH",
+        "SC"
       ],
       "time_span_hours": 3094.4166666666665,
       "start_time": "2023-01-01 01:06:00",
       "end_time": "2023-05-09 23:31:00",
-      "source_account": "account_290",
+      "source_account": "individual_82",
       "destination_countries": [
-        "SC",
-        "CH",
+        "MT",
         "VU",
         "HK",
-        "MT"
+        "CH",
+        "SC"
       ],
       "num_overseas_destinations": 5
     },
@@ -1674,10 +1674,10 @@
       "pattern_type": "RepeatedOverseasTransfers",
       "pattern_id": "RepeatedOverseasTransfers_11",
       "entities": [
+        "account_231",
         "account_336",
-        "individual_100",
         "account_230",
-        "account_231"
+        "individual_100"
       ],
       "transactions": [
         {
@@ -1845,18 +1845,18 @@
       "total_amount": 236761.2,
       "avg_amount": 11838.060000000001,
       "countries": [
+        "CH",
         "SC",
-        "LU",
-        "CH"
+        "LU"
       ],
       "time_span_hours": 2134.766666666667,
       "start_time": "2023-02-07 00:05:00",
       "end_time": "2023-05-06 22:51:00",
       "source_account": "account_336",
       "destination_countries": [
+        "CH",
         "SC",
-        "LU",
-        "CH"
+        "LU"
       ],
       "num_overseas_destinations": 3
     }
