@@ -20,6 +20,7 @@ from .utils.constants import (
 )
 from .utils.business import map_occupation_to_business_category, get_random_business_category
 from .entities import Individual, Business, Institution, Account
+from .patterns.background.manager import BackgroundPatternManager
 from .patterns.manager import PatternManager
 from .patterns.base import StructuralComponent, EntitySelection
 from .utils.accounts import process_individual, process_business
@@ -78,6 +79,8 @@ class GraphGenerator:
         self.random_instance = random_instance
 
         self.pattern_manager = PatternManager(self, self.params)
+        self.background_pattern_manager = BackgroundPatternManager(
+            self, self.params)
         self.entity_clusters: Dict[str, List[str]] = {}
 
         # PATTERN TRACKING: Track what patterns are actually injected
@@ -430,18 +433,20 @@ class GraphGenerator:
     def simulate_background_activity(self):
         """Generate realistic baseline transactions using the dedicated background pattern."""
         logger.info(
-            "Simulating background financial activity via BackgroundActivityPattern…")
+            "Simulating background financial activity via BackgroundPatternManager…")
 
         try:
-            from .patterns.background_activity import BackgroundActivityPattern
-
-            bg_pattern = BackgroundActivityPattern(self, self.params)
             all_accounts = list(self.all_nodes.get(NodeType.ACCOUNT, []))
-            bg_edges = bg_pattern.inject_pattern(all_accounts)
-            for src, dest, attrs in bg_edges:
-                self._add_edge(src, dest, attrs)
-            logger.info(
-                f"Background activity injected: {len(bg_edges)} edges.")
+
+            # Use all available background patterns from the manager
+            for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
+                logger.info(f"Injecting background pattern: {pattern_name}")
+                bg_edges = pattern_instance.inject_pattern(all_accounts)
+                for src, dest, attrs in bg_edges:
+                    self._add_edge(src, dest, attrs)
+                logger.info(
+                    f"Background pattern '{pattern_name}' injected: {len(bg_edges)} edges.")
+
         except Exception as e:
             logger.error(f"Failed to inject background activity: {e}")
 

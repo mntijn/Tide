@@ -10,7 +10,8 @@ from .base import (
 from .repeated_overseas_transfers import RepeatedOverseasTransfersPattern
 from .rapid_fund_movement import RapidFundMovementPattern
 from .front_business_activity import FrontBusinessPattern
-from .background_activity import BackgroundActivityPattern
+from .background.background_activity import BackgroundActivityPattern
+from .background.manager import BackgroundPatternManager
 
 from .manager import PatternManager
 
@@ -25,5 +26,6 @@ __all__ = [
     "RapidFundMovementPattern",
     "FrontBusinessPattern",
     "BackgroundActivityPattern",
-    "PatternManager"
+    "PatternManager",
+    "BackgroundPatternManager"
 ]

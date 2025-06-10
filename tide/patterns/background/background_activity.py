@@ -2,13 +2,13 @@ import datetime
 import numpy as np
 from typing import List, Dict, Any, Tuple
 
-from .base import (
+from ..base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
     CompositePattern, PatternInjector
 )
-from ..datastructures.enums import NodeType, TransactionType
-from ..datastructures.attributes import TransactionAttributes
-from ..utils.random_instance import random_instance
+from ...datastructures.enums import NodeType, TransactionType
+from ...datastructures.attributes import TransactionAttributes
+from ...utils.random_instance import random_instance
 
 
 class BackgroundActivityStructural(StructuralComponent):
