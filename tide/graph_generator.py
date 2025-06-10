@@ -43,8 +43,6 @@ class GraphGenerator:
         self.graph = nx.DiGraph()
         self.node_counter = 0
         self.all_nodes: Dict[NodeType, List[str]] = {nt: [] for nt in NodeType}
-        self.fraudulent_entities_map: Dict[NodeType, List[str]] = {
-            nt: [] for nt in NodeType}
 
         # Track transaction history for each entity
         self.entity_transaction_history: Dict[str, datetime.datetime] = {}
@@ -172,9 +170,9 @@ class GraphGenerator:
             logger.warning("No AML patterns are registered in PatternManager.")
             return
 
-        total_edges_added = 0
-        # Sort nodes for deterministic order when passing to patterns
         all_nodes_list = sorted(list(self.graph.nodes))
+        pattern_tasks = []
+        task_index_to_pattern: Dict[int, Any] = {}
 
         if is_random:
             # Random mode: randomly select <num_illicit_patterns> patterns
@@ -182,8 +180,6 @@ class GraphGenerator:
                 f"Injecting {self.num_aml_patterns} AML patterns randomly...")
             available_patterns = list(self.pattern_manager.patterns.values())
 
-            # Create pattern tasks for parallel execution
-            pattern_tasks = []
             for i in range(self.num_aml_patterns):
                 pattern_instance = self.random_instance.choice(
                     available_patterns)
@@ -192,25 +188,11 @@ class GraphGenerator:
 
                 task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
                 pattern_tasks.append(task)
-
-            pattern_results = run_patterns_in_parallel(pattern_tasks)
-
-            # Merge all edges into the main graph
-            for edges in pattern_results:
-                for src, dest, attrs in edges:
-                    self._add_edge(src, dest, attrs)
-                total_edges_added += len(edges)
-
+                task_index_to_pattern[i] = pattern_instance
         else:
-            # Fixed mode: use specific counts for each pattern type
             logger.info("Injecting AML patterns with specific counts...")
-
             config_to_pattern_mapping = self.pattern_manager.patterns
-
-            # Collect all pattern tasks first
-            pattern_tasks = []
             task_index = 0
-            total_patterns_injected = 0
 
             config_keys = (sorted(pattern_frequency_config.keys()) if self.random_seed
                            else pattern_frequency_config.keys())
@@ -224,66 +206,54 @@ class GraphGenerator:
                     pattern_instance = config_to_pattern_mapping.get(
                         config_key)
                     if pattern_instance:
-                        for i in range(count):
+                        for _ in range(count):
                             task = (pattern_instance.inject_pattern,
                                     (all_nodes_list,), task_index)
                             pattern_tasks.append(task)
+                            task_index_to_pattern[task_index] = pattern_instance
                             task_index += 1
-                            total_patterns_injected += 1
                     else:
                         logger.warning(
                             f"Pattern for config key '{config_key}' not found. Available patterns: {list(config_to_pattern_mapping.keys())}")
 
-            if total_patterns_injected == 0:
-                logger.warning(
-                    "No patterns were injected. Check your pattern_frequency configuration.")
-                return
+        if not pattern_tasks:
+            logger.warning(
+                "No patterns were injected. Check your pattern_frequency configuration.")
+            return
 
-            pattern_results = run_patterns_in_parallel(pattern_tasks)
+        pattern_results = run_patterns_in_parallel(pattern_tasks)
 
-            # TRACK PATTERNS: Record what patterns were actually created
-            pattern_index = 0
-            for config_key in config_keys:
-                count = pattern_frequency_config[config_key]
-                if config_key in ["random", "num_illicit_patterns"]:
-                    continue
+        # Process results
+        total_edges_added = 0
+        fraudulent_cluster_set = set(
+            self.entity_clusters.get("fraudulent", []))
 
-                if isinstance(count, int) and count > 0:
-                    pattern_instance = config_to_pattern_mapping.get(
-                        config_key)
-                    if pattern_instance:
-                        for i in range(count):
-                            if pattern_index < len(pattern_results):
-                                edges = pattern_results[pattern_index]
-                                if edges:  # Only track if pattern actually generated edges
-                                    # Mark nodes as fraudulent before analyzing pattern
-                                    fraudulent_nodes = set()
-                                    for src, dest, _ in edges:
-                                        fraudulent_nodes.add(src)
-                                        fraudulent_nodes.add(dest)
+        for i, edges in enumerate(pattern_results):
+            if not edges:
+                continue
 
-                                    # Update node attributes to mark as fraudulent
-                                    for node_id in fraudulent_nodes:
-                                        if self.graph.has_node(node_id):
-                                            self.graph.nodes[node_id]['is_fraudulent'] = True
-                                            # Track in fraudulent entities map
-                                            node_type = self.graph.nodes[node_id].get(
-                                                'node_type')
-                                            if node_type:
-                                                self.fraudulent_entities_map[node_type].append(
-                                                    node_id)
+            # Mark nodes as fraudulent and add to cluster
+            fraudulent_nodes = {src for src, _, _ in edges}.union(
+                {dest for _, dest, _ in edges})
+            for node_id in fraudulent_nodes:
+                if self.graph.has_node(node_id):
+                    self.graph.nodes[node_id]['is_fraudulent'] = True
+                    fraudulent_cluster_set.add(node_id)
 
-                                    pattern_data = self._analyze_pattern_edges(
-                                        pattern_instance.pattern_name, edges, pattern_instance)
-                                    logger.info(
-                                        f"appending {pattern_data['pattern_type']}")
-                                    self.injected_patterns.append(pattern_data)
-                                pattern_index += 1
+            # Analyze and track the injected pattern
+            pattern_instance = task_index_to_pattern[i]
+            pattern_data = self._analyze_pattern_edges(
+                pattern_instance.pattern_name, edges, pattern_instance)
+            self.injected_patterns.append(pattern_data)
 
-            for edges in pattern_results:
-                for src, dest, attrs in edges:
-                    self._add_edge(src, dest, attrs)
-                total_edges_added += len(edges)
+            # Add edges to the graph
+            for src, dest, attrs in edges:
+                self._add_edge(src, dest, attrs)
+            total_edges_added += len(edges)
+
+        # Update the fraudulent cluster in entity_clusters
+        self.entity_clusters["fraudulent"] = sorted(
+            list(fraudulent_cluster_set))
 
         logger.info(
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
