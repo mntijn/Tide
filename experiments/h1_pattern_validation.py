@@ -340,6 +340,33 @@ def validate_front_business(pattern_data, config):
                     validation['issues'].append(
                         f"Deposit amount {tx['amount']} outside range {deposit_amount_range[0]}-{deposit_amount_range[1]}")
 
+        # 3. Transaction validation: Check overseas transfer amounts and presence
+        transfer_amount_range = tx_params.get(
+            'transfer_amount_range', [5000, 20000])
+        transfers = [tx for tx in transactions if tx['transaction_type']
+                     == 'TransactionType.TRANSFER']
+
+        if not transfers:
+            validation['transaction_validation'] = False
+            validation['issues'].append(
+                "No overseas transfer transactions found in pattern")
+        else:
+            for tx in transfers:
+                if not (transfer_amount_range[0] <= tx['amount'] <= transfer_amount_range[1]):
+                    validation['transaction_validation'] = False
+                    validation['issues'].append(
+                        f"Transfer amount {tx['amount']} outside range {transfer_amount_range[0]}-{transfer_amount_range[1]}")
+
+        # Optional: basic temporal sanity – ensure transfers occur after deposits if both types exist
+        deposit_times = [datetime.datetime.fromisoformat(tx['timestamp'].replace(
+            'Z', '+00:00')) for tx in transactions if tx['transaction_type'] == 'TransactionType.DEPOSIT']
+        transfer_times = [datetime.datetime.fromisoformat(
+            tx['timestamp'].replace('Z', '+00:00')) for tx in transfers]
+        if deposit_times and transfer_times and min(transfer_times) < max(deposit_times):
+            validation['temporal_validation'] = False
+            validation['issues'].append(
+                "Transfers occur before all deposits have been made")
+
         results.append(validation)
 
     return results
