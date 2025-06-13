@@ -43,10 +43,10 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         max_senders = inflow_params.get("max_inflows", 7)
         max_sender_entities = pattern_config.get("max_sender_entities", 20)
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: min_accounts_for_pattern: {min_accounts_for_pattern}, min_senders: {min_senders}, max_senders: {max_senders}")
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Looking for individual with {min_accounts_for_pattern}+ accounts, {min_senders}-{max_senders} senders from max {max_sender_entities} entities")
 
         # Select high-risk individual as receiver from the most risky clusters
@@ -76,12 +76,12 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
 
             if len(owned_accounts) >= min_accounts_for_pattern:
                 selected_individual = individual_id
-                logger.info(
+                logger.debug(
                     f"RapidFundMovement: Selected individual {individual_id} with {len(owned_accounts)} accounts")
                 break
 
         if not selected_individual:
-            logger.info(
+            logger.warning(
                 "RapidFundMovement: No individual found with sufficient accounts")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
@@ -145,7 +145,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
             potential_sender_accounts)
 
         if not potential_sender_accounts:
-            logger.info("RapidFundMovement: No sender accounts found")
+            logger.warning("RapidFundMovement: No sender accounts found")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         # Select sender accounts based on configuration
@@ -154,7 +154,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         selected_senders = potential_sender_accounts[:min(
             num_senders, len(potential_sender_accounts))]
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Selected {len(selected_senders)} sender accounts")
 
         # Only include the central individual and sender accounts in the entity selection
@@ -174,7 +174,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
     def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
         sequences = []
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
-            logger.info(
+            logger.debug(
                 f"RapidFundMovement: Missing entities - central: {len(entity_selection.central_entities)}, peripheral: {len(entity_selection.peripheral_entities)}")
             return sequences
 
@@ -184,11 +184,11 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         # Get the individual's owned accounts for receiving funds and withdrawals
         individual_accounts = self._get_owned_accounts(central_individual_id)
         if not individual_accounts:  # Need accounts to operate on
-            logger.info(
+            logger.warning(
                 f"RapidFundMovement: Individual {central_individual_id} has no accounts")
             return sequences
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Generating transactions for individual {central_individual_id} with {len(individual_accounts)} accounts and {len(overseas_sender_accounts)} senders")
 
         # Select accounts that will receive inflows
@@ -219,7 +219,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         # Use the overseas sender accounts from entity selection
         if not overseas_sender_accounts:
-            logger.info(
+            logger.warning(
                 "RapidFundMovement: No overseas sender accounts for RapidInflowOutflowTemporal inflows.")
             return sequences
 
@@ -343,7 +343,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         cash_account_id = self.graph_generator.cash_account_id
 
         if not cash_account_id:
-            logger.info(
+            logger.warning(
                 "RapidFundMovement: Global cash_account_id not found for RapidInflowOutflowTemporal withdrawals.")
             if inflow_transactions and not withdrawal_transactions:  # if only inflows happened
                 return sequences  # Or return only inflow sequence
@@ -382,7 +382,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
                 duration=withdrawal_duration
             ))
 
-        logger.info(
+        logger.debug(
             f"RapidFundMovement: Generated {len(sequences)} sequences with {sum(len(seq.transactions) for seq in sequences)} total transactions")
         return sequences
 

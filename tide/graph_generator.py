@@ -442,7 +442,6 @@ class GraphGenerator:
             task_index = 0
 
             for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
-                logger.info(f"Preparing background pattern: {pattern_name}")
                 task = (pattern_instance.inject_pattern, ([],), task_index)
                 background_tasks.append(task)
                 task_index += 1
@@ -461,12 +460,7 @@ class GraphGenerator:
                         self._add_edge(src, dest, attrs)
                     pattern_name = list(
                         self.background_pattern_manager.patterns.keys())[i]
-                    logger.info(
-                        f"Background pattern '{pattern_name}' injected: {len(bg_edges)} edges.")
                     total_bg_edges_added += len(bg_edges)
-
-            logger.info(
-                f"Background activity simulation complete. Added {total_bg_edges_added} baseline transaction edges.")
 
         except Exception as e:
             logger.error(f"Failed to inject background activity: {e}")
