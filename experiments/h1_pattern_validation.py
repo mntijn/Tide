@@ -303,11 +303,10 @@ def validate_front_business(pattern_data, config):
     """Validate FrontBusinessActivity pattern structure"""
     results = []
 
-    # Extract validation parameters from config
     front_config = config.get('pattern_config', {}).get('frontBusiness', {})
     tx_params = front_config.get('transaction_params', {})
     deposit_amount_range = tx_params.get(
-        'deposit_amount_range', [10000, 50000])
+        'deposit_amount_range', [15000, 75000])
     min_entities = front_config.get('min_entities', 3)
 
     for pattern in pattern_data:
@@ -322,50 +321,76 @@ def validate_front_business(pattern_data, config):
             'issues': []
         }
 
-        # 1. Entity validation: Should have 3+ entities (using config value)
+        # 1. Entity validation
         entities = pattern['entities']
         if len(entities) < min_entities:
             validation['entity_validation'] = False
             validation['issues'].append(
                 f"Expected {min_entities}+ entities, got {len(entities)}")
 
-        # 2. Transaction validation: Check deposit amounts are in expected range
-        # Front businesses make large deposits above reporting thresholds
         transactions = pattern['transactions']
-        for tx in transactions:
-            if tx['transaction_type'] == 'TransactionType.DEPOSIT':
-                # Check that deposit amounts are within configured range
-                if not (deposit_amount_range[0] <= tx['amount'] <= deposit_amount_range[1]):
-                    validation['transaction_validation'] = False
-                    validation['issues'].append(
-                        f"Deposit amount {tx['amount']} outside range {deposit_amount_range[0]}-{deposit_amount_range[1]}")
+        if not transactions:
+            validation['transaction_validation'] = False
+            validation['issues'].append("No transactions found in pattern")
+            results.append(validation)
+            continue
 
-        # 3. Transaction validation: Check overseas transfer amounts and presence
-        transfer_amount_range = tx_params.get(
-            'transfer_amount_range', [5000, 20000])
-        transfers = [tx for tx in transactions if tx['transaction_type']
-                     == 'TransactionType.TRANSFER']
+        deposits = [
+            tx for tx in transactions if tx['transaction_type'] == 'TransactionType.DEPOSIT']
+        transfers = [
+            tx for tx in transactions if tx['transaction_type'] == 'TransactionType.TRANSFER']
 
+        # 2. Transaction validation
+        if not deposits:
+            validation['transaction_validation'] = False
+            validation['issues'].append("No deposit transactions found.")
         if not transfers:
             validation['transaction_validation'] = False
-            validation['issues'].append(
-                "No overseas transfer transactions found in pattern")
-        else:
-            for tx in transfers:
-                if not (transfer_amount_range[0] <= tx['amount'] <= transfer_amount_range[1]):
+            validation['issues'].append("No transfer transactions found.")
+
+        for tx in deposits:
+            if not (deposit_amount_range[0] <= tx['amount'] <= deposit_amount_range[1]):
+                validation['transaction_validation'] = False
+                validation['issues'].append(
+                    f"Deposit amount {tx['amount']} outside range {deposit_amount_range[0]}-{deposit_amount_range[1]}")
+
+        # 3. Temporal and Amount validation
+        if deposits and transfers:
+            deposit_times = [datetime.datetime.fromisoformat(
+                tx['timestamp'].replace('Z', '+00:00')) for tx in deposits]
+            transfer_times = [datetime.datetime.fromisoformat(
+                tx['timestamp'].replace('Z', '+00:00')) for tx in transfers]
+
+            last_deposit_time = max(deposit_times)
+            first_transfer_time = min(transfer_times)
+
+            # Check for phase separation
+            if first_transfer_time < last_deposit_time:
+                validation['temporal_validation'] = False
+                validation['issues'].append(
+                    f"Transfers start before all deposits are complete.")
+
+            # Check for delay between phases
+            delay_hours = (first_transfer_time -
+                           last_deposit_time).total_seconds() / 3600
+            if not (0.5 <= delay_hours <= 6.0):
+                validation['temporal_validation'] = False
+                validation['issues'].append(
+                    f"Delay between deposits and transfers is {delay_hours:.2f}h, expected 0.5-6h.")
+
+            # Check for transfer amount ratio
+            total_deposited = sum(tx['amount'] for tx in deposits)
+            total_transferred = sum(tx['amount'] for tx in transfers)
+
+            if total_deposited > 0:
+                ratio = total_transferred / total_deposited
+                if not (0.80 <= ratio <= 1.0):
                     validation['transaction_validation'] = False
                     validation['issues'].append(
-                        f"Transfer amount {tx['amount']} outside range {transfer_amount_range[0]}-{transfer_amount_range[1]}")
-
-        # Optional: basic temporal sanity – ensure transfers occur after deposits if both types exist
-        deposit_times = [datetime.datetime.fromisoformat(tx['timestamp'].replace(
-            'Z', '+00:00')) for tx in transactions if tx['transaction_type'] == 'TransactionType.DEPOSIT']
-        transfer_times = [datetime.datetime.fromisoformat(
-            tx['timestamp'].replace('Z', '+00:00')) for tx in transfers]
-        if deposit_times and transfer_times and min(transfer_times) < max(deposit_times):
-            validation['temporal_validation'] = False
-            validation['issues'].append(
-                "Transfers occur before all deposits have been made")
+                        f"Total transferred amount ({total_transferred:.2f}) is {ratio:.2f} of total deposited ({total_deposited:.2f}), expected 0.8-1.0.")
+            else:
+                validation['transaction_validation'] = False
+                validation['issues'].append("Total deposited amount is zero.")
 
         results.append(validation)
 

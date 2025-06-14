@@ -147,257 +147,96 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
             return sequences
 
-        # central_entities is now a list with the main business ID
-        # peripheral_entities contains all related accounts (front's own and overseas)
-        # We need to differentiate them for the logic below.
-
         front_business_id = entity_selection.central_entities[0]
 
-        # Re-fetch owned accounts for the front business
-        owned_accounts_ids = [
-            n for n in sorted(self.graph.neighbors(front_business_id))
-            if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
-        ]
-
-        # Determine which of the peripheral entities are the front's own vs overseas
-        # This assumes peripheral_entities was populated correctly by StructuralComponent
-        # (i.e., first its own accounts, then overseas ones, or we filter by country)
-
-        front_business_country = self.graph.nodes[front_business_id].get(
-            "country_code")
-
-        # Filter from peripheral_entities or re-select based on criteria if necessary
-        # For simplicity, let's assume structural component selected them appropriately
-        # and we just need to pick some for this cycle.
-
-        # It's safer to re-filter peripheral entities to distinguish them
-        potential_front_own_accounts_in_peripheral = []
-        potential_overseas_dest_accounts_in_peripheral = []
-
+        front_business_accounts = []
+        overseas_dest_accounts = []
         for acc_id in entity_selection.peripheral_entities:
-            acc_node_data = self.graph.nodes[acc_id]
-            acc_country = acc_node_data.get("country_code")
-
-            # Check if it's one of the front business's owned accounts
-            # This can be tricky if an overseas account is ALSO in owned_accounts_ids
-            # For now, we assume they are distinct sets initially in peripheral_entities
-            # A simpler way: owned_accounts are always domestic to the business.
-
-            is_owned_by_selected_front_business = False
-            for owner_id in self.graph.predecessors(acc_id):
-                if owner_id == front_business_id:
-                    is_owned_by_selected_front_business = True
-                    break
-
-            if is_owned_by_selected_front_business and acc_country == front_business_country:
-                potential_front_own_accounts_in_peripheral.append(acc_id)
-            elif acc_country and acc_country != front_business_country:
-                # Check if it's a business account (as per original logic)
-                is_business_account = False
-                for owner_id in self.graph.predecessors(acc_id):
-                    if self.graph.nodes[owner_id].get("node_type") == NodeType.BUSINESS:
-                        is_business_account = True
-                        break
-                if is_business_account:
-                    potential_overseas_dest_accounts_in_peripheral.append(
-                        acc_id)
-
-        # If structural component didn't provide enough distinct accounts in peripheral,
-        # we might need to fall back or log a warning.
-        # For now, we proceed with what we could filter.
-
-        # Ensure we use the accounts passed by EntitySelection, prioritizing those.
-        # The num_front_business_accounts_to_use logic from structural
-        # should already limit what's in peripheral_entities that are "own" accounts.
-
-        # Select actual accounts to use for this pattern instance from the filtered lists
-        front_business_accounts_to_use_count = self.params.get("frontBusiness", {}).get(
-            "num_front_business_accounts_to_use", 3)
-
-        front_business_accounts = random_instance.sample(
-            potential_front_own_accounts_in_peripheral,
-            min(len(potential_front_own_accounts_in_peripheral),
-                front_business_accounts_to_use_count)
-        ) if potential_front_own_accounts_in_peripheral else []
-
-        max_overseas_dest_accounts_count = self.params.get("frontBusiness", {}).get(
-            "max_overseas_destination_accounts_for_front", 4)
-        min_overseas_dest_accounts_count = self.params.get("frontBusiness", {}).get(
-            "min_overseas_destination_accounts", 2)
-
-        num_overseas_to_select_for_cycle = random_instance.randint(
-            min_overseas_dest_accounts_count,
-            max_overseas_dest_accounts_count
-        )
-
-        overseas_dest_accounts = random_instance.sample(
-            potential_overseas_dest_accounts_in_peripheral,
-            min(len(potential_overseas_dest_accounts_in_peripheral),
-                num_overseas_to_select_for_cycle)
-        ) if potential_overseas_dest_accounts_in_peripheral else []
+            is_owned_by_front_business = any(
+                owner == front_business_id for owner in self.graph.predecessors(acc_id))
+            if is_owned_by_front_business:
+                front_business_accounts.append(acc_id)
+            else:
+                overseas_dest_accounts.append(acc_id)
 
         if not front_business_accounts or not overseas_dest_accounts:
-            # Not enough accounts of the required types, skip this pattern instance
-            # Or log a warning: print(f"Warning: Not enough suitable accounts for FrontBusiness temporal component for {front_business_id}")
             return sequences
 
-        # Default values for pattern parameters from YAML
-        # Check both possible config paths for compatibility
-        pattern_config_temporal = self.params.get(
-            "pattern_config", {}).get("frontBusiness", {}).get("transaction_params", {})
-        if not pattern_config_temporal:
-            # Fallback to old path
-            pattern_config_temporal = self.params.get(
-                "frontBusiness", {}).get("transaction_params", {})
+        pattern_config = self.params.get(
+            "pattern_config", {}).get("frontBusiness", {})
+        tx_params = pattern_config.get("transaction_params", {})
+        min_deposits = tx_params.get("min_deposits", 5)
+        max_deposits = tx_params.get("max_deposits", 15)
+        deposit_amount_range = tx_params.get(
+            "deposit_amount_range", [15000, 75000])
 
-        min_deposit_cycles_yaml = pattern_config_temporal.get(
-            "min_deposit_cycles", 5)
-        max_deposit_cycles_yaml = pattern_config_temporal.get(
-            "max_deposit_cycles", 15)
-        deposit_amount_range_yaml = pattern_config_temporal.get(
-            "deposit_amount_range", [15000, 75000])  # Realistic range for front business
-        deposits_per_cycle_yaml = pattern_config_temporal.get(
-            "deposits_per_cycle", [1, 3])
+        num_cycles = random_instance.randint(min_deposits, max_deposits)
 
-        num_deposit_cycles = random_instance.randint(
-            min_deposit_cycles_yaml, max_deposit_cycles_yaml)
+        day_span = (self.time_span["end_date"] -
+                    self.time_span["start_date"]).days
+        start_day_offset = random_instance.randint(
+            0, max(0, day_span - (num_cycles * 2)))
+        current_time = self.time_span["start_date"] + \
+            datetime.timedelta(days=start_day_offset)
 
-        if (self.time_span["end_date"] - self.time_span["start_date"]).days < 15:
-            start_day_offset_range = max(
-                0, (self.time_span["end_date"] - self.time_span["start_date"]).days - 1)
-        else:
-            start_day_offset_range = (
-                self.time_span["end_date"] - self.time_span["start_date"]).days - 15
-
-        base_start_time = self.time_span["start_date"] + datetime.timedelta(
-            days=random_instance.randint(0, start_day_offset_range)
-        )
-
-        current_time = base_start_time
-
-        for i in range(num_deposit_cycles):
-            if not front_business_accounts:
-                break  # Cannot proceed without accounts
+        all_txs = []
+        for i in range(num_cycles):
+            # --- Deposit ---
+            deposit_time = current_time
             target_deposit_account = random_instance.choice(
                 front_business_accounts)
-            num_deposits_in_cycle = random_instance.randint(
-                1, 3)
+            deposit_amount = round(random_instance.uniform(
+                deposit_amount_range[0], deposit_amount_range[1]), 2)
 
-            deposit_timestamps = self.generate_timestamps(
-                current_time, "high_frequency", num_deposits_in_cycle)
-
-            # Get the currency of the target deposit account
-            deposit_account_currency = self.graph.nodes[target_deposit_account].get(
-                "currency", "EUR")
-
-            # Generate large cash deposit amounts (not structured)
-            # Front businesses make legitimate-looking large deposits
-            deposit_amounts = []
-            for _ in range(num_deposits_in_cycle):
-                amount = random_instance.uniform(
-                    deposit_amount_range_yaml[0],
-                    deposit_amount_range_yaml[1]
-                )
-                deposit_amounts.append(round(amount, 2))
-
-            deposit_txs_this_cycle = []
-            for j in range(min(num_deposits_in_cycle, len(deposit_timestamps))):
-                tx_attrs_deposit = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                    src_id=self.graph_generator.cash_account_id,
-                    dest_id=target_deposit_account,
-                    timestamp=deposit_timestamps[j],
-                    amount=deposit_amounts[j],
-                    transaction_type=TransactionType.DEPOSIT,
-                    is_fraudulent=True
-                )
-                deposit_txs_this_cycle.append(
-                    (self.graph_generator.cash_account_id, target_deposit_account, tx_attrs_deposit))
-
-            last_deposit_time_this_cycle = current_time  # Fallback
-            if deposit_txs_this_cycle:
-                last_deposit_time_this_cycle = deposit_timestamps[-1]
-                sequences.append(TransactionSequence(
-                    transactions=deposit_txs_this_cycle,
-                    sequence_name=f"cash_deposits_cycle_{i+1}",
-                    start_time=deposit_timestamps[0],
-                    duration=deposit_timestamps[-1] - deposit_timestamps[0]
-                ))
-
-            if not overseas_dest_accounts:  # Cannot proceed with transfers if no overseas accounts
-                current_time = last_deposit_time_this_cycle + \
-                    datetime.timedelta(days=random_instance.uniform(1, 7))
-                continue
-
-            transfer_start_time = last_deposit_time_this_cycle + \
-                datetime.timedelta(hours=random_instance.uniform(0.5, 6))
-            num_overseas_transfers_in_cycle = random_instance.randint(
-                1, len(overseas_dest_accounts))
-
-            transfer_timestamps = self.generate_timestamps(
-                transfer_start_time, "immediate_followup", num_overseas_transfers_in_cycle)
-
-            total_deposited_this_cycle = sum(
-                amt for _, _, attrs in deposit_txs_this_cycle for amt in [attrs.amount])
-            base_transfer_amount = (total_deposited_this_cycle / num_overseas_transfers_in_cycle * random_instance.uniform(0.8, 1.0)
-                                    if total_deposited_this_cycle > 0 and num_overseas_transfers_in_cycle > 0
-                                    else round(random_instance.uniform(5000, 20000), 2))
-
-            # Get the currency of a sample overseas destination account for proper structuring
-            sample_overseas_dest = random_instance.choice(
-                overseas_dest_accounts)
-            overseas_currency = self.graph.nodes[sample_overseas_dest].get(
-                "currency", "EUR")
-
-            transfer_amounts = self.generate_structured_amounts(
-                count=num_overseas_transfers_in_cycle,
-                base_amount=base_transfer_amount,
-                target_currency=overseas_currency
+            deposit_tx = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
+                src_id=self.graph_generator.cash_account_id,
+                dest_id=target_deposit_account,
+                timestamp=deposit_time,
+                amount=deposit_amount,
+                transaction_type=TransactionType.DEPOSIT,
+                is_fraudulent=True
             )
+            all_txs.append(
+                (self.graph_generator.cash_account_id, target_deposit_account, deposit_tx))
 
-            transfer_txs_this_cycle = []
+            # --- Transfer ---
+            delay_hours = random_instance.uniform(0.5, 6)
+            transfer_time = deposit_time + \
+                datetime.timedelta(hours=delay_hours)
+            transfer_amount = round(
+                deposit_amount * random_instance.uniform(0.8, 1.0), 2)
 
-            # Create a more distributed pattern:
-            # Each transfer can come from any front business account and go to any overseas account
-            # This creates overlap but not a complete bipartite pattern
-            for k in range(min(num_overseas_transfers_in_cycle, len(transfer_timestamps))):
-                if not overseas_dest_accounts:
-                    break
+            source_transfer_account = random_instance.choice(
+                front_business_accounts)
+            dest_transfer_account = random_instance.choice(
+                overseas_dest_accounts)
 
-                # Randomly select source account from available front business accounts
-                # Favor accounts that recently received deposits, but allow any account
-                if random_instance.random() < 0.7:  # 70% chance to use recent deposit account
-                    source_for_transfer_account = target_deposit_account
-                else:  # 30% chance to use any front business account
-                    source_for_transfer_account = random_instance.choice(
-                        front_business_accounts)
+            transfer_tx = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
+                src_id=source_transfer_account,
+                dest_id=dest_transfer_account,
+                timestamp=transfer_time,
+                amount=transfer_amount,
+                transaction_type=TransactionType.TRANSFER,
+                is_fraudulent=True
+            )
+            all_txs.append(
+                (source_transfer_account, dest_transfer_account, transfer_tx))
 
-                # Randomly select destination from overseas accounts
-                dest_overseas_account = random_instance.choice(
-                    overseas_dest_accounts)
+            # --- Advance time for the next cycle ---
+            current_time += datetime.timedelta(
+                days=random_instance.uniform(0.5, 2.0))
 
-                tx_attrs_transfer = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                    src_id=source_for_transfer_account,
-                    dest_id=dest_overseas_account,
-                    timestamp=transfer_timestamps[k],
-                    amount=transfer_amounts[k],
-                    transaction_type=TransactionType.TRANSFER,
-                    is_fraudulent=True
-                )
-                transfer_txs_this_cycle.append(
-                    (source_for_transfer_account, dest_overseas_account, tx_attrs_transfer))
-
-            last_tx_time_this_cycle = last_deposit_time_this_cycle
-            if transfer_txs_this_cycle:
-                last_tx_time_this_cycle = transfer_timestamps[-1]
-                sequences.append(TransactionSequence(
-                    transactions=transfer_txs_this_cycle,
-                    sequence_name=f"overseas_transfers_cycle_{i+1}",
-                    start_time=transfer_timestamps[0],
-                    duration=transfer_timestamps[-1] - transfer_timestamps[0]
-                ))
-
-            current_time = last_tx_time_this_cycle + \
-                datetime.timedelta(days=random_instance.uniform(1, 7))
+        if all_txs:
+            # Sort transactions by time to ensure proper sequence ordering
+            all_txs.sort(key=lambda x: x[2].timestamp)
+            start_time = all_txs[0][2].timestamp
+            end_time = all_txs[-1][2].timestamp
+            sequences.append(TransactionSequence(
+                transactions=all_txs,
+                sequence_name="front_business_deposit_transfer_pairs",
+                start_time=start_time,
+                duration=end_time - start_time
+            ))
 
         return sequences
 

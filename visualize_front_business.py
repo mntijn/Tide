@@ -181,6 +181,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
 
     # Position overseas accounts on the right side (vertically distributed)
     num_overseas = len(overseas_business_accounts)
+    print('num_overseas', num_overseas)
     if num_overseas > 0:
         y_spacing = 2.5 if num_overseas > 1 else 0
         y_start = (num_overseas - 1) * y_spacing / 2

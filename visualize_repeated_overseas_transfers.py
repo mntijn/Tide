@@ -22,10 +22,29 @@ import datetime
 import json
 import sys
 import os
+import seaborn as sns
 
 # Add the parent directory to path to import main
 sys.path.append(str(Path(__file__).parent.parent.parent))
 sys.path.append(str(Path(__file__).parent))
+
+
+def set_visualization_style():
+    """Applies Tufte's principles and accessibility guidelines for visualizations."""
+    sns.set_context("notebook", font_scale=1.5)
+    sns.set_style("ticks")
+    sns.set_palette("colorblind")
+
+    plt.rcParams.update({
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "savefig.dpi": 300,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.1,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans", "Bitstream Vera Sans", "sans-serif"],
+    })
+    return sns.color_palette("colorblind")
 
 
 def generate_pattern_data():
@@ -77,7 +96,7 @@ def generate_pattern_data():
         return pattern_data, nodes_df, edges_df
 
 
-def create_network_visualization(pattern_data, nodes_df, edges_df):
+def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
     """Create network topology visualization"""
     # Focus on RepeatedOverseasTransfers patterns
     rot_patterns = [p for p in pattern_data['patterns']
@@ -134,14 +153,9 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                 overseas_account_owners[acc_id] = {
                     'id': owner_id, 'type': owner_type}
 
-    # Add a synthetic "Cash System" node for clarity
-    cash_system_node = 'CASH_SYSTEM'
-    entity_info[cash_system_node] = {'type': 'SYSTEM', 'country': 'N/A'}
-
     # Create structured horizontal layout for clear flow visualization
     pos = {}
-    pos[cash_system_node] = (-6, 0)
-    pos[central_entity] = (-3, 0)
+    pos[central_entity] = (-4, 0)
     pos[domestic_account] = (0, 0)
 
     # Position overseas accounts on the right side (vertically distributed)
@@ -154,34 +168,32 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
 
     # Create the graph
     G = nx.DiGraph()
-    all_graph_nodes = [central_entity, domestic_account,
-                       cash_system_node] + overseas_accounts
+    all_graph_nodes = [central_entity, domestic_account] + overseas_accounts
     G.add_nodes_from(all_graph_nodes)
 
     # Draw nodes with clear styling inspired by the example image
-    node_colors = {'INDIVIDUAL': 'yellow', 'BUSINESS': 'yellow',
-                   'ACCOUNT': 'orange', 'SYSTEM': 'red'}
     for entity in G.nodes():
         info = entity_info.get(entity, {})
         entity_type = info.get('type', 'Unknown')
         country = info.get('country', 'Unknown')
 
-        color = node_colors.get(entity_type, 'gray')
         size = 3000
 
-        # Override for specific roles
-        if entity == domestic_account:
-            color = 'orange'
+        # Determine node color and style based on role
+        if entity == central_entity:
+            color = colors[0]  # Central Entity
+        elif entity == domestic_account:
+            color = colors[4]  # Domestic Account
         elif entity in overseas_accounts:
-            color = 'deepskyblue'
+            color = colors[2]  # Overseas Account
+        else:
+            color = 'gray'
 
         ax.scatter(pos[entity][0], pos[entity][1], c=color, s=size,
                    alpha=0.9, edgecolors='black', linewidth=1.5, zorder=3)
 
         # Create clear label
-        if entity == cash_system_node:
-            label = "Cash Deposits"
-        elif entity == central_entity:
+        if entity == central_entity:
             id_part = entity.split('_')[-1]
             label = f"{entity_type.title()}_{id_part}\n[{country}]"
         elif entity == domestic_account:
@@ -201,50 +213,43 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
     # --- Draw Edges ---
     # 1. Edge from Cash System to Domestic Account (Deposits)
     total_deposit_amount = sum(tx['amount'] for tx in deposit_txs)
-    ax.annotate('', xy=pos[domestic_account], xytext=pos[cash_system_node],
-                arrowprops=dict(arrowstyle='->', color='purple', lw=3,
-                                linestyle='--', alpha=0.8), zorder=1)
-    mid_x = (pos[cash_system_node][0] + pos[domestic_account][0]) / 2
-    mid_y = (pos[cash_system_node][1] + pos[domestic_account][1]) / 2
-    label_text = f"Deposits\n€{total_deposit_amount:,.0f}\n({len(deposit_txs)} txs)"
+    ax.annotate('', xy=pos[domestic_account], xytext=pos[central_entity],
+                arrowprops=dict(arrowstyle='->', color=colors[3], lw=3,
+                                linestyle='--', alpha=0.8, shrinkA=35, shrinkB=35), zorder=1)
+    mid_x = (pos[central_entity][0] + pos[domestic_account][0]) / 2
+    mid_y = (pos[central_entity][1] + pos[domestic_account][1]) / 2
+    label_text = "Deposits"
     ax.text(mid_x, mid_y + 0.4, label_text, ha='center', va='center', fontsize=9,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor='purple', alpha=0.9), zorder=2)
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor=colors[3], alpha=0.9), zorder=2)
 
     # 2. Edges from Domestic Account to Overseas Accounts
     for account in overseas_accounts:
-        txs_to_account = [
-            tx for tx in transfer_txs if tx['dest'] == account]
-        total_amount = sum(tx['amount'] for tx in txs_to_account)
-        count = len(txs_to_account)
-
         ax.annotate('', xy=pos[account], xytext=pos[domestic_account],
-                    arrowprops=dict(arrowstyle='->', color='darkblue', lw=3,
-                                    linestyle='-', alpha=0.8), zorder=1)
+                    arrowprops=dict(arrowstyle='->', color=colors[0], lw=3,
+                                    linestyle='-', alpha=0.8, shrinkA=35, shrinkB=35), zorder=1)
         mid_x = (pos[domestic_account][0] + pos[account][0]) / 2
         mid_y = (pos[domestic_account][1] + pos[account][1]) / 2
-        label_text = f"Transfers\n€{total_amount:,.0f}\n({count} txs)"
+        label_text = "Transfers"
         ax.text(mid_x, mid_y + 0.4, label_text, ha='center', va='center', fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor='darkblue', alpha=0.9), zorder=2)
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor=colors[0], alpha=0.9), zorder=2)
 
     # Set axis properties
-    ax.set_xlim(-8, 8)
+    ax.set_xlim(-5, 6)
     ax.set_ylim(-5, 5)
     ax.set_aspect('equal')
     ax.axis('off')
 
     # Add legend
     legend_elements = [
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='yellow',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[0],
                    markersize=15, label='Central Entity (Owner)'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='orange',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[4],
                    markersize=15, label='Domestic Source Account'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='deepskyblue',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[2],
                    markersize=15, label='Overseas Destination Accounts'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red',
-                   markersize=15, label='Source of Funds (Cash)'),
-        plt.Line2D([0], [0], color='purple', linewidth=3,
+        plt.Line2D([0], [0], color=colors[3], linewidth=3,
                    linestyle='--', label='Cash Deposits'),
-        plt.Line2D([0], [0], color='darkblue', linewidth=3,
+        plt.Line2D([0], [0], color=colors[0], linewidth=3,
                    label='Overseas Transfers')
     ]
     ax.legend(handles=legend_elements, loc='upper left', fontsize=11)
@@ -271,7 +276,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
     return pattern
 
 
-def create_timeline_visualization(pattern, nodes_df, edges_df):
+def create_timeline_visualization(pattern, nodes_df, edges_df, colors):
     """Create timeline visualization of transactions"""
     transactions = pattern['transactions']
 
@@ -298,40 +303,28 @@ def create_timeline_visualization(pattern, nodes_df, edges_df):
     if deposits:
         deposit_times = [tx['datetime'] for tx in deposits]
         deposit_amounts = [tx['amount'] for tx in deposits]
-        ax1.plot(deposit_times, deposit_amounts, 'o', color='purple',
-                 markersize=8, alpha=0.7, label=f'Cash Deposits ({len(deposits)} txs)')
+        ax1.scatter(deposit_times, deposit_amounts, color=colors[3],
+                    s=100, alpha=0.7, label=f'Cash Deposits ({len(deposits)} txs)')
 
     if transfers:
         transfer_times = [tx['datetime'] for tx in transfers]
         transfer_amounts = [tx['amount'] for tx in transfers]
-        ax1.plot(transfer_times, transfer_amounts, 'o', color='darkblue',
-                 markersize=8, alpha=0.7, label=f'Overseas Transfers ({len(transfers)} txs)')
+        ax1.scatter(transfer_times, transfer_amounts, color=colors[0],
+                    s=100, alpha=0.7, label=f'Overseas Transfers ({len(transfers)} txs)')
 
     ax1.set_ylabel('Amount (€)', fontsize=12)
     ax1.set_title('Transaction Amounts Over Time',
                   fontsize=12, fontweight='bold')
-    ax1.legend()
-    ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+    ax1.legend(fontsize=12)
+    ax1.grid(False)
+    sns.despine(ax=ax1)
 
     # Formatting X-axis
-    # Calculate appropriate interval based on time span
     all_times = [tx['datetime'] for tx in transactions]
-    time_span = max(all_times) - min(all_times)
-    if time_span.days <= 7:
-        # For spans up to a week, show daily ticks
-        ax1.xaxis.set_major_locator(mdates.DayLocator())
-        date_format = '%Y-%m-%d\n%H:%M'
-    elif time_span.days <= 31:
-        # For spans up to a month, show weekly ticks
-        ax1.xaxis.set_major_locator(
-            mdates.WeekdayLocator(byweekday=0))  # Monday
-        date_format = '%Y-%m-%d'
-    else:
-        # For longer spans, show monthly ticks
-        ax1.xaxis.set_major_locator(mdates.MonthLocator())
-        date_format = '%Y-%m'
-
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter(date_format))
+    start_time = min(all_times)
+    end_time = max(all_times)
+    ax1.set_xticks([start_time, end_time])
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
     plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0, ha='center')
 
     # Add phase annotations
@@ -339,10 +332,14 @@ def create_timeline_visualization(pattern, nodes_df, edges_df):
         deposit_end = max(tx['datetime'] for tx in deposits)
         transfer_start = min(tx['datetime'] for tx in transfers)
 
-        ax1.axvspan(min(all_times), deposit_end, color='plum',
-                    alpha=0.2, label='Deposit Phase')
-        ax1.axvspan(transfer_start, max(all_times), color='lightblue',
-                    alpha=0.2, label='Transfer Phase')
+        ax1.axvline(x=deposit_end, color='gray', linestyle=':', alpha=0.7)
+        ax1.axvline(x=transfer_start, color='gray', linestyle=':', alpha=0.7)
+        deposit_mid = start_time + (deposit_end - start_time) / 2
+        transfer_mid = transfer_start + (end_time - transfer_start) / 2
+        ax1.text(deposit_mid, ax1.get_ylim()[
+                 1] * 0.9, 'Deposit Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[3])
+        ax1.text(transfer_mid, ax1.get_ylim()[
+                 1] * 0.9, 'Transfer Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[0])
 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.savefig('repeated_overseas_transfers_timeline.png',
@@ -354,6 +351,7 @@ def create_timeline_visualization(pattern, nodes_df, edges_df):
 def main():
     """Main function to generate visualizations"""
     print("=== RepeatedOverseasTransfers Pattern Visualization ===")
+    colors = set_visualization_style()
 
     # Generate pattern data
     pattern_data, nodes_df, edges_df = generate_pattern_data()
@@ -373,11 +371,12 @@ def main():
 
     # Create visualizations
     print("\nCreating network topology visualization...")
-    pattern = create_network_visualization(pattern_data, nodes_df, edges_df)
+    pattern = create_network_visualization(
+        pattern_data, nodes_df, edges_df, colors)
 
     if pattern:
         print("\nCreating timeline visualization...")
-        create_timeline_visualization(pattern, nodes_df, edges_df)
+        create_timeline_visualization(pattern, nodes_df, edges_df, colors)
 
         print("\nVisualizations saved:")
         print("- repeated_overseas_transfers_network.png")

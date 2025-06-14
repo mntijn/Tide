@@ -19,17 +19,30 @@ except ImportError:
     SCIPY_AVAILABLE = False
     print("Warning: scipy not available. Using manual calculations.")
 
-# Apply visualization guidelines
+# Apply Tufte-inspired visualization guidelines
 golden_ratio = 1.618
 figure_size = (7, 7 / golden_ratio)
 
-# Configure matplotlib and seaborn for accessibility and aesthetics
+# Configure matplotlib and seaborn for accessibility and a clean, Tufte-like aesthetic
 sns.set_context("notebook")
-sns.set_style("ticks")
+sns.set_style("ticks")  # "ticks" style is a good base for Tufte
 sns.set_palette("colorblind", color_codes=True)
-plt.rcParams["figure.facecolor"] = "none"
-plt.rcParams["axes.facecolor"] = "none"
+
+# Set white background and other Tufte-friendly parameters inspired by the article
+plt.rcParams["figure.facecolor"] = "white"
+plt.rcParams["axes.facecolor"] = "white"
 plt.rcParams["figure.figsize"] = figure_size
+plt.rcParams["axes.labelcolor"] = "black"
+plt.rcParams["xtick.color"] = "black"
+plt.rcParams["ytick.color"] = "black"
+plt.rcParams["text.color"] = "black"
+# From the article: increase font sizes for legibility
+plt.rcParams["font.size"] = 14
+plt.rcParams["axes.labelsize"] = 14
+plt.rcParams["axes.titlesize"] = 16
+plt.rcParams["xtick.labelsize"] = 12
+plt.rcParams["ytick.labelsize"] = 12
+plt.rcParams["legend.fontsize"] = 12
 
 
 def power_law_model(N, c, alpha):
@@ -96,90 +109,99 @@ def calculate_pearson_correlation(x, y):
 
 
 def create_scaling_plots(configurations, total_elements, times, alpha=None, c=None, r_squared=None):
-    """Create scaling analysis plots following accessibility guidelines"""
+    """Create Tufte-inspired scaling analysis plots based on web article"""
 
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
-    fig.suptitle('H2 Scalability Analysis', fontsize=16, fontweight='bold')
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 14))
+    fig.suptitle('H2 Scalability Analysis', fontsize=20,
+                 fontweight='bold', color='black')
 
-    # Plot 1: Linear scale
-    ax1.scatter(total_elements, times, s=60, alpha=0.8,
-                color='#D81B60', edgecolors='black', linewidth=0.5)
+    # Plot 1: Linear scale (Tufte style)
+    ax1.scatter(total_elements, times, s=80, alpha=0.8,
+                color='#D81B60', ec='w', lw=0.5)
     ax1.set_xlabel('Total Elements (N)')
     ax1.set_ylabel('Time (seconds)')
     ax1.set_title('Scaling Performance (Linear Scale)')
-    ax1.grid(True, alpha=0.3)
+    sns.despine(ax=ax1, trim=True)
 
-    # Add configuration labels
+    # Direct labeling for each point
     for i, (x, y, config) in enumerate(zip(total_elements, times, configurations)):
-        ax1.annotate(config, (x, y), xytext=(5, 5),
-                     textcoords='offset points', fontsize=8)
+        ax1.annotate(config, (x, y), xytext=(
+            8, 0), textcoords='offset points', fontsize=10, ha='left', va='center')
 
-    # Plot 2: Log-log scale with power-law fit
+    # Plot 2: Log-log scale with power-law fit (Tufte style)
     ax2.loglog(total_elements, times, 'o', markersize=8,
-               color='#1E88E5', markeredgecolor='black', linewidth=0.5)
+               color='#D81B60', alpha=0.7, mec='w')
     ax2.set_xlabel('Total Elements (N)')
     ax2.set_ylabel('Time (seconds)')
     ax2.set_title('Log-Log Scale with Power-Law Fit')
-    ax2.grid(True, alpha=0.3)
+    sns.despine(ax=ax2, trim=True)
 
-    # Add power-law fit if available
+    # Add power-law fit with direct labeling instead of a legend
     if alpha is not None and c is not None:
         N_fit = np.logspace(np.log10(min(total_elements)),
                             np.log10(max(total_elements)), 100)
         T_fit = power_law_model(N_fit, c, alpha)
-        ax2.loglog(N_fit, T_fit, '--', color='#FFC107', linewidth=2,
-                   label=f'T = {c:.2e} × N^{alpha:.3f}\nR² = {r_squared:.3f}')
-        ax2.legend()
+        ax2.loglog(N_fit, T_fit, '--', color='#004D40', linewidth=2.5)
+        fit_text = f'T ≈ {c:.2e} * N^{alpha:.3f} (R²={r_squared:.3f})'
+        # Place text in a less obtrusive position
+        ax2.text(0.95, 0.05, fit_text, transform=ax2.transAxes, fontsize=12,
+                 verticalalignment='bottom', horizontalalignment='right',
+                 bbox=dict(boxstyle='round,pad=0.4', fc='white', alpha=0.7, ec='none'))
 
-    # Plot 3: Scaling ratios
+    # Plot 3: Scaling ratios (Tufte style)
     if len(total_elements) > 1:
         size_ratios = [total_elements[i] / total_elements[i-1]
                        for i in range(1, len(total_elements))]
         time_ratios = [times[i] / times[i-1] for i in range(1, len(times))]
-        transition_labels = [
-            f"{configurations[i-1]}\n→\n{configurations[i]}" for i in range(1, len(configurations))]
+        transition_labels = [f"{c1} → {c2}" for c1, c2 in zip(
+            configurations[:-1], configurations[1:])]
 
-        x_pos = np.arange(len(transition_labels))
-        width = 0.35
+        y_pos = np.arange(len(transition_labels))
 
-        bars1 = ax3.bar(x_pos - width/2, size_ratios, width,
-                        label='Size Ratio', color='#004D40', alpha=0.8)
-        bars2 = ax3.bar(x_pos + width/2, time_ratios, width,
-                        label='Time Ratio', color='#D81B60', alpha=0.8)
+        ax3.set_yticks(y_pos)
+        ax3.set_yticklabels(transition_labels)
+        ax3.set_xlabel('Ratio Multiplier')
+        ax3.set_title('Scaling Ratios (Time vs. Size)')
+        sns.despine(ax=ax3, left=True, bottom=True)
+        ax3.tick_params(axis='x', which='both',
+                        bottom=False, labelbottom=False)
 
-        ax3.set_xlabel('Scale Transition')
-        ax3.set_ylabel('Ratio')
-        ax3.set_title('Scaling Ratios Between Consecutive Tests')
-        ax3.set_xticks(x_pos)
-        ax3.set_xticklabels(transition_labels, rotation=45, ha='right')
-        ax3.legend()
-        ax3.grid(True, alpha=0.3, axis='y')
+        # Create "lollipop" or "dot" plots instead of bars for a cleaner look
+        # Size Ratios
+        ax3.hlines(y=y_pos, xmin=1, xmax=size_ratios,
+                   color='#004D40', alpha=0.4, linewidth=2)
+        ax3.scatter(size_ratios, y_pos, color='#004D40', s=100,
+                    label='Size Ratio', alpha=0.8, zorder=3)
+        # Time Ratios
+        ax3.hlines(y=y_pos, xmin=1, xmax=time_ratios,
+                   color='#D81B60', alpha=0.4, linewidth=2)
+        ax3.scatter(time_ratios, y_pos, color='#D81B60', s=100,
+                    label='Time Ratio', alpha=0.8, zorder=3)
+        ax3.axvline(x=1, color='grey', linestyle='--', linewidth=1, zorder=0)
 
-        # Add value labels on bars
-        for bar in bars1:
-            height = bar.get_height()
-            ax3.annotate(f'{height:.1f}x', xy=(bar.get_x() + bar.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
-        for bar in bars2:
-            height = bar.get_height()
-            ax3.annotate(f'{height:.1f}x', xy=(bar.get_x() + bar.get_width() / 2, height),
-                         xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=8)
+        # Direct labeling, no legend
+        for i, (sr, tr) in enumerate(zip(size_ratios, time_ratios)):
+            ax3.text(sr + 0.1, i, f'{sr:.1f}x', color='#004D40',
+                     ha='left', va='center', fontsize=10)
+            ax3.text(tr + 0.1, i, f'{tr:.1f}x', color='#D81B60',
+                     ha='left', va='center', fontsize=10)
 
-    # Plot 4: Time complexity per element
+    # Plot 4: Time complexity per element (Tufte style)
     time_per_element = np.array(times) / np.array(total_elements)
-    ax4.plot(total_elements, time_per_element * 1e6, 'o-',
-             markersize=6, color='#1E88E5', linewidth=2)
+    ax4.plot(total_elements, time_per_element * 1e6, 'o-', markersize=7,
+             color='#1E88E5', linewidth=1.5, alpha=0.7, mfc='w', mec='#1E88E5')
     ax4.set_xlabel('Total Elements (N)')
-    ax4.set_ylabel('Time per Element (microseconds)')
-    ax4.set_title('Time Complexity per Element')
-    ax4.grid(True, alpha=0.3)
+    ax4.set_ylabel('Time per Element (μs)')
+    ax4.set_title('Cost per Element at Scale')
+    sns.despine(ax=ax4, trim=True)
 
-    # Add configuration labels
+    # Direct labeling for each point
     for i, (x, y, config) in enumerate(zip(total_elements, time_per_element * 1e6, configurations)):
-        ax4.annotate(config, (x, y), xytext=(5, 5),
-                     textcoords='offset points', fontsize=8)
+        ax4.annotate(config, (x, y), xytext=(
+            0, -10), textcoords='offset points', fontsize=10, ha='center', va='top')
 
-    plt.tight_layout()
+    # Adjust layout to make room for suptitle
+    plt.tight_layout(rect=[0, 0, 1, 0.95])
     return fig
 
 
