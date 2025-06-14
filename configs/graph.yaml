@@ -17,6 +17,7 @@ business_creation_date_range: [90, 5475]
 
 backgroundPatterns:
   randomPayments:
+    weight: 0.6  # 60% of total background transactions
     # Transaction rate multiplier for legitimate accounts (fraction of base rate)
     legit_rate_multiplier: [0.3, 0.8]  # Random between 30%-80% of base rate
     # Transaction type probabilities (must sum to 1.0)
@@ -32,6 +33,7 @@ backgroundPatterns:
       cash_operations: [20.0, 1500.0]  # Deposits/withdrawals, rounded to nearest 10
 
   salaryPayments:
+    weight: 0.25  # 25% of total background transactions
     # Payment schedule options (monthly=30, bi-weekly=14, weekly=7)
     payment_intervals: [14, 30]  # bi-weekly or monthly
     # Salary amount range per payment
@@ -42,6 +44,7 @@ backgroundPatterns:
     preferred_payment_days: [1, 15, 30]  # 1st, 15th, end of month
 
   fraudsterBackground:
+    weight: 0.1  # 10% of total background transactions
     # Rate multiplier for fraudulent entities' background activity
     fraudster_rate_multiplier: [0.1, 0.5]  # Lower than legit (10%-50%)
     # Different amount distribution for fraudster background
@@ -54,6 +57,7 @@ backgroundPatterns:
       medium: 0.2  # 20% medium transactions
 
   legitimateHighPayments:
+    weight: 0.05  # 5% of total background transactions
     # High payment amount ranges
     high_payment_ranges:
       property_transactions: [50000.0, 500000.0]  # Real estate, major purchases

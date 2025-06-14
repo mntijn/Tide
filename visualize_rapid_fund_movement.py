@@ -15,6 +15,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import seaborn as sns
 import yaml
 import subprocess
 import tempfile
@@ -28,6 +29,24 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 sys.path.append(str(Path(__file__).parent))
 
 # Import the H1 config
+
+
+def set_visualization_style():
+    """Applies Tufte's principles and accessibility guidelines for visualizations."""
+    sns.set_context("notebook", font_scale=1.5)
+    sns.set_style("ticks")
+    sns.set_palette("colorblind")
+
+    plt.rcParams.update({
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "savefig.dpi": 300,
+        "savefig.bbox": "tight",
+        "savefig.pad_inches": 0.1,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans", "Bitstream Vera Sans", "sans-serif"],
+    })
+    return sns.color_palette("colorblind")
 
 
 def generate_pattern_data():
@@ -73,7 +92,7 @@ def generate_pattern_data():
         return pattern_data, nodes_df, edges_df
 
 
-def create_network_visualization(pattern_data, nodes_df, edges_df):
+def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
     """Create network topology visualization"""
     # Focus on RapidFundMovement patterns
     rfm_patterns = [p for p in pattern_data['patterns']
@@ -90,7 +109,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
     # Create a single, clear network diagram
     fig, ax = plt.subplots(1, 1, figsize=(16, 12))
     fig.suptitle(f'RapidFundMovement Pattern Structure: {pattern["pattern_id"]}',
-                 fontsize=16, fontweight='bold')
+                 fontsize=20, fontweight='bold')
 
     # Extract pattern entities and transactions
     pattern_entities = set(pattern['entities'])
@@ -195,16 +214,16 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
 
         # Determine node color and style
         if entity_type == 'INDIVIDUAL':
-            color = 'lightblue'
+            color = colors[0]  # Blue
             size = 3000
         elif entity == 'account_9459':  # Cash account
-            color = 'red'
+            color = colors[3]  # Reddish-orange
             size = 2000
         elif entity_type == 'ACCOUNT':
             if entity in overseas_accounts:
-                color = 'lightgreen'
+                color = colors[2]  # Green
             else:
-                color = 'orange'
+                color = colors[4]  # Yellow-orange
             size = 2000
         else:
             color = 'gray'
@@ -231,7 +250,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
 
         # Position label
         ax.text(pos[entity][0], pos[entity][1], label,
-                ha='center', va='center', fontsize=10, fontweight='bold', zorder=4)
+                ha='center', va='center', fontsize=12, fontweight='bold', zorder=4)
 
     # Draw edges with detailed labels
     for (src, dest), edge_data in edges_info.items():
@@ -241,11 +260,11 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
         # Determine line style and color
         tx_type = edge_data['type']
         if 'TRANSFER' in tx_type:
-            color = 'blue'
+            color = colors[0]  # Blue
             linestyle = '-'
             alpha = 0.8
         else:  # WITHDRAWAL
-            color = 'red'
+            color = colors[3]  # Reddish-orange
             linestyle = '--'
             alpha = 0.8
 
@@ -255,25 +274,6 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                                     linestyle=linestyle, alpha=alpha),
                     zorder=1)
 
-        # Add transaction details as label
-        total_amount = edge_data['total_amount']
-        count = edge_data['count']
-
-        # Create detailed label
-        tx_details = []
-        for tx in edge_data['transactions'][:3]:  # Show first 3 transactions
-            amount = tx['amount']
-            timestamp = tx['timestamp']
-            # Parse timestamp for readable format
-            dt = datetime.datetime.fromisoformat(timestamp.replace('Z', ''))
-            time_str = dt.strftime('%H:%M, %d-%m')
-            tx_details.append(f"€{amount:,.0f}\n{time_str}")
-
-        if count > 3:
-            tx_details.append(f"...+{count-3} more")
-
-        label_text = '\n'.join(tx_details)
-
         # Position label along the edge
         mid_x = (src_pos[0] + dest_pos[0]) / 2
         mid_y = (src_pos[1] + dest_pos[1]) / 2
@@ -281,40 +281,36 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
         # Offset label slightly to avoid overlapping with arrow
         offset_y = 0.3 if src_pos[1] == dest_pos[1] else 0
 
-        ax.text(mid_x, mid_y + offset_y, label_text,
-                ha='center', va='center', fontsize=9,
+        # Add transaction type label
+        type_label = tx_type.replace('TransactionType.', '').title()
+        ax.text(mid_x, mid_y + offset_y, type_label,
+                ha='center', va='center', fontsize=11, fontweight='bold',
                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
                           edgecolor=color, alpha=0.9),
                 zorder=2)
 
-        # Add transaction type label
-        type_label = tx_type.replace('TransactionType.', '').title()
-        ax.text(mid_x, mid_y - 0.2 + offset_y, type_label,
-                ha='center', va='center', fontsize=8, fontweight='bold',
-                color=color, zorder=2)
-
     # Set axis properties
     ax.set_xlim(-4, 4)
-    ax.set_ylim(-3, 3)
+    ax.set_ylim(-3.5, 3.5)
     ax.set_aspect('equal')
     ax.axis('off')
 
     # Add legend
     legend_elements = [
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[0],
                    markersize=15, label='Individual'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='lightgreen',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[2],
                    markersize=15, label='Overseas Account'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='orange',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[4],
                    markersize=15, label='Individual Account'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='red',
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[3],
                    markersize=15, label='Cash System'),
-        plt.Line2D([0], [0], color='blue', linewidth=3, label='Transfers'),
-        plt.Line2D([0], [0], color='red', linewidth=3,
+        plt.Line2D([0], [0], color=colors[0], linewidth=3, label='Transfers'),
+        plt.Line2D([0], [0], color=colors[3], linewidth=3,
                    linestyle='--', label='Cash Withdrawals')
     ]
 
-    ax.legend(handles=legend_elements, loc='upper left', fontsize=11)
+    ax.legend(handles=legend_elements, loc='upper left', fontsize=14)
 
     # Add summary statistics
     total_inflow = sum(tx['amount'] for tx in pattern_transactions
@@ -330,20 +326,19 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                   f"Entities: {len(pattern_entities)}\n"
                   f"Transactions: {len(pattern_transactions)}")
 
-    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=12,
             verticalalignment='top', bbox=dict(boxstyle="round,pad=0.5",
                                                facecolor="lightyellow", alpha=0.8))
 
-    plt.tight_layout()
-    plt.savefig('rapid_fund_movement_network.png',
-                dpi=300, bbox_inches='tight')
+    plt.tight_layout(pad=0)
+    plt.savefig('rapid_fund_movement_network.png')
     print("✓ Network topology visualization saved as 'rapid_fund_movement_network.png'")
     plt.show()
 
     return pattern
 
 
-def create_timeline_visualization(pattern_data, pattern):
+def create_timeline_visualization(pattern_data, pattern, colors):
     """Create timeline visualization of transactions"""
     transactions = pattern['transactions']
 
@@ -362,138 +357,54 @@ def create_timeline_visualization(pattern_data, pattern):
                    == 'TransactionType.WITHDRAWAL']
 
     # Create timeline plot
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(15, 12))
+    fig, ax1 = plt.subplots(1, 1, figsize=(15, 6))
     fig.suptitle(f'RapidFundMovement Pattern Timeline: {pattern["pattern_id"]}',
-                 fontsize=16, fontweight='bold')
-
-    # Plot 1: Transaction amounts over time
+                 fontsize=20, fontweight='bold')
+    # Plot transaction amounts over time
     if inflows:
         inflow_times = [tx['datetime'] for tx in inflows]
         inflow_amounts = [tx['amount'] for tx in inflows]
-        ax1.scatter(inflow_times, inflow_amounts, color='blue', s=100, alpha=0.7,
-                    label=f'Inflows ({len(inflows)} txns)')
-
+        ax1.scatter(inflow_times, inflow_amounts,
+                    color=colors[0], s=100, alpha=0.7, label=f'Inflows ({len(inflows)} txns)')
     if withdrawals:
         withdrawal_times = [tx['datetime'] for tx in withdrawals]
         withdrawal_amounts = [tx['amount'] for tx in withdrawals]
-        ax1.scatter(withdrawal_times, withdrawal_amounts, color='red', s=100, alpha=0.7,
-                    label=f'Withdrawals ({len(withdrawals)} txns)')
-
-    ax1.set_ylabel('Amount (€)', fontsize=12)
+        ax1.scatter(withdrawal_times, withdrawal_amounts,
+                    color=colors[3], s=100, alpha=0.7, label=f'Withdrawals ({len(withdrawals)} txns)')
+    ax1.set_ylabel('Amount (€)', fontsize=14)
     ax1.set_title('Transaction Amounts Over Time',
-                  fontsize=12, fontweight='bold')
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+                  fontsize=16, fontweight='bold')
+    ax1.legend(fontsize=12)
+    ax1.grid(False)
+    sns.despine(ax=ax1)
+    # Force x-axis to show timestamps at the beginning and end of the timeline (horizontal)
+    start_time = min(tx['datetime'] for tx in transactions)
+    end_time = max(tx['datetime'] for tx in transactions)
     ax1.xaxis.set_major_locator(mdates.HourLocator(interval=6))
-    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
-
-    # Plot 2: Cumulative amounts
-    all_times = [tx['datetime'] for tx in transactions]
-    cumulative_inflow = []
-    cumulative_outflow = []
-    current_inflow = 0
-    current_outflow = 0
-
-    for tx in transactions:
-        if tx['transaction_type'] == 'TransactionType.TRANSFER':
-            current_inflow += tx['amount']
-        else:
-            current_outflow += tx['amount']
-        cumulative_inflow.append(current_inflow)
-        cumulative_outflow.append(current_outflow)
-
-    ax2.plot(all_times, cumulative_inflow, color='blue', linewidth=2,
-             label=f'Cumulative Inflow (€{current_inflow:,.0f})')
-    ax2.plot(all_times, cumulative_outflow, color='red', linewidth=2,
-             label=f'Cumulative Outflow (€{current_outflow:,.0f})')
-
-    # Add ratio annotation
-    ratio = current_outflow / current_inflow if current_inflow > 0 else 0
-    ax2.axhline(y=current_inflow * 0.85, color='green', linestyle='--', alpha=0.5,
-                label=f'85% threshold (€{current_inflow * 0.85:,.0f})')
-    ax2.axhline(y=current_inflow * 0.95, color='green', linestyle='--', alpha=0.5,
-                label=f'95% threshold (€{current_inflow * 0.95:,.0f})')
-
-    ax2.set_ylabel('Cumulative Amount (€)', fontsize=12)
-    ax2.set_title(
-        f'Cumulative Flow (Outflow Ratio: {ratio:.1%})', fontsize=12, fontweight='bold')
-    ax2.legend()
-    ax2.grid(True, alpha=0.3)
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-    ax2.xaxis.set_major_locator(mdates.HourLocator(interval=6))
-    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
-
-    # Plot 3: Transaction frequency over time (hourly bins)
-    start_time = min(all_times)
-    end_time = max(all_times)
-    duration = end_time - start_time
-
-    # Create hourly bins
-    hours = int(duration.total_seconds() / 3600) + 1
-    time_bins = [start_time +
-                 datetime.timedelta(hours=i) for i in range(hours + 1)]
-
-    inflow_counts = [0] * hours
-    withdrawal_counts = [0] * hours
-
-    for tx in transactions:
-        hour_index = int((tx['datetime'] - start_time).total_seconds() / 3600)
-        if hour_index < hours:
-            if tx['transaction_type'] == 'TransactionType.TRANSFER':
-                inflow_counts[hour_index] += 1
-            else:
-                withdrawal_counts[hour_index] += 1
-
-    # Create bar chart
-    bar_times = time_bins[:-1]
-    width = datetime.timedelta(hours=0.4)
-
-    ax3.bar([t - width/2 for t in bar_times], inflow_counts, width=width,
-            color='blue', alpha=0.7, label='Inflows/hour')
-    ax3.bar([t + width/2 for t in bar_times], withdrawal_counts, width=width,
-            color='red', alpha=0.7, label='Withdrawals/hour')
-
-    ax3.set_ylabel('Transactions/Hour', fontsize=12)
-    ax3.set_xlabel('Time', fontsize=12)
-    ax3.set_title('Transaction Frequency Pattern',
-                  fontsize=12, fontweight='bold')
-    ax3.legend()
-    ax3.grid(True, alpha=0.3)
-    ax3.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-    ax3.xaxis.set_major_locator(mdates.HourLocator(interval=6))
-    plt.setp(ax3.xaxis.get_majorticklabels(), rotation=45)
-
-    # Add phase annotations
+    ax1.set_xticks([start_time, end_time])
+    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0, ha='center')
+    # Re-add inflow and withdrawal phase annotations (if inflows and withdrawals exist)
     if inflows and withdrawals:
         inflow_end = max(tx['datetime'] for tx in inflows)
         withdrawal_start = min(tx['datetime'] for tx in withdrawals)
-
-        for ax in [ax1, ax2, ax3]:
-            ax.axvline(x=inflow_end, color='gray', linestyle=':', alpha=0.7)
-            ax.axvline(x=withdrawal_start, color='gray',
-                       linestyle=':', alpha=0.7)
-
-        # Add phase labels
+        ax1.axvline(x=inflow_end, color='gray', linestyle=':', alpha=0.7)
+        ax1.axvline(x=withdrawal_start, color='gray', linestyle=':', alpha=0.7)
         inflow_mid = start_time + (inflow_end - start_time) / 2
         withdrawal_mid = withdrawal_start + (end_time - withdrawal_start) / 2
-
-        ax1.text(inflow_mid, ax1.get_ylim()[1] * 0.9, 'Inflow Phase',
-                 ha='center', va='center', fontsize=10, fontweight='bold',
-                 bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
-        ax1.text(withdrawal_mid, ax1.get_ylim()[1] * 0.9, 'Withdrawal Phase',
-                 ha='center', va='center', fontsize=10, fontweight='bold',
-                 bbox=dict(boxstyle="round,pad=0.3", facecolor="lightcoral", alpha=0.8))
-
-    plt.tight_layout()
-    plt.savefig('rapid_fund_movement_timeline.png',
-                dpi=300, bbox_inches='tight')
+        ax1.text(inflow_mid, ax1.get_ylim()[
+                 1] * 0.9, 'Inflow Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[0])
+        ax1.text(withdrawal_mid, ax1.get_ylim()[
+                 1] * 0.9, 'Withdrawal Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[3])
+    plt.tight_layout(pad=1.5)
+    plt.savefig('rapid_fund_movement_timeline.png')
     plt.show()
 
 
 def main():
     """Main function to generate visualizations"""
     print("=== RapidFundMovement Pattern Visualization ===")
+    colors = set_visualization_style()
 
     # Generate pattern data
     pattern_data, nodes_df, edges_df = generate_pattern_data()
@@ -504,10 +415,11 @@ def main():
 
     # Create visualizations
     print("\nCreating network topology visualization...")
-    pattern = create_network_visualization(pattern_data, nodes_df, edges_df)
+    pattern = create_network_visualization(
+        pattern_data, nodes_df, edges_df, colors)
 
     print("\nCreating timeline visualization...")
-    create_timeline_visualization(pattern_data, pattern)
+    create_timeline_visualization(pattern_data, pattern, colors)
 
     print("\nVisualizations saved:")
     print("- rapid_fund_movement_network.png")

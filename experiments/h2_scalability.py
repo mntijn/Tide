@@ -48,10 +48,30 @@ except ImportError:
 
 
 def create_h2_config(scale_type):
-    """Create configuration for different scales"""
+    """Create configuration for different scales with realistic pattern generation"""
+
+    # Simple pattern rate: 1 pattern per 1000 individuals
+    pattern_rate_per_individuals = 1.2/1000
+
+    # Transaction rates per account per day by scale (for efficiency)
+    transaction_rates_by_scale = {
+        "extra_small": 0.8,
+        "small": 1.0,
+        "small_medium": 1.2,
+        "medium": 1.4,
+        "medium_large": 1.6,
+        "large": 1.8,
+        "extra_large": 2
+    }
+
+    # Time span in days (keeping it reasonable for efficiency)
+    time_span_days = 150
+
+    trans_rate = transaction_rates_by_scale.get(scale_type, 1.4)
+
     base_config = {
         'transaction_rates': {
-            'per_account_per_day': 0.1
+            'per_account_per_day': trans_rate
         },
         'time_span': {
             'start_date': '2023-01-01T00:00:00',
@@ -75,6 +95,56 @@ def create_h2_config(scale_type):
         'high_transaction_amount_ratio': 0.05,
         'low_transaction_amount_ratio': 0.1,
         'account_categories': ["Current", "Savings", "Loan"],
+        'backgroundPatterns': {
+            'randomPayments': {
+                'weight': 0.6,  # 60% of total background transactions
+                'legit_rate_multiplier': [0.3, 0.8],
+                'transaction_type_probabilities': {
+                    'transfer': 0.4,
+                    'payment': 0.3,
+                    'deposit': 0.15,
+                    'withdrawal': 0.15
+                },
+                'amount_ranges': {
+                    'payment': [10.0, 2000.0],
+                    'transfer': [5.0, 800.0],
+                    'cash_operations': [20.0, 1500.0]
+                }
+            },
+            'salaryPayments': {
+                'weight': 0.25,  # 25% of total background transactions
+                'payment_intervals': [14, 30],
+                'salary_range': [2500.0, 7500.0],
+                'salary_variation': 0.05,
+                'preferred_payment_days': [1, 15, 30]
+            },
+            'fraudsterBackground': {
+                'weight': 0.1,  # 10% of total background transactions
+                'fraudster_rate_multiplier': [0.1, 0.5],
+                'amount_ranges': {
+                    'small_transactions': [5.0, 200.0],
+                    'medium_transactions': [200.0, 1000.0]
+                },
+                'transaction_size_probabilities': {
+                    'small': 0.8,
+                    'medium': 0.2
+                }
+            },
+            'legitimateHighPayments': {
+                'weight': 0.05,  # 5% of total background transactions
+                'high_payment_ranges': {
+                    'property_transactions': [50000.0, 500000.0],
+                    'business_deals': [10000.0, 100000.0],
+                    'luxury_purchases': [5000.0, 50000.0]
+                },
+                'high_payment_type_probabilities': {
+                    'property': 0.2,
+                    'business': 0.5,
+                    'luxury': 0.3
+                },
+                'high_payment_rate_per_month': 0.1
+            }
+        },
         'high_risk_config': {
             'countries_weight_factor': 1.0,
             'business_categories_weight_factor': 1.0,
@@ -105,13 +175,7 @@ def create_h2_config(scale_type):
             'individual_accounts_per_institution_range': [1, 3],
             'business_accounts_per_institution_range': [1, 6]
         },
-        'random_business_probability': 0.15,  # 15% business creation probability
-        'pattern_frequency': {
-            'random': False,
-            'RapidFundMovement': 3,
-            'FrontBusinessActivity': 2,
-            'RepeatedOverseasTransfers': 3
-        }
+        'random_business_probability': 0.15  # 15% business creation probability
     }
 
     if scale_type == "extra_small":
@@ -145,6 +209,23 @@ def create_h2_config(scale_type):
     else:
         raise ValueError(f"Invalid scale type: {scale_type}")
 
+    # Calculate patterns based on number of individuals (1 per 1000 people)
+    individuals = config['graph_scale']['individuals']
+    expected_patterns = max(1, int(individuals * pattern_rate_per_individuals))
+
+    # Use random pattern generation with the calculated total count
+    config['pattern_frequency'] = {
+        'random': True,
+        'num_illicit_patterns': expected_patterns
+    }
+
+    # Store metadata for analysis
+    config['_metadata'] = {
+        'expected_total_patterns': expected_patterns,
+        'pattern_rate_per_individuals': pattern_rate_per_individuals,
+        'time_span_days': time_span_days
+    }
+
     return config
 
 
@@ -158,9 +239,10 @@ def measure_performance(scale_type, config):
         nodes_file = os.path.join(temp_dir, "generated_nodes.csv")
         edges_file = os.path.join(temp_dir, "generated_edges.csv")
 
-        # Create config file
+        # Create config file (remove metadata before saving)
+        config_to_save = {k: v for k, v in config.items() if k != '_metadata'}
         with open(config_file, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+            yaml.dump(config_to_save, f, default_flow_style=False)
 
         # Start monitoring
         process = psutil.Process()
@@ -173,7 +255,7 @@ def measure_performance(scale_type, config):
             # Use direct function call for accurate memory measurement
             try:
                 # Load configuration
-                generator_parameters = config.copy()
+                generator_parameters = config_to_save.copy()
 
                 # Convert date strings to datetime objects
                 generator_parameters["time_span"]["start_date"] = datetime.datetime.fromisoformat(
@@ -184,6 +266,7 @@ def measure_performance(scale_type, config):
                 # Generate graph
                 aml_graph_gen = GraphGenerator(params=generator_parameters)
                 graph = aml_graph_gen.generate_graph()
+                end_time = time.time()
 
                 # Export to CSV
                 export_to_csv(
@@ -232,59 +315,91 @@ def measure_performance(scale_type, config):
                 print(f"STDERR: {result.stderr}")
 
         # Measure results
-        end_time = time.time()
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         wall_time = end_time - start_time
         # Ensure memory usage is non-negative
         peak_memory = max(0, final_memory - initial_memory)
 
         if not success:
+            expected_patterns = config.get('_metadata', {}).get(
+                'expected_total_patterns', 0)
             return {
                 'scale_type': scale_type,
                 'wall_time_seconds': wall_time,
                 'memory_usage_mb': peak_memory,
                 'nodes_count': 0,
+                'account_nodes_count': 0,
                 'edges_count': 0,
+                'total_edges_count': 0,
                 'patterns_generated': 0,
+                'patterns_expected': expected_patterns,
                 'patterns_success': False,
                 'individuals_configured': config['graph_scale']['individuals'],
-                'business_probability': config['random_business_probability']
+                'business_probability': config['random_business_probability'],
+                'actual_transaction_rate': 0.0
             }
 
         # Count nodes and edges
         nodes_count = 0
+        account_nodes_count = 0
         edges_count = 0
 
         if os.path.exists(nodes_file):
             with open(nodes_file, 'r') as f:
-                nodes_count = sum(1 for line in f) - 1  # Subtract header
+                lines = list(f)
+                nodes_count = len(lines) - 1  # Subtract header
+                # Count account nodes specifically
+                for line in lines[1:]:  # Skip header
+                    if "ACCOUNT" in line.upper():
+                        account_nodes_count += 1
 
         if os.path.exists(edges_file):
             with open(edges_file, 'r') as f:
-                edges_count = sum(1 for line in f) - 1  # Subtract header
+                lines = list(f)
+                # Count only transaction edges, not ownership edges
+                edges_count = sum(
+                    1 for line in lines[1:] if "ownership" not in line.lower())
+                total_edges_count = len(lines) - 1  # Subtract header
+
+        # Calculate actual transaction rate per account per day
+        actual_transaction_rate = 0.0
+        if account_nodes_count > 0:
+            # Use the time span from config (these are already datetime objects)
+            start_date = config['time_span']['start_date']
+            end_date = config['time_span']['end_date']
+            time_span_days = (end_date - start_date).days
+            if time_span_days > 0:
+                actual_transaction_rate = edges_count / \
+                    (account_nodes_count * time_span_days)
 
         # Count patterns
         patterns_count = 0
         patterns_success = False
+        expected_patterns = config.get('_metadata', {}).get(
+            'expected_total_patterns', 0)
+
         if os.path.exists(patterns_file):
             with open(patterns_file, 'r') as f:
                 data = json.load(f)
                 patterns_count = len(data.get('patterns', []))
-                expected_patterns = (config['pattern_frequency']['RapidFundMovement'] +
-                                     config['pattern_frequency']['FrontBusinessActivity'] +
-                                     config['pattern_frequency']['RepeatedOverseasTransfers'])
-                patterns_success = patterns_count == expected_patterns
+                # Allow 20% tolerance for random pattern generation
+                patterns_success = abs(
+                    patterns_count - expected_patterns) <= max(1, expected_patterns * 0.2)
 
         return {
             'scale_type': scale_type,
             'wall_time_seconds': wall_time,
             'memory_usage_mb': peak_memory,
             'nodes_count': nodes_count,
+            'account_nodes_count': account_nodes_count,
             'edges_count': edges_count,
+            'total_edges_count': total_edges_count,
             'patterns_generated': patterns_count,
+            'patterns_expected': expected_patterns,
             'patterns_success': patterns_success,
             'individuals_configured': config['graph_scale']['individuals'],
-            'business_probability': config['random_business_probability']
+            'business_probability': config['random_business_probability'],
+            'actual_transaction_rate': actual_transaction_rate
         }
 
 
@@ -456,7 +571,7 @@ def run_h2_experiment():
     print("Testing generation performance across different scales\n")
 
     scales = ["extra_small", "small", "small_medium",
-              "medium", "medium_large", "large", "extra_large"]
+              "medium", "medium_large", "large"]
     results = []
 
     for scale in scales:
@@ -467,13 +582,19 @@ def run_h2_experiment():
         print(f"{scale.capitalize().replace('_', ' ')} Scale Results:")
         print(f"  Individuals: {result['individuals_configured']:,}")
         print(f"  Nodes: {result['nodes_count']:,}")
-        print(f"  Edges: {result['edges_count']:,}")
+        print(f"  Account Nodes: {result['account_nodes_count']:,}")
+        print(f"  Edges (Transactions): {result['edges_count']:,}")
+        print(f"  Total Edges: {result['total_edges_count']:,}")
+        print(
+            f"  Configured Rate: {config['transaction_rates']['per_account_per_day']:.3f} tx/account/day")
+        print(
+            f"  Actual Rate: {result['actual_transaction_rate']:.3f} tx/account/day")
         print(
             f"  Total Elements (N): {result['nodes_count'] + result['edges_count']:,}")
         print(f"  Wall Time: {result['wall_time_seconds']:.2f} seconds")
         print(f"  Memory Usage: {result['memory_usage_mb']:.1f} MB")
         print(
-            f"  Patterns Generated: {result['patterns_generated']} ({'✓' if result['patterns_success'] else '✗'})")
+            f"  Patterns Generated: {result['patterns_generated']}/{result['patterns_expected']} ({'✓' if result['patterns_success'] else '✗'})")
         print()
 
     # Perform comprehensive scaling analysis

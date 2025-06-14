@@ -194,3 +194,52 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
                     f"({super_high_risk_count/total_entities*100:.1f}%)")
 
     return result_clusters
+
+
+def precompute_cluster_accounts(graph_generator, entity_clusters: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    """Pre-compute account collections for each cluster to avoid repeated graph traversals.
+
+    This optimization converts entity clusters to account clusters, significantly speeding up
+    pattern generation by eliminating the need for repeated _get_owned_accounts() calls.
+
+    Args:
+        graph_generator: The GraphGenerator instance
+        entity_clusters: Mapping of cluster names to entity IDs
+
+    Returns:
+        Dict[str, List[str]]: Mapping of cluster names to account IDs owned by entities in that cluster
+    """
+    from ..datastructures.enums import NodeType
+
+    logger.info("Pre-computing account collections for clusters...")
+    account_clusters = {}
+
+    for cluster_name, entities in entity_clusters.items():
+        cluster_accounts = set()
+
+        for entity_id in entities:
+            if not graph_generator.graph.has_node(entity_id):
+                continue
+
+            # Get direct accounts
+            for neighbor_id in graph_generator.graph.neighbors(entity_id):
+                if graph_generator.graph.nodes[neighbor_id].get("node_type") == NodeType.ACCOUNT:
+                    cluster_accounts.add(neighbor_id)
+
+            # If entity is an individual, also check business accounts they own
+            entity_data = graph_generator.graph.nodes[entity_id]
+            if entity_data.get("node_type") == NodeType.INDIVIDUAL:
+                for neighbor_id in graph_generator.graph.neighbors(entity_id):
+                    neighbor_data = graph_generator.graph.nodes[neighbor_id]
+                    if neighbor_data.get("node_type") == NodeType.BUSINESS:
+                        # Get accounts of owned businesses
+                        for business_neighbor in graph_generator.graph.neighbors(neighbor_id):
+                            if graph_generator.graph.nodes[business_neighbor].get("node_type") == NodeType.ACCOUNT:
+                                cluster_accounts.add(business_neighbor)
+
+        # Convert to sorted list for deterministic order
+        account_clusters[cluster_name] = sorted(list(cluster_accounts))
+        logger.info(
+            f"  {cluster_name}: {len(cluster_accounts)} accounts from {len(entities)} entities")
+
+    return account_clusters

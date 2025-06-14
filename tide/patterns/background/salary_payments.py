@@ -121,6 +121,10 @@ class SalaryPaymentsTemporal(TemporalComponent):
 
                 # Create salary payment transactions
                 for payment_date in payment_dates:
+                    # Check budget if set
+                    if hasattr(self, "tx_budget") and self.tx_budget is not None and len(all_transactions) >= self.tx_budget:
+                        break
+
                     # Add small variation to salary amount
                     variation_factor = random_instance.uniform(
                         1 - salary_variation, 1 + salary_variation)
@@ -139,6 +143,10 @@ class SalaryPaymentsTemporal(TemporalComponent):
 
         # Create sequences grouped by business
         if all_transactions:
+            # Respect budget trimming
+            if hasattr(self, "tx_budget") and self.tx_budget is not None and len(all_transactions) > self.tx_budget:
+                all_transactions = all_transactions[: self.tx_budget]
+
             # Sort by timestamp
             all_transactions.sort(key=lambda x: x[2].timestamp)
 

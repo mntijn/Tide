@@ -463,3 +463,16 @@ class CompositePattern(PatternInjector):
     def pattern_name(self) -> str:
         """Return a descriptive name for this pattern"""
         return f"{self.structural.__class__.__name__}_{self.temporal.__class__.__name__}"
+
+    def set_tx_budget(self, n):
+        """Set an optional upper bound for number of transactions this pattern
+        may generate.  Temporal component implementations should respect
+        `self.tx_budget` if it is not None."""
+        try:
+            n_int = None if n is None else int(max(0, n))
+        except Exception:
+            n_int = None
+        # Store on both the wrapper and the temporal component for convenience
+        setattr(self, "tx_budget", n_int)
+        if hasattr(self.temporal, "__dict__"):
+            setattr(self.temporal, "tx_budget", n_int)

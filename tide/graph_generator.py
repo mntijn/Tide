@@ -165,11 +165,17 @@ class GraphGenerator:
 
     def build_entity_clusters(self):
         """Build entity clusters using the helper function."""
+        from .utils.clustering import precompute_cluster_accounts
+
         # Keep the existing legit cluster that was built during entity creation
         existing_legit = self.entity_clusters.get("legit", [])
         self.entity_clusters = build_entity_clusters(self)
         # Restore the legit cluster
         self.entity_clusters["legit"] = existing_legit
+
+        # Pre-compute account clusters for efficient pattern generation
+        self.account_clusters = precompute_cluster_accounts(
+            self, self.entity_clusters)
 
     def inject_aml_patterns(self):
         """Inject AML patterns: each pattern builds its own transactions using the
@@ -195,8 +201,6 @@ class GraphGenerator:
             for i in range(self.num_aml_patterns):
                 pattern_instance = self.random_instance.choice(
                     available_patterns)
-                logger.info(
-                    f"[Pattern] {i+1}/{self.num_aml_patterns}: {pattern_instance.pattern_name}")
 
                 task = (pattern_instance.inject_pattern, (all_nodes_list,), i)
                 pattern_tasks.append(task)
@@ -276,6 +280,8 @@ class GraphGenerator:
             f"Done injecting AML patterns. Added {total_edges_added} fraudulent transaction edges.")
         logger.info(
             f"Tracked {len(self.injected_patterns)} actual pattern instances.")
+
+        return total_edges_added
 
     def _analyze_pattern_edges(self, pattern_name: str, edges: List, pattern_instance) -> Dict:
         """Analyze pattern edges to extract key characteristics for tracking"""
@@ -434,10 +440,73 @@ class GraphGenerator:
 
         return pattern_data
 
-    def simulate_background_activity(self):
-        """Generate realistic baseline transactions using the dedicated background pattern."""
+    def expected_background_transactions(self) -> int:
+        """Return the total number of background transactions that should be generated
+        based on the configured `transaction_rates.per_account_per_day`.  The value
+        is computed after entity creation so the number of accounts is known.
+        """
+        days = max(1, (self.time_span["end_date"] -
+                   self.time_span["start_date"]).days)
+        total_accounts = len(self.all_nodes.get(NodeType.ACCOUNT, []))
+        return int(self.background_tx_rate_per_account_per_day * total_accounts * days)
+
+    def simulate_background_activity(self, target_transaction_count: Optional[int] = None):
+        """Generate realistic baseline transactions using the dedicated background patterns.
+
+        Prior to running each pattern we allocate a transaction *budget* derived
+        from the global `transaction_rates.per_account_per_day` so that the sum
+        of all background patterns approximately matches the desired average
+        rate.  Each pattern can still use its own logic but must not exceed the
+        budget it receives via `set_tx_budget` (if it implements the method).
+        """
 
         try:
+            # ------------------------------------------------------------------
+            # 1) Compute global budget based on configured rate and entity count
+            # ------------------------------------------------------------------
+            if target_transaction_count is not None:
+                total_budget = target_transaction_count
+                logger.info(
+                    f"Using target transaction count for background activity: {total_budget:,}")
+            else:
+                total_budget = self.expected_background_transactions()
+                logger.info(
+                    f"Using rate-based count for background activity: {total_budget:,}")
+
+            # ------------------------------------------------------------------
+            # 2) Determine weights for each pattern from the configuration.
+            #    Fallback: equal weight if not specified or sum == 0
+            # ------------------------------------------------------------------
+            bg_cfg = self.params.get("backgroundPatterns", {})
+            pattern_weights = {}
+            sum_weights = 0.0
+            for pattern_name in self.background_pattern_manager.patterns.keys():
+                # Config keys may be lowerCamelCase; fall back to exact key
+                cfg_key = pattern_name[0].lower() + pattern_name[1:]
+                weight = bg_cfg.get(cfg_key, {}).get("weight",
+                                                     bg_cfg.get(pattern_name, {}).get("weight", 0.0))
+                pattern_weights[pattern_name] = weight
+                sum_weights += weight
+
+            # If no weights defined, assign equal weight
+            if sum_weights == 0.0:
+                equal_w = 1.0 / len(pattern_weights)
+                for k in pattern_weights:
+                    pattern_weights[k] = equal_w
+                sum_weights = 1.0
+
+            # ------------------------------------------------------------------
+            # 3) Allocate budget and inform patterns (if supported)
+            # ------------------------------------------------------------------
+            for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
+                weight = pattern_weights.get(pattern_name, 0.0)
+                pattern_budget = int(total_budget * (weight / sum_weights))
+                if hasattr(pattern_instance, "set_tx_budget"):
+                    pattern_instance.set_tx_budget(pattern_budget)
+
+            # ------------------------------------------------------------------
+            # 4) Build function tasks for parallel execution
+            # ------------------------------------------------------------------
             background_tasks = []
             task_index = 0
 
@@ -452,14 +521,14 @@ class GraphGenerator:
 
             background_results = run_patterns_in_parallel(background_tasks)
 
-            # Process results and add edges to graph
+            # ------------------------------------------------------------------
+            # 5) Merge results back into the master graph
+            # ------------------------------------------------------------------
             total_bg_edges_added = 0
             for i, bg_edges in enumerate(background_results):
                 if bg_edges:
                     for src, dest, attrs in bg_edges:
                         self._add_edge(src, dest, attrs)
-                    pattern_name = list(
-                        self.background_pattern_manager.patterns.keys())[i]
                     total_bg_edges_added += len(bg_edges)
 
         except Exception as e:
