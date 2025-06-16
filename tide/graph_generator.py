@@ -525,11 +525,19 @@ class GraphGenerator:
             # 5) Merge results back into the master graph
             # ------------------------------------------------------------------
             total_bg_edges_added = 0
-            for i, bg_edges in enumerate(background_results):
-                if bg_edges:
-                    for src, dest, attrs in bg_edges:
-                        self._add_edge(src, dest, attrs)
-                    total_bg_edges_added += len(bg_edges)
+            for bg_edges in background_results:
+
+                edge_triplets = [
+                    (
+                        src,
+                        dest,
+                        (attrs.__dict__ if hasattr(attrs, "__dict__") else attrs),
+                    )
+                    for src, dest, attrs in bg_edges
+                ]
+
+                self.graph.add_edges_from(edge_triplets)
+                total_bg_edges_added += len(bg_edges)
 
         except Exception as e:
             logger.error(f"Failed to inject background activity: {e}")

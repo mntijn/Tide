@@ -77,9 +77,7 @@ def initialize_entities(graph_generator):
                 suggested_category = map_occupation_to_business_category(
                     occupation_str)
 
-                # Create business if occupation suggests one, or randomly
-
-                if graph_generator.random_instance.random() < 0.15:
+                if graph_generator.random_instance.random() < graph_generator.params.get("random_business_probability", 0.15):
                     # Use suggested category or random one
                     business_category = suggested_category or get_random_business_category()
 

@@ -126,9 +126,6 @@ class FraudsterBackgroundTemporal(TemporalComponent):
             random_instance.shuffle(available_counterparts)
 
             for i, tx_date in enumerate(tx_dates):
-                # Stop if budget reached
-                if hasattr(self, "tx_budget") and self.tx_budget is not None and len(all_transactions) >= self.tx_budget:
-                    break
 
                 if not available_counterparts:
                     available_counterparts = legit_accounts.copy()
@@ -170,9 +167,6 @@ class FraudsterBackgroundTemporal(TemporalComponent):
 
         # Create single sequence for all fraudster background activity
         if all_transactions:
-            # Respect budget trimming
-            if hasattr(self, "tx_budget") and self.tx_budget is not None and len(all_transactions) > self.tx_budget:
-                all_transactions = all_transactions[: self.tx_budget]
 
             # Sort by timestamp
             all_transactions.sort(key=lambda x: x[2].timestamp)

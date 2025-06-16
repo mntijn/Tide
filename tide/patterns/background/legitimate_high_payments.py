@@ -78,10 +78,6 @@ class LegitimateHighPaymentsPattern:
         pattern_injector = PatternInjector(self.graph_generator, self.params)
         total_seconds = max(1, (end_date - start_date).total_seconds())
 
-        # Respect optional budget
-        if hasattr(self, "tx_budget") and self.tx_budget is not None:
-            total_expected_txs = min(total_expected_txs, self.tx_budget)
-
         for i in range(total_expected_txs):
             # Random business hours timestamp
             random_seconds = random_instance.randint(0, int(total_seconds - 1))
@@ -131,15 +127,4 @@ class LegitimateHighPaymentsPattern:
 
             transactions.append((src_account_id, dest_account_id, tx_attrs))
 
-        # After generation, ensure we did not exceed budget
-        if hasattr(self, "tx_budget") and self.tx_budget is not None and len(transactions) > self.tx_budget:
-            transactions = transactions[: self.tx_budget]
-
         return transactions
-
-    def set_tx_budget(self, n):
-        """Optional upper bound for generated transactions"""
-        try:
-            self.tx_budget = None if n is None else int(max(0, n))
-        except Exception:
-            self.tx_budget = None

@@ -355,42 +355,53 @@ def validate_front_business(pattern_data, config):
                     f"Deposit amount {tx['amount']} outside range {deposit_amount_range[0]}-{deposit_amount_range[1]}")
 
         # 3. Temporal and Amount validation
+        if len(deposits) != len(transfers):
+            validation['transaction_validation'] = False
+            validation['issues'].append(
+                f"Mismatch between number of deposits ({len(deposits)}) and transfers ({len(transfers)}).")
+
         if deposits and transfers:
-            deposit_times = [datetime.datetime.fromisoformat(
-                tx['timestamp'].replace('Z', '+00:00')) for tx in deposits]
-            transfer_times = [datetime.datetime.fromisoformat(
-                tx['timestamp'].replace('Z', '+00:00')) for tx in transfers]
+            # Sort both by time to attempt to match pairs
+            deposits.sort(key=lambda x: x['timestamp'])
+            transfers.sort(key=lambda x: x['timestamp'])
 
-            last_deposit_time = max(deposit_times)
-            first_transfer_time = min(transfer_times)
-
-            # Check for phase separation
-            if first_transfer_time < last_deposit_time:
-                validation['temporal_validation'] = False
-                validation['issues'].append(
-                    f"Transfers start before all deposits are complete.")
-
-            # Check for delay between phases
-            delay_hours = (first_transfer_time -
-                           last_deposit_time).total_seconds() / 3600
-            if not (0.5 <= delay_hours <= 6.0):
-                validation['temporal_validation'] = False
-                validation['issues'].append(
-                    f"Delay between deposits and transfers is {delay_hours:.2f}h, expected 0.5-6h.")
-
-            # Check for transfer amount ratio
             total_deposited = sum(tx['amount'] for tx in deposits)
             total_transferred = sum(tx['amount'] for tx in transfers)
 
-            if total_deposited > 0:
-                ratio = total_transferred / total_deposited
-                if not (0.80 <= ratio <= 1.0):
+            for i in range(len(deposits)):
+                deposit = deposits[i]
+                transfer = transfers[i]
+
+                deposit_time = datetime.datetime.fromisoformat(
+                    deposit['timestamp'].replace('Z', '+00:00'))
+                transfer_time = datetime.datetime.fromisoformat(
+                    transfer['timestamp'].replace('Z', '+00:00'))
+
+                # Check for pairing: transfer must follow deposit
+                if transfer_time < deposit_time:
+                    validation['temporal_validation'] = False
+                    validation['issues'].append(
+                        f"Pair {i+1}: Transfer happens before its corresponding deposit.")
+
+                # Check delay for each pair
+                delay_hours = (transfer_time -
+                               deposit_time).total_seconds() / 3600
+                if not (0.5 <= delay_hours <= 6.0):
+                    validation['temporal_validation'] = False
+                    validation['issues'].append(
+                        f"Pair {i+1}: Delay between deposit and transfer is {delay_hours:.2f}h, expected 0.5-6h.")
+
+                # Check for transfer amount ratio for each pair
+                if deposit['amount'] > 0:
+                    ratio = transfer['amount'] / deposit['amount']
+                    if not (0.80 <= ratio <= 1.0):
+                        validation['transaction_validation'] = False
+                        validation['issues'].append(
+                            f"Pair {i+1}: Transfer amount ({transfer['amount']:.2f}) is {ratio:.2f} of deposit ({deposit['amount']:.2f}), expected 0.8-1.0.")
+                else:
                     validation['transaction_validation'] = False
                     validation['issues'].append(
-                        f"Total transferred amount ({total_transferred:.2f}) is {ratio:.2f} of total deposited ({total_deposited:.2f}), expected 0.8-1.0.")
-            else:
-                validation['transaction_validation'] = False
-                validation['issues'].append("Total deposited amount is zero.")
+                        f"Pair {i+1}: Deposit amount is zero.")
 
         results.append(validation)
 

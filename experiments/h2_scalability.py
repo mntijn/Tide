@@ -247,7 +247,6 @@ def measure_performance(scale_type, config):
         # Start monitoring
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
-        start_time = time.time()
 
         success = False
 
@@ -264,6 +263,7 @@ def measure_performance(scale_type, config):
                     generator_parameters["time_span"]["end_date"])
 
                 # Generate graph
+                start_time = time.time()
                 aml_graph_gen = GraphGenerator(params=generator_parameters)
                 graph = aml_graph_gen.generate_graph()
                 end_time = time.time()
@@ -343,23 +343,23 @@ def measure_performance(scale_type, config):
         nodes_count = 0
         account_nodes_count = 0
         edges_count = 0
+        total_edges_count = 0
 
         if os.path.exists(nodes_file):
             with open(nodes_file, 'r') as f:
-                lines = list(f)
-                nodes_count = len(lines) - 1  # Subtract header
-                # Count account nodes specifically
-                for line in lines[1:]:  # Skip header
+                next(f, None)  # Skip header
+                for line in f:
+                    nodes_count += 1
                     if "ACCOUNT" in line.upper():
                         account_nodes_count += 1
 
         if os.path.exists(edges_file):
             with open(edges_file, 'r') as f:
-                lines = list(f)
-                # Count only transaction edges, not ownership edges
-                edges_count = sum(
-                    1 for line in lines[1:] if "ownership" not in line.lower())
-                total_edges_count = len(lines) - 1  # Subtract header
+                next(f, None)  # Skip header
+                for line in f:
+                    total_edges_count += 1
+                    if "ownership" not in line.lower():
+                        edges_count += 1
 
         # Calculate actual transaction rate per account per day
         actual_transaction_rate = 0.0

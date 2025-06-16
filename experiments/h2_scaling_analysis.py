@@ -215,10 +215,10 @@ def analyze_h2_results():
     configurations = ["Test-1k", "Test-2k",
                       "Test-3.5k", "Test-5k", "Test-8k", "Test-12k"]
     total_nodes = [4730, 9460, 16581, 23662, 37231, 56169]
-    total_transactions = [375930, 940743, 1997464, 3327628, 5992458, 10202036]
-    total_elements = [377004, 950203, 2014045, 3351290,
-                      6029689, 10289250]  # N = nodes + transactions
-    times = [5.74, 14.27, 35.85, 98.89, 406.68, 2336.81]  # seconds
+    total_transactions = [372273, 940735, 1997466, 3327649, 5992532, 10189065]
+    total_elements = [377003, 950195, 2014047, 3351311,
+                      6029763, 10245234]  # N = nodes + transactions
+    times = [1.90, 5.04, 11.74, 33.52, 127.36, 670.70]  # seconds
 
     # Print raw data
     print("Raw Data:")

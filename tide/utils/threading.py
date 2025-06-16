@@ -67,7 +67,9 @@ def run_patterns_in_parallel(pattern_tasks: List[Tuple[Callable, tuple, int]]) -
 
     for pattern_func, args, task_index in sorted_tasks:
         try:
+            print(f"Running pattern {pattern_func}")
             edges = pattern_func(*args)
+            print(f"Pattern {pattern_func} completed")
             results.append(edges)
         except Exception as e:
             results.append([])  # Return empty list on error
