@@ -9,6 +9,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
+from ...utils.constants import HIGH_PAID_OCCUPATIONS
 
 
 class SalaryPaymentsStructural(StructuralComponent):
@@ -81,6 +82,10 @@ class SalaryPaymentsTemporal(TemporalComponent):
         payment_intervals = salary_config.get(
             "payment_intervals", [14, 30])  # bi-weekly or monthly
         salary_range = salary_config.get("salary_range", [2500.0, 7500.0])
+        high_earner_salary_range = salary_config.get(
+            # Higher range for specific occupations
+            "high_earner_salary_range", [8000.0, 20000.0]
+        )
         salary_variation = salary_config.get("salary_variation", 0.05)  # ±5%
         preferred_days = salary_config.get(
             "preferred_payment_days", [1, 15, 30])
@@ -110,9 +115,17 @@ class SalaryPaymentsTemporal(TemporalComponent):
 
                 individual_account_id, individual_entity_id = available_individuals.pop()
 
+                # Check if the individual has a high-paying occupation
+                individual_node = self.graph_generator.graph.nodes[individual_entity_id]
+                occupation = individual_node.get("occupation")
+
+                current_salary_range = salary_range
+                if occupation and occupation in HIGH_PAID_OCCUPATIONS:
+                    current_salary_range = high_earner_salary_range
+
                 # Random salary and payment interval for this recipient
                 base_salary = random_instance.uniform(
-                    salary_range[0], salary_range[1])
+                    current_salary_range[0], current_salary_range[1])
                 payment_interval = random_instance.choice(payment_intervals)
 
                 # Generate payment dates

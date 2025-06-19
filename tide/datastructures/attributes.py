@@ -46,8 +46,6 @@ class InstitutionAttributes:
 
 @dataclass
 class AccountAttributes:
-    start_balance: float = 0.0
-    current_balance: float = 0.0
     institution_id: Optional[str] = None
     account_category: Optional[AccountCategory] = None
     currency: Optional[str] = None

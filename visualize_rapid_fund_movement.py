@@ -28,8 +28,6 @@ import os
 sys.path.append(str(Path(__file__).parent.parent.parent))
 sys.path.append(str(Path(__file__).parent))
 
-# Import the H1 config
-
 
 def set_visualization_style():
     """Applies Tufte's principles and accessibility guidelines for visualizations."""

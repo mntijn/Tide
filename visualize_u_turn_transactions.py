@@ -167,7 +167,6 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
 
     source_account = path[0]
     return_account = path[-1]
-    intermediary_accounts = path[1:-1]
 
     # Get entity information
     entity_info = {}
@@ -215,49 +214,60 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
     for tx in transactions:
         G.add_edge(tx['src'], tx['dest'], type='transaction', **tx)
 
-    # Draw nodes
+    # Define node properties
+    node_properties = {}
     for node_id in G.nodes():
         node_info = entity_info.get(node_id, {})
         country = node_info.get('country', 'Unknown')
         node_type = node_info.get('type', 'Unknown')
+        props = {}
 
         if node_id == originator_id:
-            # Different colors for business vs individual
             if 'BUSINESS' in node_type:
-                color = 'lightgreen'  # Green for businesses
-                entity_type = "Business"
+                props['color'] = 'lightgreen'
+                props['entity_type'] = "Business"
             elif 'INDIVIDUAL' in node_type:
-                color = 'yellow'  # Yellow for individuals
-                entity_type = "Individual"
+                props['color'] = 'yellow'
+                props['entity_type'] = "Individual"
             else:
-                color = 'gray'  # Fallback color
-                entity_type = "Unknown"
-            size = 4000
-            label = f"{entity_type}\n{node_id.split('_')[1]}\n[{country}]"
+                props['color'] = 'gray'
+                props['entity_type'] = "Unknown"
+            props['size'] = 4000
+            props['label'] = f"{props['entity_type']}\n{node_id.split('_')[1]}\n[{country}]"
         elif node_id in [source_account, return_account]:
-            color = 'orange'
-            size = 2500
+            props['color'] = 'orange'
+            props['size'] = 2500
             label_prefix = "Source Acct" if node_id == source_account else "Return Acct"
-            label = f"{label_prefix}\n{node_id.split('_')[1]}\n[{country}]"
+            props['label'] = f"{label_prefix}\n{node_id.split('_')[1]}\n[{country}]"
         else:  # Intermediary
-            color = 'skyblue'
-            size = 2000
-            label = f"Intermediary\n{node_id.split('_')[1]}\n[{country}]"
+            props['color'] = 'skyblue'
+            props['size'] = 2000
+            props['label'] = f"Intermediary\n{node_id.split('_')[1]}\n[{country}]"
 
-        ax.scatter(pos[node_id][0], pos[node_id][1], c=color,
-                   s=size, alpha=0.9, edgecolors='black', zorder=3)
-        ax.text(pos[node_id][0], pos[node_id][1], label, ha='center',
-                va='center', fontsize=9, fontweight='bold', zorder=4)
+        node_properties[node_id] = props
+
+    # Draw nodes
+    for node_id, props in node_properties.items():
+        ax.scatter(pos[node_id][0], pos[node_id][1], c=props['color'],
+                   s=props['size'], alpha=0.9, edgecolors='black', zorder=3)
+        ax.text(pos[node_id][0], pos[node_id][1] + 0.35, props['label'], ha='center',
+                va='bottom', fontsize=9, fontweight='bold', zorder=4)
 
     # Draw edges
     for src, dest, data in G.edges(data=True):
         src_pos = pos[src]
         dest_pos = pos[dest]
 
+        src_node_size = node_properties[src]['size']
+        dest_node_size = node_properties[dest]['size']
+        shrink_a = np.sqrt(src_node_size) * 0.5
+        shrink_b = np.sqrt(dest_node_size) * 0.5
+
         if data['type'] == 'ownership':
             ax.annotate('', xy=dest_pos, xytext=src_pos,
                         arrowprops=dict(arrowstyle='-', color='gray',
-                                        lw=2, linestyle=':', alpha=0.7),
+                                        lw=2, linestyle=':', alpha=0.7,
+                                        shrinkA=shrink_a, shrinkB=shrink_b),
                         zorder=1)
         elif data['type'] == 'transaction':
             rad_val = 0.1
@@ -272,21 +282,16 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
                     rad_val = -0.2
 
             ax.annotate('', xy=dest_pos, xytext=src_pos,
-                        arrowprops=dict(arrowstyle='->', color='black', lw=2,
-                                        connectionstyle=f"arc3,rad={rad_val}"),
+                        arrowprops=dict(arrowstyle='->', color='darkred', lw=1.5,
+                                        connectionstyle=f"arc3,rad={rad_val}",
+                                        shrinkA=shrink_a, shrinkB=shrink_b),
                         zorder=2)
-
-            amount = data['amount']
-            dt = datetime.datetime.fromisoformat(
-                data['timestamp'].replace('Z', ''))
-            time_str = dt.strftime('%d-%m %H:%M')
-            label = f"€{amount:,.0f}\n{time_str}"
 
             mid_x = (src_pos[0] + dest_pos[0]) / 2
             mid_y = (src_pos[1] + dest_pos[1]) / 2
 
-            ax.text(mid_x, mid_y, label, ha='center', va='center', fontsize=8,
-                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="black", alpha=0.8), zorder=3)
+            ax.text(mid_x, mid_y, "Transfer", ha='center', va='center', fontsize=8, color='darkred',
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="darkred", alpha=0.8, lw=0.5), zorder=3)
 
     ax.set_xlim(-5, 5)
     ax.set_ylim(-3, 4)
@@ -294,13 +299,15 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
     ax.axis('off')
 
     legend_elements = [
-        plt.Line2D([0], [0], marker='o', color='w', label='Originator',
+        plt.Line2D([0], [0], marker='o', color='w', label='Originator (Individual)',
                    markerfacecolor='yellow', markersize=15),
-        plt.Line2D([0], [0], marker='o', color='w', label='Originator Accounts',
+        plt.Line2D([0], [0], marker='o', color='w', label='Originator (Business)',
+                   markerfacecolor='lightgreen', markersize=15),
+        plt.Line2D([0], [0], marker='o', color='w', label='Source/Return Account',
                    markerfacecolor='orange', markersize=15),
-        plt.Line2D([0], [0], marker='o', color='w', label='Intermediary Accounts',
+        plt.Line2D([0], [0], marker='o', color='w', label='Intermediary Account',
                    markerfacecolor='skyblue', markersize=15),
-        plt.Line2D([0], [0], color='black', lw=2, label='Transaction'),
+        plt.Line2D([0], [0], color='darkred', lw=2, label='Transfer'),
         plt.Line2D([0], [0], color='gray', lw=2,
                    linestyle=':', label='Ownership')
     ]
@@ -359,7 +366,11 @@ def create_timeline_visualization(pattern_data, pattern):
     ax.set_xlabel("Timestamp", fontsize=12)
     ax.set_ylabel("Amount (€)", fontsize=12)
     ax.set_title("Transaction Flow Over Time", fontsize=14)
-    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.grid(False)
+
+    # Hide the top and right spines
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
     plt.setp(ax.xaxis.get_majorticklabels(), rotation=30, ha='right')

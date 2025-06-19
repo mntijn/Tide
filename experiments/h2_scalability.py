@@ -22,6 +22,8 @@ import yaml
 import tempfile
 import subprocess
 import psutil
+import threading
+import gc
 import numpy as np
 from pathlib import Path
 
@@ -244,9 +246,32 @@ def measure_performance(scale_type, config):
         with open(config_file, 'w') as f:
             yaml.dump(config_to_save, f, default_flow_style=False)
 
-        # Start monitoring
+        # Prepare memory monitoring (track absolute peak RSS in MB)
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+
+        peak_memory_holder = {'value': initial_memory}
+        stop_event = threading.Event()
+
+        def _memory_monitor():
+            """Background thread that updates the peak RSS usage."""
+            while not stop_event.is_set():
+                try:
+                    current_mem = process.memory_info().rss / 1024 / 1024
+                    if current_mem > peak_memory_holder['value']:
+                        peak_memory_holder['value'] = current_mem
+                except psutil.Error:
+                    # Process may have terminated; exit monitor loop
+                    break
+                # Polling interval – small enough for fidelity, large enough for efficiency
+                time.sleep(0.05)
+
+        monitor_thread = threading.Thread(target=_memory_monitor, daemon=True)
+        monitor_thread.start()
+
+        # Record start time for wall-time measurement (may be overwritten in direct path)
+        start_time = time.time()
+        end_time = start_time  # initialize to avoid undefined if generation fails early
 
         success = False
 
@@ -308,17 +333,21 @@ def measure_performance(scale_type, config):
                 '--edges-file', 'generated_edges.csv'
             ]
             result = subprocess.run(cmd, capture_output=True, text=True)
+            end_time = time.time()
             success = result.returncode == 0
             if not success:
                 print(
                     f"ERROR: Subprocess generation failed for {scale_type} scale")
                 print(f"STDERR: {result.stderr}")
 
-        # Measure results
-        final_memory = process.memory_info().rss / 1024 / 1024  # MB
+        # Stop memory monitor and compute peak usage
+        stop_event.set()
+        monitor_thread.join()
+
         wall_time = end_time - start_time
-        # Ensure memory usage is non-negative
-        peak_memory = max(0, final_memory - initial_memory)
+
+        # Peak additional memory consumed during generation (ensure non-negative)
+        peak_memory = max(0, peak_memory_holder['value'] - initial_memory)
 
         if not success:
             expected_patterns = config.get('_metadata', {}).get(
@@ -566,39 +595,98 @@ def analyze_scaling_performance(results):
 
 
 def run_h2_experiment():
-    """Run the H2 scalability experiment"""
+    """Run the H2 scalability experiment with multiple runs for statistical reliability."""
     print("=== H2: Scalability Experiment ===")
-    print("Testing generation performance across different scales\n")
+    print("Testing generation performance across different scales with multiple runs\n")
 
+    NUM_RUNS = 3
     scales = ["extra_small", "small", "small_medium",
               "medium", "medium_large", "large"]
-    results = []
+    all_runs_results = []
 
-    for scale in scales:
+    for i in range(NUM_RUNS):
+        print(f"--- Starting Run {i + 1}/{NUM_RUNS} ---")
+        results_for_run = []
+        for scale in scales:
+            config = create_h2_config(scale)
+            # Use a different seed for each run to test robustness, but same seed across scales within a run
+            config['random_seed'] = 42 + i
+            result = measure_performance(scale, config)
+            results_for_run.append(result)
+
+            # Explicitly trigger garbage collection to free up memory for the next run
+            gc.collect()
+        all_runs_results.append(results_for_run)
+        print(f"--- Finished Run {i + 1}/{NUM_RUNS} ---\n")
+
+    # Aggregate results across runs
+    print("=== Aggregating Results Across All Runs ===\n")
+    aggregated_results = []
+    for i, scale in enumerate(scales):
+        results_for_scale = [run[i] for run in all_runs_results]
+
+        # Take the first run's result as a template for non-numeric data
+        agg_result = results_for_scale[0].copy()
+
+        # Metrics to average and get std dev for
+        metrics_to_aggregate = [
+            'wall_time_seconds', 'memory_usage_mb', 'nodes_count',
+            'account_nodes_count', 'edges_count', 'total_edges_count',
+            'patterns_generated', 'actual_transaction_rate'
+        ]
+
+        for metric in metrics_to_aggregate:
+            values = [r[metric] for r in results_for_scale]
+            agg_result[f'{metric}_mean'] = np.mean(values)
+            agg_result[f'{metric}_std'] = np.std(values)
+
+        # Handle boolean success flag - must be true for all runs
+        agg_result['patterns_success'] = all(
+            r['patterns_success'] for r in results_for_scale)
+
+        # Overwrite with mean values for analysis functions
+        agg_result['wall_time_seconds'] = agg_result['wall_time_seconds_mean']
+        agg_result['memory_usage_mb'] = agg_result['memory_usage_mb_mean']
+        agg_result['nodes_count'] = int(agg_result['nodes_count_mean'])
+        agg_result['edges_count'] = int(agg_result['edges_count_mean'])
+
+        aggregated_results.append(agg_result)
+
+    # Print aggregated results
+    for result in aggregated_results:
+        scale = result['scale_type']
         config = create_h2_config(scale)
-        result = measure_performance(scale, config)
-        results.append(result)
-
-        print(f"{scale.capitalize().replace('_', ' ')} Scale Results:")
+        print(f"{scale.capitalize().replace('_', ' ')} Scale Aggregated Results:")
         print(f"  Individuals: {result['individuals_configured']:,}")
-        print(f"  Nodes: {result['nodes_count']:,}")
-        print(f"  Account Nodes: {result['account_nodes_count']:,}")
-        print(f"  Edges (Transactions): {result['edges_count']:,}")
-        print(f"  Total Edges: {result['total_edges_count']:,}")
+        print(
+            f"  Nodes: {result['nodes_count_mean']:.0f} (±{result['nodes_count_std']:.0f})")
+        print(
+            f"  Account Nodes: {result['account_nodes_count_mean']:.0f} (±{result['account_nodes_count_std']:.0f})")
+        print(
+            f"  Edges (Transactions): {result['edges_count_mean']:.0f} (±{result['edges_count_std']:.0f})")
+        print(
+            f"  Total Edges: {result['total_edges_count_mean']:.0f} (±{result['total_edges_count_std']:.0f})")
         print(
             f"  Configured Rate: {config['transaction_rates']['per_account_per_day']:.3f} tx/account/day")
         print(
-            f"  Actual Rate: {result['actual_transaction_rate']:.3f} tx/account/day")
+            f"  Actual Rate: {result['actual_transaction_rate_mean']:.3f} (±{result['actual_transaction_rate_std']:.3f}) tx/account/day")
+
+        total_elements_mean = result['nodes_count_mean'] + \
+            result['edges_count_mean']
+        total_elements_std = np.sqrt(
+            result['nodes_count_std']**2 + result['edges_count_std']**2)
         print(
-            f"  Total Elements (N): {result['nodes_count'] + result['edges_count']:,}")
-        print(f"  Wall Time: {result['wall_time_seconds']:.2f} seconds")
-        print(f"  Memory Usage: {result['memory_usage_mb']:.1f} MB")
+            f"  Total Elements (N): {total_elements_mean:,.0f} (±{total_elements_std:,.0f})")
         print(
-            f"  Patterns Generated: {result['patterns_generated']}/{result['patterns_expected']} ({'✓' if result['patterns_success'] else '✗'})")
+            f"  Wall Time: {result['wall_time_seconds_mean']:.2f}s (±{result['wall_time_seconds_std']:.2f}s)")
+        print(
+            f"  Memory Usage: {result['memory_usage_mb_mean']:.1f}MB (±{result['memory_usage_mb_std']:.1f}MB)")
+        print(
+            f"  Patterns Generated: {result['patterns_generated_mean']:.1f} (±{result['patterns_generated_std']:.1f}) / {result['patterns_expected']} ({'✓' if result['patterns_success'] else '✗'})")
         print()
 
-    # Perform comprehensive scaling analysis
-    scaling_analysis = analyze_scaling_performance(results)
+    # Perform comprehensive scaling analysis using aggregated results
+    scaling_analysis = analyze_scaling_performance(aggregated_results)
 
     print("=== Scaling Analysis ===")
 
@@ -641,8 +729,8 @@ def run_h2_experiment():
         trend = scaling_analysis['memory_efficiency_trend']
 
         print("Memory Efficiency Analysis:")
-        for i, (result, efficiency) in enumerate(zip(results, efficiencies)):
-            scale_name = result['scale_type'].capitalize()
+        for i, (result, efficiency) in enumerate(zip(aggregated_results, efficiencies)):
+            scale_name = result['scale_type'].capitalize().replace('_', ' ')
             print(f"  {scale_name}: {efficiency:.4f} MB/element")
         print(f"  Average: {avg_efficiency:.4f} MB/element")
         print(f"  Trend: {trend}")
@@ -662,7 +750,8 @@ def run_h2_experiment():
                 print()
 
     # Overall assessment
-    all_patterns_successful = all(r['patterns_success'] for r in results)
+    all_patterns_successful = all(
+        r['patterns_success'] for r in aggregated_results)
 
     # Updated assessment criteria
     good_scaling = True

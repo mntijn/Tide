@@ -359,23 +359,29 @@ def plot_compliance_results(per_run_df):
     """
 
     # Set up styling for accessibility and clarity
-    sns.set_context("notebook", font_scale=1.1)
+    sns.set_context("notebook", font_scale=1.8)
     sns.set_style("ticks")
     sns.set_palette("colorblind", color_codes=True)
 
-    golden_ratio = 1.618
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12 / golden_ratio * 2))
+    fig, axes = plt.subplots(2, 2, figsize=(16, 10))
     axes = axes.flatten()
+
+    # --- Helper to set y-limits with padding ---
+    def set_padded_ylim(ax, values, padding_factor=0.1):
+        min_val, max_val = np.min(values), np.max(values)
+        padding = (max_val - min_val) * padding_factor
+        ax.set_ylim(min_val - padding, max_val + padding)
 
     # --------------------------------------------------------------------------------
     # 1. Business Nodes boxplot
     ax = axes[0]
     sns.boxplot(data=per_run_df, x='config', y='business_nodes', ax=ax)
-    # Draw target line per configuration
-    for cfg in CONFIGURATIONS:
-        target_businesses = cfg['individuals'] * cfg['business_probability']
-        ax.axhline(target_businesses, linestyle='--',
-                   linewidth=1, color='#004D40')
+    target_lines = [c['individuals'] * c['business_probability']
+                    for c in CONFIGURATIONS]
+    for target in target_lines:
+        ax.axhline(target, linestyle='--', linewidth=1, color='#004D40')
+    set_padded_ylim(ax, np.concatenate(
+        [per_run_df['business_nodes'], target_lines]))
     ax.set_title('Business Nodes per Configuration')
     ax.set_xlabel('Configuration')
     ax.set_ylabel('Business Node Count')
@@ -385,6 +391,7 @@ def plot_compliance_results(per_run_df):
     # 2. Total Transactions boxplot
     ax = axes[1]
     sns.boxplot(data=per_run_df, x='config', y='total_transactions', ax=ax)
+    set_padded_ylim(ax, per_run_df['total_transactions'])
     ax.set_title('Total Transactions per Configuration')
     ax.set_xlabel('Configuration')
     ax.set_ylabel('Total Transactions')
@@ -395,10 +402,11 @@ def plot_compliance_results(per_run_df):
     ax = axes[2]
     sns.lineplot(data=per_run_df, x='seed', y='transaction_rate', hue='config',
                  marker='o', ax=ax, legend=False)
-    # Add target lines
-    for cfg in CONFIGURATIONS:
-        ax.axhline(cfg['transaction_rate'], linestyle='--',
-                   linewidth=1, color='grey')
+    target_lines = [c['transaction_rate'] for c in CONFIGURATIONS]
+    for target in target_lines:
+        ax.axhline(target, linestyle='--', linewidth=1, color='grey')
+    set_padded_ylim(ax, np.concatenate(
+        [per_run_df['transaction_rate'], target_lines]))
     ax.set_title('Transaction Rate across Seeds')
     ax.set_xlabel('Seed')
     ax.set_ylabel('Rate (tx/account/day)')
@@ -409,15 +417,18 @@ def plot_compliance_results(per_run_df):
     ax = axes[3]
     sns.lineplot(data=per_run_df, x='seed', y='pattern_count', hue='config',
                  marker='s', ax=ax, legend=False)
-    for cfg in CONFIGURATIONS:
-        ax.axhline(cfg['target_fraud_patterns'],
-                   linestyle='--', linewidth=1, color='grey')
+    target_lines = [c['target_fraud_patterns'] for c in CONFIGURATIONS]
+    for target in target_lines:
+        ax.axhline(target, linestyle='--', linewidth=1, color='grey')
+    set_padded_ylim(ax, np.concatenate(
+        [per_run_df['pattern_count'], target_lines]))
     ax.set_title('Fraud Patterns Generated across Seeds')
     ax.set_xlabel('Seed')
     ax.set_ylabel('Pattern Count')
     sns.despine(ax=ax)
 
     plt.tight_layout()
+    plt.show()
 
     # Save figure
     if not os.path.exists('plots'):

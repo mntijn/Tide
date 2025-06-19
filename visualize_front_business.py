@@ -102,7 +102,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
     # Create a single, clear network diagram
     fig, ax = plt.subplots(1, 1, figsize=(16, 12))
     ax.set_title(f'FrontBusinessActivity Pattern: {pattern["pattern_id"]}',
-                 fontsize=16, fontweight='bold')
+                 fontsize=20, fontweight='bold')
 
     # Extract pattern entities and transactions
     pattern_entities = set(pattern['entities'])
@@ -280,14 +280,11 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                    alpha=0.9, edgecolors='black', linewidth=1.5)
 
         # Create clear label matching the example format
-        vertical_alignment = 'center'
         if entity == cash_account:
-            label = 'Cash System'
-            vertical_alignment = 'bottom'  # Position above center
+            label = ''
         elif entity == front_business:
             bus_id = entity.split('_')[1] if '_' in entity else '1'
             label = f"Business_{bus_id}\n[{country}]"
-            vertical_alignment = 'top'  # Position below center
         else:
             # For accounts, show simplified labels
             if entity.startswith('account_'):
@@ -302,11 +299,17 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
             else:
                 label = f"{entity}\n[{country}]"
 
-        # Position label
-        ax.text(pos[entity][0], pos[entity][1], label,
-                ha='center', va=vertical_alignment, fontsize=10, fontweight='bold')
+        # Position label above the node for readability
+        label_y_offset = 0.5
+        ax.text(pos[entity][0], pos[entity][1] + label_y_offset, label,
+                ha='center', va='bottom', fontsize=12, fontweight='bold')
 
-    # Draw edges with detailed labels
+    # Draw edges and prepare for consolidated labels
+    deposit_midpoints = []
+    transfer_midpoints = []
+    deposit_color = color_palette['deposits']
+    transfer_color = color_palette['transfers']
+
     for (src, dest), edge_data in edges_info.items():
         src_pos = pos[src]
         dest_pos = pos[dest]
@@ -314,13 +317,17 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
         # Determine line style and color
         tx_type = edge_data['type']
         if 'DEPOSIT' in tx_type:
-            color = color_palette['deposits']
+            color = deposit_color
             linestyle = '--'  # Dashed for deposits
             alpha = 0.8
+            deposit_midpoints.append(
+                ((src_pos[0] + dest_pos[0]) / 2, (src_pos[1] + dest_pos[1]) / 2))
         elif 'TRANSFER' in tx_type:
-            color = color_palette['transfers']
+            color = transfer_color
             linestyle = '-'   # Solid for transfers
             alpha = 0.8
+            transfer_midpoints.append(
+                ((src_pos[0] + dest_pos[0]) / 2, (src_pos[1] + dest_pos[1]) / 2))
         else:
             color = 'gray'
             linestyle = '-'
@@ -332,24 +339,23 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                                     linestyle=linestyle, alpha=alpha,
                                     shrinkA=35, shrinkB=35))
 
-        # Set label to transaction type only (Deposits / Transfers)
-        if 'DEPOSIT' in tx_type:
-            label_text = "Deposits"
-        elif 'TRANSFER' in tx_type:
-            label_text = "Transfers"
-        else:
-            label_text = tx_type.replace('TransactionType.', '').title()
-
-        # Position label along the edge
-        mid_x = (src_pos[0] + dest_pos[0]) / 2
-        mid_y = (src_pos[1] + dest_pos[1]) / 2
-
-        # Offset label slightly to avoid overlapping with arrow
+    # Draw a single, consolidated label for all deposits
+    if deposit_midpoints:
+        avg_x = sum(p[0] for p in deposit_midpoints) / len(deposit_midpoints)
+        avg_y = sum(p[1] for p in deposit_midpoints) / len(deposit_midpoints)
         offset_y = 0.3
+        ax.text(avg_x, avg_y + offset_y, "Deposits",
+                ha='center', va='center', fontsize=12,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC", edgecolor=deposit_color, alpha=0.9))
 
-        ax.text(mid_x, mid_y + offset_y, label_text,
-                ha='center', va='center', fontsize=9,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC", edgecolor=color, alpha=0.9))
+    # Draw a single, consolidated label for all transfers
+    if transfer_midpoints:
+        avg_x = sum(p[0] for p in transfer_midpoints) / len(transfer_midpoints)
+        avg_y = sum(p[1] for p in transfer_midpoints) / len(transfer_midpoints)
+        offset_y = 0.3
+        ax.text(avg_x, avg_y + offset_y, "Transfers",
+                ha='center', va='center', fontsize=12,
+                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC", edgecolor=transfer_color, alpha=0.9))
 
     # Set axis properties dynamically based on node positions so nothing is cut off
     all_x = [coord[0] for coord in pos.values()]
@@ -403,7 +409,7 @@ def create_timeline_visualization(pattern_data, pattern):
     # Create timeline plot
     fig, ax = plt.subplots(1, 1, figsize=(15, 8))
     ax.set_title(f'FrontBusinessActivity Pattern Timeline: {pattern["pattern_id"]}',
-                 fontsize=14, fontweight='bold')
+                 fontsize=18, fontweight='bold')
 
     # Plot 1: Transaction amounts over time
     if deposits:
@@ -418,17 +424,22 @@ def create_timeline_visualization(pattern_data, pattern):
         ax.scatter(transfer_times, transfer_amounts, color=color_palette['transfers'], s=100, alpha=0.7,
                    marker='o', label=f'Transfers ({len(transfers)} txns)')
 
-    ax.set_ylabel('Amount (€)', fontsize=12)
+    ax.set_ylabel('Amount (€)', fontsize=14)
     ax.set_title('Transaction Amounts Over Time',
-                 fontsize=12, fontweight='bold')
+                 fontsize=16, fontweight='bold')
     ax.grid(False)
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, fontsize=12)
     # Show only first and last (and optionally midpoint) timestamps to avoid clutter
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
     all_times = [tx['datetime'] for tx in transactions]
     if all_times:
         start_time = min(all_times)
         end_time = max(all_times)
+
+        # Set axis limits to start at 0
+        ax.set_ylim(bottom=0)
+        ax.set_xlim(left=start_time)
+
         # Always include start and end
         xticks = [start_time, end_time]
         # Optionally include midpoint if the range is wide enough (> 1 day)
@@ -436,7 +447,8 @@ def create_timeline_visualization(pattern_data, pattern):
             mid_time = start_time + (end_time - start_time) / 2
             xticks.insert(1, mid_time)
         ax.set_xticks(xticks)
-        plt.setp(ax.xaxis.get_majorticklabels(), rotation=0, ha='center')
+        plt.setp(ax.xaxis.get_majorticklabels(),
+                 rotation=0, ha='center', fontsize=12)
     else:
         ax.set_xticks([])
 
