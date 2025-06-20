@@ -181,8 +181,12 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                 # Must be overseas destination account
                 overseas_business_accounts.append(entity_id)
 
+    # Sort accounts for deterministic layout
+    front_business_accounts.sort()
+    overseas_business_accounts.sort()
+
     # Assuming a single cash source for visualization clarity
-    cash_account = list(cash_sources)[
+    cash_account = sorted(list(cash_sources))[
         0] if cash_sources else 'cash_system_fallback'
     if not cash_sources:
         entity_info[cash_account] = {'type': 'CASH_SYSTEM', 'country': ''}

@@ -33,7 +33,9 @@ def set_visualization_style():
     """Applies Tufte's principles and accessibility guidelines for visualizations."""
     sns.set_context("notebook", font_scale=1.5)
     sns.set_style("ticks")
-    sns.set_palette("colorblind")
+    # Use a specific, colorblind-friendly palette for consistency
+    colors = ['#1E88E5', '#D81B60', '#004D40', '#FFC107', '#1E88E5', '#004D40']
+    sns.set_palette(sns.color_palette(colors))
 
     plt.rcParams.update({
         "figure.facecolor": "white",
@@ -44,7 +46,7 @@ def set_visualization_style():
         "font.family": "sans-serif",
         "font.sans-serif": ["Arial", "DejaVu Sans", "Liberation Sans", "Bitstream Vera Sans", "sans-serif"],
     })
-    return sns.color_palette("colorblind")
+    return sns.color_palette(colors)
 
 
 def generate_pattern_data():
@@ -146,6 +148,11 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
             else:
                 individual_accounts.append(entity_id)
 
+    # Sort entity lists for deterministic layout
+    individuals.sort()
+    individual_accounts.sort()
+    overseas_accounts.sort()
+
     # Create manual positioning for clear flow visualization
     pos = {}
 
@@ -215,13 +222,13 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
             color = colors[0]  # Blue
             size = 3000
         elif entity == 'account_9459':  # Cash account
-            color = colors[3]  # Reddish-orange
+            color = colors[1]  # Reddish-pink
             size = 2000
         elif entity_type == 'ACCOUNT':
             if entity in overseas_accounts:
-                color = colors[2]  # Green
+                color = colors[2]  # Dark Green
             else:
-                color = colors[4]  # Yellow-orange
+                color = colors[3]  # Yellow-orange
             size = 2000
         else:
             color = 'gray'
@@ -262,7 +269,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
             linestyle = '-'
             alpha = 0.8
         else:  # WITHDRAWAL
-            color = colors[3]  # Reddish-orange
+            color = colors[1]  # Reddish-pink
             linestyle = '--'
             alpha = 0.8
 
@@ -299,12 +306,12 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, colors):
                    markersize=15, label='Individual'),
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[2],
                    markersize=15, label='Overseas Account'),
-        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[4],
-                   markersize=15, label='Individual Account'),
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[3],
+                   markersize=15, label='Individual Account'),
+        plt.Line2D([0], [0], marker='o', color='w', markerfacecolor=colors[1],
                    markersize=15, label='Cash System'),
         plt.Line2D([0], [0], color=colors[0], linewidth=3, label='Transfers'),
-        plt.Line2D([0], [0], color=colors[3], linewidth=3,
+        plt.Line2D([0], [0], color=colors[1], linewidth=3,
                    linestyle='--', label='Cash Withdrawals')
     ]
 
@@ -368,8 +375,9 @@ def create_timeline_visualization(pattern_data, pattern, colors):
         withdrawal_times = [tx['datetime'] for tx in withdrawals]
         withdrawal_amounts = [tx['amount'] for tx in withdrawals]
         ax1.scatter(withdrawal_times, withdrawal_amounts,
-                    color=colors[3], s=100, alpha=0.7, label=f'Withdrawals ({len(withdrawals)} txns)')
+                    color=colors[1], s=100, alpha=0.7, label=f'Withdrawals ({len(withdrawals)} txns)')
     ax1.set_ylabel('Amount (€)', fontsize=14)
+    ax1.set_ylim(bottom=0)
     ax1.set_title('Transaction Amounts Over Time',
                   fontsize=16, fontweight='bold')
     ax1.legend(fontsize=12)
@@ -393,7 +401,7 @@ def create_timeline_visualization(pattern_data, pattern, colors):
         ax1.text(inflow_mid, ax1.get_ylim()[
                  1] * 0.9, 'Inflow Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[0])
         ax1.text(withdrawal_mid, ax1.get_ylim()[
-                 1] * 0.9, 'Withdrawal Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[3])
+                 1] * 0.9, 'Withdrawal Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[1])
     plt.tight_layout(pad=1.5)
     plt.savefig('rapid_fund_movement_timeline.png')
     plt.show()

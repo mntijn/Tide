@@ -147,7 +147,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
 
     fig, ax = plt.subplots(1, 1, figsize=(16, 12))
     fig.suptitle(
-        f'UTurnTransactions Pattern Structure: {pattern["pattern_id"]}', fontsize=16, fontweight='bold')
+        f'UTurnTransactions Pattern Structure: {pattern["pattern_id"]}', fontsize=20, fontweight='bold')
 
     transactions = sorted(pattern['transactions'],
                           key=lambda tx: tx['timestamp'])
@@ -250,8 +250,8 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
     for node_id, props in node_properties.items():
         ax.scatter(pos[node_id][0], pos[node_id][1], c=props['color'],
                    s=props['size'], alpha=0.9, edgecolors='black', zorder=3)
-        ax.text(pos[node_id][0], pos[node_id][1] + 0.35, props['label'], ha='center',
-                va='bottom', fontsize=9, fontweight='bold', zorder=4)
+        ax.text(pos[node_id][0], pos[node_id][1] + 0.3, props['label'], ha='center',
+                va='bottom', fontsize=15, fontweight='bold', zorder=4)
 
     # Draw edges
     for src, dest, data in G.edges(data=True):
@@ -283,6 +283,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
 
             ax.annotate('', xy=dest_pos, xytext=src_pos,
                         arrowprops=dict(arrowstyle='->', color='darkred', lw=1.5,
+                                        mutation_scale=30,
                                         connectionstyle=f"arc3,rad={rad_val}",
                                         shrinkA=shrink_a, shrinkB=shrink_b),
                         zorder=2)
@@ -290,7 +291,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
             mid_x = (src_pos[0] + dest_pos[0]) / 2
             mid_y = (src_pos[1] + dest_pos[1]) / 2
 
-            ax.text(mid_x, mid_y, "Transfer", ha='center', va='center', fontsize=8, color='darkred',
+            ax.text(mid_x, mid_y, "Transfer", ha='center', va='center', fontsize=14, color='darkred',
                     bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="darkred", alpha=0.8, lw=0.5), zorder=3)
 
     ax.set_xlim(-5, 5)
@@ -311,7 +312,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
         plt.Line2D([0], [0], color='gray', lw=2,
                    linestyle=':', label='Ownership')
     ]
-    ax.legend(handles=legend_elements, loc='upper left')
+    ax.legend(handles=legend_elements, loc='upper left', fontsize=16)
 
     initial_amount = transactions[0]['amount']
     final_amount = transactions[-1]['amount']
@@ -324,7 +325,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df, config):
                   f"Return Ratio: {returned_ratio:.1%}\n"
                   f"Hops: {total_hops}")
 
-    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=10,
+    ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, fontsize=16,
             verticalalignment='top', bbox=dict(boxstyle="round,pad=0.5", facecolor="lightyellow", alpha=0.8))
 
     plt.tight_layout()
@@ -348,9 +349,9 @@ def create_timeline_visualization(pattern_data, pattern):
         tx['datetime'] = datetime.datetime.fromisoformat(
             tx['timestamp'].replace('Z', ''))
 
-    fig, ax = plt.subplots(figsize=(15, 6))
+    fig, ax = plt.subplots(figsize=(15, 8))
     fig.suptitle(
-        f'UTurnTransactions Pattern Timeline: {pattern["pattern_id"]}', fontsize=16, fontweight='bold')
+        f'UTurnTransactions Pattern Timeline: {pattern["pattern_id"]}', fontsize=18, fontweight='bold')
 
     times = [tx['datetime'] for tx in transactions]
     amounts = [tx['amount'] for tx in transactions]
@@ -361,19 +362,24 @@ def create_timeline_visualization(pattern_data, pattern):
 
     for i, txt in enumerate(labels):
         ax.annotate(txt, (times[i], amounts[i]), textcoords="offset points", xytext=(
-            0, 10), ha='center')
+            0, 15), ha='center', fontsize=16)
 
-    ax.set_xlabel("Timestamp", fontsize=12)
-    ax.set_ylabel("Amount (€)", fontsize=12)
-    ax.set_title("Transaction Flow Over Time", fontsize=14)
+    ax.set_xlabel("Timestamp", fontsize=16)
+    ax.set_ylabel("Amount (€)", fontsize=16)
+    ax.set_title("Transaction Flow Over Time", fontsize=18)
     ax.grid(False)
+
+    # Set y-axis to start at 0 for a clear baseline
+    ax.set_ylim(bottom=0)
 
     # Hide the top and right spines
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-    plt.setp(ax.xaxis.get_majorticklabels(), rotation=30, ha='right')
+    plt.setp(ax.xaxis.get_majorticklabels(),
+             rotation=30, ha='right', fontsize=14)
+    ax.tick_params(axis='y', labelsize=14)
 
     # Show delays
     for i in range(len(times) - 1):
@@ -382,10 +388,10 @@ def create_timeline_visualization(pattern_data, pattern):
         mid_amount = (amounts[i] + amounts[i+1]) / 2
         if delay.total_seconds() > 0:
             ax.text(mid_time, mid_amount, f"{delay.days}d {delay.seconds//3600}h",
-                    ha='center', va='bottom', fontsize=9,
+                    ha='center', va='bottom', fontsize=14,
                     bbox=dict(boxstyle="round,pad=0.2", fc="yellow", alpha=0.7))
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig('u_turn_transactions_timeline.png',
                 dpi=300, bbox_inches='tight')
     print("✓ Timeline visualization saved as 'u_turn_transactions_timeline.png'")

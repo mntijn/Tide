@@ -45,13 +45,13 @@ class UTurnTransactionsStructural(StructuralComponent):
         # Look for entities from high-risk clusters with multiple accounts
         for cluster_name in ["super_high_risk", "high_risk_score", "structuring_candidates"]:
             cluster_entities = self.get_cluster(cluster_name)
-            for entity_id in cluster_entities:
+            for entity_id in sorted(list(cluster_entities)):
                 if self.graph.nodes[entity_id].get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
                     # Count accounts
-                    owned_accounts = [
+                    owned_accounts = sorted([
                         n for n in self.graph.neighbors(entity_id)
                         if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
-                    ]
+                    ])
                     if len(owned_accounts) >= 2:  # Need at least 2 accounts
                         potential_originators.append(
                             (entity_id, owned_accounts))
@@ -80,10 +80,10 @@ class UTurnTransactionsStructural(StructuralComponent):
             random_instance.shuffle(all_entities)
 
             for entity_id in all_entities:
-                owned_accounts = [
+                owned_accounts = sorted([
                     n for n in self.graph.neighbors(entity_id)
                     if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
-                ]
+                ])
                 if len(owned_accounts) >= 2:
                     originator_id = entity_id
                     originator_accounts = owned_accounts[:2]
@@ -129,8 +129,8 @@ class UTurnTransactionsStructural(StructuralComponent):
                     offshore_accounts.append(acc_id)
 
         # Combine and deduplicate
-        potential_intermediaries = list(
-            set(high_risk_accounts + offshore_accounts))
+        potential_intermediaries = sorted(list(
+            set(high_risk_accounts + offshore_accounts)))
         random_instance.shuffle(potential_intermediaries)
 
         # Select intermediaries
@@ -151,7 +151,8 @@ class UTurnTransactionsStructural(StructuralComponent):
                     if self.graph.nodes[acc_id].get("node_type") == NodeType.ACCOUNT:
                         all_potential_intermediaries.append(acc_id)
 
-            potential_intermediaries = list(set(all_potential_intermediaries))
+            potential_intermediaries = sorted(
+                list(set(all_potential_intermediaries)))
             # Exclude originator's own accounts
             potential_intermediaries = [
                 acc for acc in potential_intermediaries if acc not in originator_accounts]
