@@ -7,6 +7,7 @@ from enum import Enum
 import json
 import argparse
 import os
+import pickle
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
@@ -140,14 +141,22 @@ if __name__ == "__main__":
         description="Generate synthetic AML dataset with Tide")
     parser.add_argument("--config", default="configs/graph.yaml",
                         help="Path to configuration file")
+    parser.add_argument("--output-config", default="configs/output.yaml",
+                        help="Path to output configuration file")
     parser.add_argument("--output-dir", default=".",
                         help="Output directory for generated files")
     parser.add_argument("--nodes-file", default="generated_nodes.csv",
                         help="Filename for nodes CSV")
     parser.add_argument("--edges-file", default="generated_edges.csv",
                         help="Filename for edges CSV")
+    parser.add_argument("--transactions-file", default="generated_transactions.csv",
+                        help="Filename for transactions-only CSV")
     parser.add_argument("--patterns-file", default="generated_patterns.json",
                         help="Filename for patterns JSON")
+    parser.add_argument("--graphml-file", default="generated_graph.graphml",
+                        help="Filename for GraphML export")
+    parser.add_argument("--gpickle-file", default="generated_graph.gpickle",
+                        help="Filename for Gpickle export")
 
     args = parser.parse_args()
 
@@ -157,11 +166,31 @@ if __name__ == "__main__":
     # Construct full file paths
     nodes_filepath = os.path.join(args.output_dir, args.nodes_file)
     edges_filepath = os.path.join(args.output_dir, args.edges_file)
+    transactions_filepath = os.path.join(
+        args.output_dir, args.transactions_file)
     patterns_filepath = os.path.join(args.output_dir, args.patterns_file)
+    graphml_filepath = os.path.join(args.output_dir, args.graphml_file)
+    gpickle_filepath = os.path.join(args.output_dir, args.gpickle_file)
 
     # Load and merge configurations
     generator_parameters = load_configurations(args.config)
     print(f'Loading configuration from: {args.config}')
+
+    # Load output configurations
+    output_config_path = args.output_config
+    if os.path.exists(output_config_path):
+        with open(output_config_path, 'r') as f:
+            output_config = yaml.safe_load(f)
+            print(f'Loading output configuration from: {output_config_path}')
+    else:
+        # Default values if file doesn't exist
+        print(
+            f"Output configuration file not found at {output_config_path}, using defaults.")
+        output_config = {
+            'CSVfiles': True,
+            'GraphML': False,
+            'Gpickle': False
+        }
 
     # Convert date strings to datetime objects
     generator_parameters["time_span"]["start_date"] = datetime.datetime.fromisoformat(
@@ -177,11 +206,14 @@ if __name__ == "__main__":
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
 
     # Export to CSV
-    export_to_csv(
-        graph=graph,
-        nodes_filepath=nodes_filepath,
-        edges_filepath=edges_filepath
-    )
+    if output_config.get('CSVfiles', False):
+        print("\nExporting to CSV...")
+        export_to_csv(
+            graph=graph,
+            nodes_filepath=nodes_filepath,
+            edges_filepath=edges_filepath,
+            transactions_filepath=transactions_filepath
+        )
 
     # Export tracked patterns as JSON
     patterns_data = {
@@ -203,14 +235,20 @@ if __name__ == "__main__":
         f"Exported {len(aml_graph_gen.injected_patterns)} tracked patterns to: {patterns_filepath}")
     print(f"Generated files saved to: {args.output_dir}")
 
-    # # Export to GraphML for visualization
-    # print("Saving graph in GraphML format for visualization...")
+    # Export to GraphML for visualization
+    if output_config.get('GraphML', False):
+        print("\nSaving graph in GraphML format for visualization...")
+        # Convert enums to strings for GraphML compatibility
+        converted_graph = convert_enums_to_strings(graph)
+        nx.write_graphml(converted_graph, graphml_filepath)
+        print(f"Graph saved as: {graphml_filepath}")
 
-    # # Convert enums to strings for GraphML compatibility
-    # converted_graph = convert_enums_to_strings(graph)
-    # nx.write_graphml(converted_graph, "generated_graph.graphml")
+    # Export to Gpickle
+    if output_config.get('Gpickle', False):
+        print("\nSaving graph in Gpickle format...")
+        with open(gpickle_filepath, 'wb') as f:
+            pickle.dump(graph, f, pickle.HIGHEST_PROTOCOL)
+        print(f"Graph saved as: {gpickle_filepath}")
 
-    # print("Graph saved as: generated_graph.graphml")
-
-    # print("\nTo visualize the patterns, run:")
-    # print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")
+    print("\nTo visualize the patterns, run:")
+    print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")

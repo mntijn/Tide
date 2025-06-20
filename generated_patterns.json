@@ -1,0 +1,2308 @@
+{
+  "metadata": {
+    "generation_timestamp": "2025-06-20T11:37:15.035021",
+    "total_patterns": 11,
+    "graph_nodes": 9366,
+    "graph_edges": 19597,
+    "config_file": "configs/graph.yaml",
+    "output_directory": "."
+  },
+  "patterns": [
+    {
+      "pattern_type": "FrontBusinessActivity",
+      "pattern_id": "FrontBusinessActivity_1",
+      "entities": [
+        "account_8490",
+        "account_8882",
+        "account_8648",
+        "account_9365",
+        "account_8881",
+        "account_8883"
+      ],
+      "transactions": [
+        {
+          "src": "account_9365",
+          "dest": "account_8881",
+          "amount": 46038.5,
+          "timestamp": "2023-02-07 00:00:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8882",
+          "dest": "account_8490",
+          "amount": 41523.69,
+          "timestamp": "2023-02-07 05:27:52.879236",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8883",
+          "amount": 40991.37,
+          "timestamp": "2023-02-08 11:06:06.234945",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8882",
+          "dest": "account_8490",
+          "amount": 39564.49,
+          "timestamp": "2023-02-08 16:05:38.274485",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8883",
+          "amount": 25114.85,
+          "timestamp": "2023-02-09 10:24:06.143837",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8883",
+          "dest": "account_8490",
+          "amount": 22156.81,
+          "timestamp": "2023-02-09 14:22:10.029093",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8882",
+          "amount": 16735.57,
+          "timestamp": "2023-02-11 05:04:27.417730",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8882",
+          "dest": "account_8648",
+          "amount": 13660.06,
+          "timestamp": "2023-02-11 08:13:01.830655",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8882",
+          "amount": 17534.2,
+          "timestamp": "2023-02-12 03:01:49.638981",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8883",
+          "dest": "account_8648",
+          "amount": 14739.87,
+          "timestamp": "2023-02-12 03:43:35.193379",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        }
+      ],
+      "num_transactions": 10,
+      "total_amount": 278059.41,
+      "avg_amount": 27805.941,
+      "countries": [
+        "USA",
+        "SC",
+        "CASH",
+        "IM"
+      ],
+      "time_span_hours": 123.72644260527778,
+      "start_time": "2023-02-07 00:00:00",
+      "end_time": "2023-02-12 03:43:35.193379",
+      "business_entity": null,
+      "num_deposits": 5,
+      "num_transfers": 5,
+      "deposit_amount": 146414.49000000002,
+      "transfer_amount": 131644.91999999998
+    },
+    {
+      "pattern_type": "FrontBusinessActivity",
+      "pattern_id": "FrontBusinessActivity_2",
+      "entities": [
+        "account_8410",
+        "account_8960",
+        "account_9365",
+        "account_8692",
+        "account_8961",
+        "account_8971",
+        "account_8959",
+        "account_8752"
+      ],
+      "transactions": [
+        {
+          "src": "account_9365",
+          "dest": "account_8960",
+          "amount": 39021.51,
+          "timestamp": "2023-04-14 00:00:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8959",
+          "dest": "account_8752",
+          "amount": 31479.47,
+          "timestamp": "2023-04-14 05:59:18.199784",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8961",
+          "amount": 48114.24,
+          "timestamp": "2023-04-15 07:23:55.197735",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8960",
+          "dest": "account_8410",
+          "amount": 41184.19,
+          "timestamp": "2023-04-15 11:02:12.091759",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8960",
+          "amount": 40750.4,
+          "timestamp": "2023-04-16 13:48:45.956903",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8959",
+          "dest": "account_8752",
+          "amount": 34252.87,
+          "timestamp": "2023-04-16 14:28:09.283355",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8959",
+          "amount": 23854.89,
+          "timestamp": "2023-04-18 12:06:37.069362",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8961",
+          "dest": "account_8971",
+          "amount": 21672.96,
+          "timestamp": "2023-04-18 14:52:19.111603",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8961",
+          "amount": 27781.4,
+          "timestamp": "2023-04-19 11:36:40.298722",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8959",
+          "dest": "account_8692",
+          "amount": 27691.67,
+          "timestamp": "2023-04-19 16:02:33.372833",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8959",
+          "amount": 17585.65,
+          "timestamp": "2023-04-21 08:35:01.458211",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8961",
+          "dest": "account_8752",
+          "amount": 17178.69,
+          "timestamp": "2023-04-21 09:27:53.097641",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9365",
+          "dest": "account_8960",
+          "amount": 28570.66,
+          "timestamp": "2023-04-21 21:05:09.651542",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_8959",
+          "dest": "account_8971",
+          "amount": 24039.91,
+          "timestamp": "2023-04-22 00:15:20.576517",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        }
+      ],
+      "num_transactions": 14,
+      "total_amount": 423178.51,
+      "avg_amount": 30227.036428571428,
+      "countries": [
+        "MT",
+        "BM",
+        "CASH",
+        "IM",
+        "KY"
+      ],
+      "time_span_hours": 192.25571569916667,
+      "start_time": "2023-04-14 00:00:00",
+      "end_time": "2023-04-22 00:15:20.576517",
+      "business_entity": null,
+      "num_deposits": 7,
+      "num_transfers": 7,
+      "deposit_amount": 225678.74999999997,
+      "transfer_amount": 197499.75999999998
+    },
+    {
+      "pattern_type": "RapidFundMovement",
+      "pattern_id": "RapidFundMovement_3",
+      "entities": [
+        "account_7984",
+        "account_7987",
+        "account_9186",
+        "account_9365",
+        "account_7579",
+        "account_7986",
+        "account_7145",
+        "account_6027",
+        "account_7819"
+      ],
+      "transactions": [
+        {
+          "src": "account_7579",
+          "dest": "account_7986",
+          "amount": 2381.33,
+          "timestamp": "2023-02-04 02:09:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7145",
+          "dest": "account_7987",
+          "amount": 2772.17,
+          "timestamp": "2023-02-04 02:36:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BSD"
+        },
+        {
+          "src": "account_6027",
+          "dest": "account_7987",
+          "amount": 2866.68,
+          "timestamp": "2023-02-04 02:49:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7145",
+          "dest": "account_7984",
+          "amount": 2762.85,
+          "timestamp": "2023-02-04 10:39:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BSD"
+        },
+        {
+          "src": "account_7819",
+          "dest": "account_7984",
+          "amount": 2901.73,
+          "timestamp": "2023-02-04 18:52:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9186",
+          "dest": "account_7984",
+          "amount": 2941.54,
+          "timestamp": "2023-02-04 21:10:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "HKD"
+        },
+        {
+          "src": "account_7986",
+          "dest": "account_9365",
+          "amount": 4941.69,
+          "timestamp": "2023-02-05 01:46:15.105619",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_9365",
+          "amount": 5052.93,
+          "timestamp": "2023-02-05 09:44:15.105619",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7984",
+          "dest": "account_9365",
+          "amount": 4454.33,
+          "timestamp": "2023-02-05 17:46:15.105619",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "CHF"
+        }
+      ],
+      "num_transactions": 9,
+      "total_amount": 31075.25,
+      "avg_amount": 3452.8055555555557,
+      "countries": [
+        "MC",
+        "CH",
+        "CY",
+        "HK",
+        "CASH",
+        "DE",
+        "LI",
+        "BS",
+        "NL"
+      ],
+      "time_span_hours": 39.620862671944444,
+      "start_time": "2023-02-04 02:09:00",
+      "end_time": "2023-02-05 17:46:15.105619",
+      "central_account": "account_7986",
+      "movement_speed_hours": 39.620862671944444
+    },
+    {
+      "pattern_type": "RapidFundMovement",
+      "pattern_id": "RapidFundMovement_4",
+      "entities": [
+        "account_3804",
+        "account_2801",
+        "account_9365",
+        "account_3803",
+        "account_3549",
+        "account_3806",
+        "account_6896",
+        "account_3805",
+        "account_7682"
+      ],
+      "transactions": [
+        {
+          "src": "account_3549",
+          "dest": "account_3803",
+          "amount": 2757.6,
+          "timestamp": "2023-03-28 07:40:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "HKD"
+        },
+        {
+          "src": "account_6896",
+          "dest": "account_3804",
+          "amount": 2920.94,
+          "timestamp": "2023-03-28 08:34:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "VUV"
+        },
+        {
+          "src": "account_3549",
+          "dest": "account_3805",
+          "amount": 2602.09,
+          "timestamp": "2023-03-28 09:07:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "HKD"
+        },
+        {
+          "src": "account_7682",
+          "dest": "account_3806",
+          "amount": 2437.53,
+          "timestamp": "2023-03-28 12:32:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7682",
+          "dest": "account_3804",
+          "amount": 2509.29,
+          "timestamp": "2023-03-28 14:04:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7682",
+          "dest": "account_3803",
+          "amount": 2728.56,
+          "timestamp": "2023-03-28 15:33:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_2801",
+          "dest": "account_3806",
+          "amount": 2772.7,
+          "timestamp": "2023-03-28 20:52:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BBD"
+        },
+        {
+          "src": "account_3549",
+          "dest": "account_3806",
+          "amount": 2235.19,
+          "timestamp": "2023-03-28 22:42:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "HKD"
+        },
+        {
+          "src": "account_3804",
+          "dest": "account_9365",
+          "amount": 2258.86,
+          "timestamp": "2023-03-29 03:26:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_3804",
+          "dest": "account_9365",
+          "amount": 2464.98,
+          "timestamp": "2023-03-29 04:38:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_3806",
+          "dest": "account_9365",
+          "amount": 2466.74,
+          "timestamp": "2023-03-29 06:28:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "VUV"
+        },
+        {
+          "src": "account_3806",
+          "dest": "account_9365",
+          "amount": 2407.31,
+          "timestamp": "2023-03-29 10:43:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "VUV"
+        },
+        {
+          "src": "account_3804",
+          "dest": "account_9365",
+          "amount": 1983.76,
+          "timestamp": "2023-03-29 12:34:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_3804",
+          "dest": "account_9365",
+          "amount": 1976.96,
+          "timestamp": "2023-03-29 13:40:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_3806",
+          "dest": "account_9365",
+          "amount": 2133.48,
+          "timestamp": "2023-03-29 20:19:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "VUV"
+        },
+        {
+          "src": "account_3804",
+          "dest": "account_9365",
+          "amount": 2482.91,
+          "timestamp": "2023-03-29 23:07:28.135069",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        }
+      ],
+      "num_transactions": 16,
+      "total_amount": 39138.899999999994,
+      "avg_amount": 2446.1812499999996,
+      "countries": [
+        "BB",
+        "VU",
+        "HK",
+        "CASH",
+        "CY",
+        "NL"
+      ],
+      "time_span_hours": 39.457815296944446,
+      "start_time": "2023-03-28 07:40:00",
+      "end_time": "2023-03-29 23:07:28.135069",
+      "central_account": "account_3804",
+      "movement_speed_hours": 39.457815296944446
+    },
+    {
+      "pattern_type": "RapidFundMovement",
+      "pattern_id": "RapidFundMovement_5",
+      "entities": [
+        "account_6560",
+        "account_7771",
+        "account_3178",
+        "account_5467",
+        "account_6558",
+        "account_7750",
+        "account_7139",
+        "account_9365",
+        "account_3021",
+        "account_6559",
+        "account_7140"
+      ],
+      "transactions": [
+        {
+          "src": "account_3178",
+          "dest": "account_6558",
+          "amount": 3401.21,
+          "timestamp": "2023-05-01 00:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "SCR"
+        },
+        {
+          "src": "account_7771",
+          "dest": "account_6560",
+          "amount": 3100.81,
+          "timestamp": "2023-05-01 01:04:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BZD"
+        },
+        {
+          "src": "account_3021",
+          "dest": "account_6560",
+          "amount": 4052.17,
+          "timestamp": "2023-05-01 11:45:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BSD"
+        },
+        {
+          "src": "account_7750",
+          "dest": "account_6559",
+          "amount": 3437.03,
+          "timestamp": "2023-05-01 11:48:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "USD"
+        },
+        {
+          "src": "account_7139",
+          "dest": "account_6558",
+          "amount": 3594.57,
+          "timestamp": "2023-05-01 14:11:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "USD"
+        },
+        {
+          "src": "account_5467",
+          "dest": "account_6559",
+          "amount": 3104.23,
+          "timestamp": "2023-05-01 15:37:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BSD"
+        },
+        {
+          "src": "account_7140",
+          "dest": "account_6560",
+          "amount": 3838.05,
+          "timestamp": "2023-05-01 16:49:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7750",
+          "dest": "account_6558",
+          "amount": 3754.41,
+          "timestamp": "2023-05-01 17:06:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "USD"
+        },
+        {
+          "src": "account_7771",
+          "dest": "account_6558",
+          "amount": 3204.57,
+          "timestamp": "2023-05-01 22:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BZD"
+        },
+        {
+          "src": "account_6560",
+          "dest": "account_9365",
+          "amount": 7116.53,
+          "timestamp": "2023-05-03 00:17:01.168125",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_6560",
+          "dest": "account_9365",
+          "amount": 6170.0,
+          "timestamp": "2023-05-03 01:11:01.168125",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_6560",
+          "dest": "account_9365",
+          "amount": 7749.33,
+          "timestamp": "2023-05-03 03:31:01.168125",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_6559",
+          "dest": "account_9365",
+          "amount": 6378.59,
+          "timestamp": "2023-05-03 19:38:01.168125",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "EUR"
+        }
+      ],
+      "num_transactions": 13,
+      "total_amount": 58901.5,
+      "avg_amount": 4530.884615384615,
+      "countries": [
+        "USA",
+        "MC",
+        "CH",
+        "BZ",
+        "SC",
+        "CASH",
+        "BS",
+        "KY"
+      ],
+      "time_span_hours": 67.1836578125,
+      "start_time": "2023-05-01 00:27:00",
+      "end_time": "2023-05-03 19:38:01.168125",
+      "central_account": "account_6560",
+      "movement_speed_hours": 67.1836578125
+    },
+    {
+      "pattern_type": "RapidFundMovement",
+      "pattern_id": "RapidFundMovement_6",
+      "entities": [
+        "account_7293",
+        "account_8715",
+        "account_4991",
+        "account_9365",
+        "account_6855",
+        "account_8204",
+        "account_9338",
+        "account_6853",
+        "account_6854"
+      ],
+      "transactions": [
+        {
+          "src": "account_9338",
+          "dest": "account_6853",
+          "amount": 3366.68,
+          "timestamp": "2023-02-27 07:09:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_9338",
+          "dest": "account_6854",
+          "amount": 2666.33,
+          "timestamp": "2023-02-27 10:28:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_4991",
+          "dest": "account_6854",
+          "amount": 2842.64,
+          "timestamp": "2023-02-27 11:02:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BMD"
+        },
+        {
+          "src": "account_8204",
+          "dest": "account_6855",
+          "amount": 3498.55,
+          "timestamp": "2023-02-27 12:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "BSD"
+        },
+        {
+          "src": "account_9338",
+          "dest": "account_6854",
+          "amount": 3157.41,
+          "timestamp": "2023-02-27 13:42:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7293",
+          "dest": "account_6855",
+          "amount": 3521.26,
+          "timestamp": "2023-02-27 15:07:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_9338",
+          "dest": "account_6853",
+          "amount": 2758.63,
+          "timestamp": "2023-02-27 15:26:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_8715",
+          "dest": "account_6853",
+          "amount": 3287.72,
+          "timestamp": "2023-02-27 21:05:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "USD"
+        },
+        {
+          "src": "account_8715",
+          "dest": "account_6854",
+          "amount": 2972.62,
+          "timestamp": "2023-02-27 21:44:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "USD"
+        },
+        {
+          "src": "account_6854",
+          "dest": "account_9365",
+          "amount": 3692.18,
+          "timestamp": "2023-02-28 13:23:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_6853",
+          "dest": "account_9365",
+          "amount": 4279.72,
+          "timestamp": "2023-03-01 02:45:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "XCD"
+        },
+        {
+          "src": "account_6854",
+          "dest": "account_9365",
+          "amount": 4467.05,
+          "timestamp": "2023-03-01 03:02:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_6853",
+          "dest": "account_9365",
+          "amount": 4048.37,
+          "timestamp": "2023-03-01 09:21:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "XCD"
+        },
+        {
+          "src": "account_6854",
+          "dest": "account_9365",
+          "amount": 3816.26,
+          "timestamp": "2023-03-01 10:27:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_6854",
+          "dest": "account_9365",
+          "amount": 4442.95,
+          "timestamp": "2023-03-01 10:51:40.021823",
+          "transaction_type": "TransactionType.WITHDRAWAL",
+          "currency": "CHF"
+        }
+      ],
+      "num_transactions": 15,
+      "total_amount": 52818.37000000001,
+      "avg_amount": 3521.2246666666674,
+      "countries": [
+        "USA",
+        "AG",
+        "CH",
+        "BM",
+        "CASH",
+        "DE",
+        "LI",
+        "BS"
+      ],
+      "time_span_hours": 51.711117173055555,
+      "start_time": "2023-02-27 07:09:00",
+      "end_time": "2023-03-01 10:51:40.021823",
+      "central_account": "account_6853",
+      "movement_speed_hours": 51.711117173055555
+    },
+    {
+      "pattern_type": "RepeatedOverseasTransfers",
+      "pattern_id": "RepeatedOverseasTransfers_7",
+      "entities": [
+        "account_3948",
+        "individual_682",
+        "account_4157",
+        "account_6938"
+      ],
+      "transactions": [
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9548.43,
+          "timestamp": "2023-01-21 00:00:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9405.32,
+          "timestamp": "2023-01-21 00:15:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 8533.6,
+          "timestamp": "2023-01-21 00:28:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9347.71,
+          "timestamp": "2023-01-21 00:58:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9704.16,
+          "timestamp": "2023-01-21 01:43:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9025.28,
+          "timestamp": "2023-01-21 03:45:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9575.8,
+          "timestamp": "2023-01-21 05:53:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9897.42,
+          "timestamp": "2023-01-21 11:46:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9310.94,
+          "timestamp": "2023-01-21 14:14:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 8750.85,
+          "timestamp": "2023-01-21 18:49:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 8892.85,
+          "timestamp": "2023-01-21 18:53:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 8998.23,
+          "timestamp": "2023-01-21 19:01:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9344.1,
+          "timestamp": "2023-01-21 20:26:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9874.84,
+          "timestamp": "2023-01-21 20:40:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_682",
+          "dest": "account_3948",
+          "amount": 9887.67,
+          "timestamp": "2023-01-21 20:40:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7880.48,
+          "timestamp": "2023-01-25 20:51:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7438.1,
+          "timestamp": "2023-01-25 21:54:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 6648.05,
+          "timestamp": "2023-01-25 22:30:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 6964.94,
+          "timestamp": "2023-01-26 01:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 7369.66,
+          "timestamp": "2023-01-26 03:18:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 6430.47,
+          "timestamp": "2023-01-26 05:55:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 6906.24,
+          "timestamp": "2023-01-26 07:10:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 7953.77,
+          "timestamp": "2023-01-26 08:04:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7768.09,
+          "timestamp": "2023-01-26 08:34:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 8143.67,
+          "timestamp": "2023-01-26 09:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7840.28,
+          "timestamp": "2023-01-26 10:11:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7454.79,
+          "timestamp": "2023-01-26 11:16:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 7533.65,
+          "timestamp": "2023-01-26 11:52:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 6630.03,
+          "timestamp": "2023-01-26 13:48:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 6862.47,
+          "timestamp": "2023-01-26 17:08:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_6938",
+          "amount": 6915.6,
+          "timestamp": "2023-01-26 17:56:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 6333.91,
+          "timestamp": "2023-01-26 18:07:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 7883.76,
+          "timestamp": "2023-01-26 19:08:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_3948",
+          "dest": "account_4157",
+          "amount": 6337.3,
+          "timestamp": "2023-01-26 20:15:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        }
+      ],
+      "num_transactions": 34,
+      "total_amount": 277392.46,
+      "avg_amount": 8158.601764705883,
+      "countries": [
+        "JP",
+        "CH",
+        "KY"
+      ],
+      "time_span_hours": 140.25,
+      "start_time": "2023-01-21 00:00:00",
+      "end_time": "2023-01-26 20:15:00",
+      "source_account": "account_3948",
+      "destination_countries": [
+        "JP",
+        "CH",
+        "KY"
+      ],
+      "num_overseas_destinations": 3
+    },
+    {
+      "pattern_type": "RepeatedOverseasTransfers",
+      "pattern_id": "RepeatedOverseasTransfers_8",
+      "entities": [
+        "account_3520",
+        "individual_1782",
+        "account_6807",
+        "account_4285",
+        "account_7410",
+        "account_5342"
+      ],
+      "transactions": [
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 8890.89,
+          "timestamp": "2023-03-21 00:23:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9371.42,
+          "timestamp": "2023-03-21 00:30:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9185.27,
+          "timestamp": "2023-03-21 02:41:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9388.73,
+          "timestamp": "2023-03-21 07:48:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 8706.26,
+          "timestamp": "2023-03-21 09:42:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9824.13,
+          "timestamp": "2023-03-21 10:17:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9494.41,
+          "timestamp": "2023-03-21 11:37:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1782",
+          "dest": "account_6807",
+          "amount": 9245.84,
+          "timestamp": "2023-03-21 13:21:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_4285",
+          "amount": 5000,
+          "timestamp": "2023-03-23 13:56:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-23 14:07:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 16:50:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 17:20:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 18:39:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_7410",
+          "amount": 5000,
+          "timestamp": "2023-03-23 19:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 19:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 21:30:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_7410",
+          "amount": 5000,
+          "timestamp": "2023-03-23 22:02:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-23 22:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_4285",
+          "amount": 5000,
+          "timestamp": "2023-03-23 23:47:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_4285",
+          "amount": 5000,
+          "timestamp": "2023-03-24 00:33:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_7410",
+          "amount": 5000,
+          "timestamp": "2023-03-24 01:32:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-24 01:47:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-24 02:06:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-24 07:51:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-24 08:35:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-24 08:37:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-24 10:51:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_7410",
+          "amount": 5000,
+          "timestamp": "2023-03-24 10:52:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_5342",
+          "amount": 5000,
+          "timestamp": "2023-03-24 11:01:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        },
+        {
+          "src": "account_6807",
+          "dest": "account_3520",
+          "amount": 5000,
+          "timestamp": "2023-03-24 12:26:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "JPY"
+        }
+      ],
+      "num_transactions": 30,
+      "total_amount": 184106.95,
+      "avg_amount": 6136.8983333333335,
+      "countries": [
+        "JP",
+        "BS",
+        "CH",
+        "SG"
+      ],
+      "time_span_hours": 84.05,
+      "start_time": "2023-03-21 00:23:00",
+      "end_time": "2023-03-24 12:26:00",
+      "source_account": "individual_1782",
+      "destination_countries": [
+        "JP",
+        "CH",
+        "BS",
+        "SG"
+      ],
+      "num_overseas_destinations": 4
+    },
+    {
+      "pattern_type": "RepeatedOverseasTransfers",
+      "pattern_id": "RepeatedOverseasTransfers_9",
+      "entities": [
+        "account_5967",
+        "account_7987",
+        "account_7684",
+        "account_7277",
+        "individual_2228"
+      ],
+      "transactions": [
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9289.32,
+          "timestamp": "2023-03-09 06:30:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9245.47,
+          "timestamp": "2023-03-09 07:15:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9290.01,
+          "timestamp": "2023-03-09 07:18:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9013.3,
+          "timestamp": "2023-03-09 09:33:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9435.21,
+          "timestamp": "2023-03-09 10:24:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9124.19,
+          "timestamp": "2023-03-09 14:42:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9719.12,
+          "timestamp": "2023-03-09 15:32:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9235.85,
+          "timestamp": "2023-03-09 17:31:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9783.86,
+          "timestamp": "2023-03-09 18:17:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9123.0,
+          "timestamp": "2023-03-09 19:18:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 8919.65,
+          "timestamp": "2023-03-09 20:44:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 8626.25,
+          "timestamp": "2023-03-09 22:13:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 8960.07,
+          "timestamp": "2023-03-09 22:13:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_2228",
+          "dest": "account_7987",
+          "amount": 9730.24,
+          "timestamp": "2023-03-09 23:41:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-10 23:45:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 00:16:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 00:20:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 01:34:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 01:35:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 03:17:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 05:47:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 06:55:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 07:06:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 07:21:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 08:08:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 09:29:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 10:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 10:40:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 12:47:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 13:20:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 14:17:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 14:26:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 15:01:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 16:12:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7684",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 16:40:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 16:49:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_7277",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 23:04:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7987",
+          "dest": "account_5967",
+          "amount": 5287.73,
+          "timestamp": "2023-03-11 23:35:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "EUR"
+        }
+      ],
+      "num_transactions": 38,
+      "total_amount": 256401.06000000026,
+      "avg_amount": 6747.3963157894805,
+      "countries": [
+        "USA",
+        "MC",
+        "HK",
+        "KY"
+      ],
+      "time_span_hours": 65.08333333333333,
+      "start_time": "2023-03-09 06:30:00",
+      "end_time": "2023-03-11 23:35:00",
+      "source_account": "individual_2228",
+      "destination_countries": [
+        "USA",
+        "MC",
+        "HK",
+        "KY"
+      ],
+      "num_overseas_destinations": 4
+    },
+    {
+      "pattern_type": "RepeatedOverseasTransfers",
+      "pattern_id": "RepeatedOverseasTransfers_10",
+      "entities": [
+        "account_7168",
+        "account_7839",
+        "account_7739",
+        "account_4069",
+        "individual_1913",
+        "account_8428"
+      ],
+      "transactions": [
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8551.27,
+          "timestamp": "2023-01-05 00:05:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8829.7,
+          "timestamp": "2023-01-05 01:36:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9059.59,
+          "timestamp": "2023-01-05 05:16:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8610.47,
+          "timestamp": "2023-01-05 05:55:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8998.72,
+          "timestamp": "2023-01-05 09:34:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9541.18,
+          "timestamp": "2023-01-05 13:00:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9442.98,
+          "timestamp": "2023-01-05 14:09:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9261.07,
+          "timestamp": "2023-01-05 14:24:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8875.55,
+          "timestamp": "2023-01-05 14:48:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8920.47,
+          "timestamp": "2023-01-05 16:38:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9416.63,
+          "timestamp": "2023-01-05 17:48:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9575.39,
+          "timestamp": "2023-01-05 18:53:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9720.73,
+          "timestamp": "2023-01-05 18:55:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 8554.79,
+          "timestamp": "2023-01-05 21:04:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7168",
+          "amount": 9079.82,
+          "timestamp": "2023-01-05 22:32:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7839",
+          "amount": 12155.42,
+          "timestamp": "2023-01-08 22:57:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_4069",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 02:10:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_4069",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 06:09:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7739",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 07:11:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7739",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 07:32:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_4069",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 07:43:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_4069",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 13:07:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7839",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 14:40:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_8428",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 16:36:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7739",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 18:22:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7168",
+          "dest": "account_7739",
+          "amount": 12155.42,
+          "timestamp": "2023-01-09 22:25:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        }
+      ],
+      "num_transactions": 26,
+      "total_amount": 270147.98000000016,
+      "avg_amount": 10390.306923076929,
+      "countries": [
+        "BM",
+        "LU",
+        "CH",
+        "CY"
+      ],
+      "time_span_hours": 118.33333333333333,
+      "start_time": "2023-01-05 00:05:00",
+      "end_time": "2023-01-09 22:25:00",
+      "source_account": "individual_1913",
+      "destination_countries": [
+        "BM",
+        "LU",
+        "CH",
+        "CY"
+      ],
+      "num_overseas_destinations": 4
+    },
+    {
+      "pattern_type": "RepeatedOverseasTransfers",
+      "pattern_id": "RepeatedOverseasTransfers_11",
+      "entities": [
+        "account_7124",
+        "account_5282",
+        "account_4707",
+        "account_9317",
+        "account_7171",
+        "account_4173",
+        "individual_1913"
+      ],
+      "transactions": [
+        {
+          "src": "individual_1913",
+          "dest": "account_7171",
+          "amount": 9877.57,
+          "timestamp": "2023-01-31 05:14:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7171",
+          "amount": 9633.36,
+          "timestamp": "2023-01-31 06:56:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7171",
+          "amount": 9368.27,
+          "timestamp": "2023-01-31 11:46:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7171",
+          "amount": 8910.18,
+          "timestamp": "2023-01-31 16:42:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "individual_1913",
+          "dest": "account_7171",
+          "amount": 8600.41,
+          "timestamp": "2023-01-31 21:28:00",
+          "transaction_type": "TransactionType.DEPOSIT",
+          "currency": "EUR"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-04 22:09:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-04 23:21:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-04 23:24:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-04 23:37:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_5282",
+          "amount": 5000,
+          "timestamp": "2023-02-04 23:50:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_5282",
+          "amount": 5000,
+          "timestamp": "2023-02-05 00:02:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 00:55:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 01:11:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 01:22:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-05 02:16:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_7124",
+          "amount": 5000,
+          "timestamp": "2023-02-05 02:33:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 02:45:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_7124",
+          "amount": 5000,
+          "timestamp": "2023-02-05 04:16:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_5282",
+          "amount": 5000,
+          "timestamp": "2023-02-05 04:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 05:06:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_7124",
+          "amount": 5000,
+          "timestamp": "2023-02-05 05:10:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 05:48:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 06:50:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 07:58:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-05 08:55:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4707",
+          "amount": 5000,
+          "timestamp": "2023-02-05 09:16:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-05 10:27:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_7124",
+          "amount": 5000,
+          "timestamp": "2023-02-05 11:33:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_5282",
+          "amount": 5000,
+          "timestamp": "2023-02-05 13:40:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 14:10:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_5282",
+          "amount": 5000,
+          "timestamp": "2023-02-05 15:09:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 15:21:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_4173",
+          "amount": 5000,
+          "timestamp": "2023-02-05 15:56:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-05 16:19:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        },
+        {
+          "src": "account_7171",
+          "dest": "account_9317",
+          "amount": 5000,
+          "timestamp": "2023-02-05 16:54:00",
+          "transaction_type": "TransactionType.TRANSFER",
+          "currency": "CHF"
+        }
+      ],
+      "num_transactions": 35,
+      "total_amount": 196389.79,
+      "avg_amount": 5611.1368571428575,
+      "countries": [
+        "MC",
+        "LU",
+        "BB",
+        "CH",
+        "HK",
+        "SG"
+      ],
+      "time_span_hours": 131.66666666666666,
+      "start_time": "2023-01-31 05:14:00",
+      "end_time": "2023-02-05 16:54:00",
+      "source_account": "individual_1913",
+      "destination_countries": [
+        "MC",
+        "LU",
+        "CH",
+        "BB",
+        "HK",
+        "SG"
+      ],
+      "num_overseas_destinations": 6
+    }
+  ]
+}
