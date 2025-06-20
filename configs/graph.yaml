@@ -12,7 +12,7 @@ time_span:
 account_balance_range_normal: [1000.0, 50000.0]
 
 company_size_range: [1, 1000]
-random_seed: 123
+random_seed: 42
 business_creation_date_range: [90, 5475]
 
 backgroundPatterns:
@@ -91,9 +91,6 @@ random_business_probability: 0.15
 # Probability for an account to be an offshore account
 offshore_account_probability: 0.1
 
-amount_distribution_params:
-  mean: 100
-  variance: 50
 high_transaction_amount_ratio: 0.05
 low_transaction_amount_ratio: 0.1
 
