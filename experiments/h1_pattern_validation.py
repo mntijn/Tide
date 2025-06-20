@@ -46,7 +46,7 @@ def create_h1_config():
         'company_size_range': [1, 1000],
         'salary_payment_days': [24, 30, 1],
         'salary_amount_range': [2500.0, 7500.0],
-        'random_seed': 69,
+        'random_seed': 42,
         'business_creation_date_range': [90, 5475],
         'pattern_frequency': {
             'random': False,

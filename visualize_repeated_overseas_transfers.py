@@ -62,6 +62,7 @@ def generate_pattern_data():
 
         # Create config file
         config = create_h1_config()
+        config['random_seed'] = 69
         # Ensure the pattern is active
         if "pattern_configs" in config and "repeatedOverseas" in config["pattern_configs"]:
             config["pattern_configs"]["repeatedOverseas"]["enabled"] = True

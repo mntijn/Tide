@@ -32,6 +32,7 @@ sys.path.append(str(Path(__file__).parent))
 def create_viz_config():
     """Create configuration for UTurnTransactions visualization"""
     config = create_h1_config()  # Start with base config
+    config['random_seed'] = 69
     config['pattern_frequency'] = {
         'random': False,
         'RapidFundMovement': 0,

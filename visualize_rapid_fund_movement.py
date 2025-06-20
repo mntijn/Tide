@@ -62,6 +62,7 @@ def generate_pattern_data():
 
         # Create config file
         config = create_h1_config()
+        config['random_seed'] = 69
         with open(config_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
 
