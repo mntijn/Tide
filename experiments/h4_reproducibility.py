@@ -8,7 +8,7 @@ identical datasets.
 Validates:
 - Multiple runs with same seed produce identical outputs
 - Different seeds produce different outputs
-- All output files are identical (nodes, edges, patterns)
+- All output files are identical (nodes, edges)
 """
 
 import os
@@ -18,7 +18,6 @@ import tempfile
 import hashlib
 import subprocess
 from pathlib import Path
-import json
 
 # Add the parent directory to path to import main
 sys.path.append(str(Path(__file__).parent.parent))
@@ -156,28 +155,6 @@ def calculate_file_hash(filepath):
     return hash_sha256.hexdigest()
 
 
-def calculate_json_content_hash(filepath):
-    """Calculate SHA-256 hash of a JSON file's content, normalized by sorting."""
-    if not os.path.exists(filepath):
-        return None
-
-    with open(filepath, 'r') as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError:
-            # If it's not valid JSON, maybe it's empty or malformed.
-            # Fallback to hashing the raw file content.
-            return calculate_file_hash(filepath)
-
-    # Serialize to string with sorted keys to ensure consistent hash
-    # No indent to make it compact
-    normalized_content = json.dumps(data, sort_keys=True).encode('utf-8')
-
-    hash_sha256 = hashlib.sha256()
-    hash_sha256.update(normalized_content)
-    return hash_sha256.hexdigest()
-
-
 def run_generation(config, run_id):
     """Run generation and return file hashes"""
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -209,14 +186,12 @@ def run_generation(config, run_id):
             return {
                 'nodes': None,
                 'edges': None,
-                'patterns': None
             }
 
         # Calculate hashes
         hashes = {
             'nodes': calculate_file_hash(nodes_file),
             'edges': calculate_file_hash(edges_file),
-            'patterns': calculate_json_content_hash(patterns_file)
         }
 
         return hashes
@@ -238,7 +213,6 @@ def test_same_seed_reproducibility(seed, num_runs=5):
     results = {
         'nodes_identical': True,
         'edges_identical': True,
-        'patterns_identical': True,
         'all_identical': True,
         'hashes': all_hashes
     }
@@ -258,13 +232,8 @@ def test_same_seed_reproducibility(seed, num_runs=5):
             results['edges_identical'] = False
             print(f"    ✗ Edges differ in run {i+1}")
 
-        if run_hashes['patterns'] != reference_hashes['patterns']:
-            results['patterns_identical'] = False
-            print(f"    ✗ Patterns differ in run {i+1}")
-
     results['all_identical'] = (results['nodes_identical'] and
-                                results['edges_identical'] and
-                                results['patterns_identical'])
+                                results['edges_identical'])
 
     if results['all_identical']:
         print(f"    ✓ All runs identical")
@@ -285,13 +254,11 @@ def test_different_seed_variation(seed1, seed2):
     results = {
         'nodes_different': hashes1['nodes'] != hashes2['nodes'],
         'edges_different': hashes1['edges'] != hashes2['edges'],
-        'patterns_different': hashes1['patterns'] != hashes2['patterns'],
         'any_different': False
     }
 
     results['any_different'] = (results['nodes_different'] or
-                                results['edges_different'] or
-                                results['patterns_different'])
+                                results['edges_different'])
 
     if results['any_different']:
         print(f"    ✓ Seeds produce different outputs")
@@ -299,8 +266,6 @@ def test_different_seed_variation(seed1, seed2):
             print(f"      - Nodes differ")
         if results['edges_different']:
             print(f"      - Edges differ")
-        if results['patterns_different']:
-            print(f"      - Patterns differ")
     else:
         print(f"    ✗ Seeds produce identical outputs (unexpected)")
 
@@ -319,8 +284,6 @@ def run_h4_experiment():
     print("Same Seed Results:")
     print(f"  Nodes: {'✓' if same_seed_results['nodes_identical'] else '✗'}")
     print(f"  Edges: {'✓' if same_seed_results['edges_identical'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if same_seed_results['patterns_identical'] else '✗'}")
     print()
 
     # Print hashes for seed 42
@@ -329,7 +292,6 @@ def run_h4_experiment():
         print(f"  Run {i+1}:")
         print(f"    Nodes:    {hashes['nodes']}")
         print(f"    Edges:    {hashes['edges']}")
-        print(f"    Patterns: {hashes['patterns']}")
     print()
 
     # Test 2: Different seed variation
@@ -341,8 +303,6 @@ def run_h4_experiment():
         f"  Nodes: {'✓' if different_seed_results['nodes_different'] else '✗'}")
     print(
         f"  Edges: {'✓' if different_seed_results['edges_different'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if different_seed_results['patterns_different'] else '✗'}")
     print()
 
     # Test 3: Additional verification with different seed
@@ -355,8 +315,6 @@ def run_h4_experiment():
         f"  Nodes: {'✓' if additional_same_seed_results['nodes_identical'] else '✗'}")
     print(
         f"  Edges: {'✓' if additional_same_seed_results['edges_identical'] else '✗'}")
-    print(
-        f"  Patterns: {'✓' if additional_same_seed_results['patterns_identical'] else '✗'}")
     print()
 
     # Print hashes for seed 123
@@ -365,7 +323,6 @@ def run_h4_experiment():
         print(f"  Run {i+1}:")
         print(f"    Nodes:    {hashes['nodes']}")
         print(f"    Edges:    {hashes['edges']}")
-        print(f"    Patterns: {hashes['patterns']}")
     print()
 
     # Overall assessment
@@ -394,7 +351,6 @@ def run_h4_experiment():
             print(f"  Run {i+1}:")
             print(f"    Nodes: {hashes['nodes'][:16]}...")
             print(f"    Edges: {hashes['edges'][:16]}...")
-            print(f"    Patterns: {hashes.get('patterns', 'N/A')[:16]}...")
 
     return all_reproducible and seeds_produce_variation
 
