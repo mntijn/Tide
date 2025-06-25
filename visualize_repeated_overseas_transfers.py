@@ -295,40 +295,41 @@ def create_timeline_visualization(pattern, nodes_df, edges_df, colors):
     transactions.sort(key=lambda x: x['datetime'])
 
     # Separate deposits and transfers
-    deposits = [tx for tx in transactions if tx['transaction_type']
-                == 'TransactionType.DEPOSIT']
-    transfers = [tx for tx in transactions if tx['transaction_type']
-                 == 'TransactionType.TRANSFER']
+    deposits = [
+        tx for tx in transactions if tx['transaction_type'] == 'TransactionType.DEPOSIT']
+    transfers = [
+        tx for tx in transactions if tx['transaction_type'] == 'TransactionType.TRANSFER']
 
-    # Create timeline plot - now only one subplot
-    fig, ax1 = plt.subplots(1, 1, figsize=(16, 6))
-    fig.suptitle(f'Repeated Overseas Transfers Timeline: {pattern["pattern_id"]}',
-                 fontsize=16, fontweight='bold')
+    # Create timeline plot
+    fig, ax1 = plt.subplots(1, 1, figsize=(15, 8))
+    fig.suptitle(
+        f'Repeated Overseas Transfers Timeline: {pattern["pattern_id"]}', fontsize=22, fontweight='bold')
 
-    # Plot 1: Transaction amounts over time
+    # Plot transaction amounts over time
     if deposits:
         deposit_times = [tx['datetime'] for tx in deposits]
         deposit_amounts = [tx['amount'] for tx in deposits]
-        ax1.scatter(deposit_times, deposit_amounts, color=colors[1],
-                    s=100, alpha=0.7, label=f'Cash Deposits ({len(deposits)} txs)')
-
+        ax1.scatter(deposit_times, deposit_amounts, color=colors[1], s=200,
+                    alpha=0.8, label=f'Cash Deposits ({len(deposits)} txns)')
     if transfers:
         transfer_times = [tx['datetime'] for tx in transfers]
         transfer_amounts = [tx['amount'] for tx in transfers]
-        ax1.scatter(transfer_times, transfer_amounts, color=colors[0],
-                    s=100, alpha=0.7, label=f'Overseas Transfers ({len(transfers)} txs)')
+        ax1.scatter(transfer_times, transfer_amounts, color=colors[0], s=200,
+                    alpha=0.8, label=f'Overseas Transfers ({len(transfers)} txns)')
 
-    ax1.set_ylabel('Amount (€)', fontsize=12)
+    ax1.set_ylabel('Amount (€)', fontsize=22)
+    ax1.set_ylim(bottom=0)
     ax1.set_title('Transaction Amounts Over Time',
-                  fontsize=12, fontweight='bold')
-    ax1.legend(fontsize=12)
+                  fontsize=22, fontweight='bold')
+    ax1.legend(fontsize=18)
     ax1.grid(False)
+    ax1.tick_params(axis='both', which='major', labelsize=18)
     sns.despine(ax=ax1)
 
-    # Formatting X-axis
-    all_times = [tx['datetime'] for tx in transactions]
-    start_time = min(all_times)
-    end_time = max(all_times)
+    # Force x-axis to show timestamps at the beginning and end
+    start_time = min(tx['datetime'] for tx in transactions)
+    end_time = max(tx['datetime'] for tx in transactions)
+    ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax1.set_xticks([start_time, end_time])
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
     plt.setp(ax1.xaxis.get_majorticklabels(), rotation=0, ha='center')
@@ -337,19 +338,19 @@ def create_timeline_visualization(pattern, nodes_df, edges_df, colors):
     if deposits and transfers:
         deposit_end = max(tx['datetime'] for tx in deposits)
         transfer_start = min(tx['datetime'] for tx in transfers)
-
         ax1.axvline(x=deposit_end, color='gray', linestyle=':', alpha=0.7)
         ax1.axvline(x=transfer_start, color='gray', linestyle=':', alpha=0.7)
+
         deposit_mid = start_time + (deposit_end - start_time) / 2
         transfer_mid = transfer_start + (end_time - transfer_start) / 2
-        ax1.text(deposit_mid, ax1.get_ylim()[
-                 1] * 0.9, 'Deposit Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[1])
-        ax1.text(transfer_mid, ax1.get_ylim()[
-                 1] * 0.9, 'Transfer Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[0])
 
-    plt.tight_layout(rect=[0, 0, 1, 0.96])
-    plt.savefig('repeated_overseas_transfers_timeline.png',
-                dpi=300, bbox_inches='tight')
+        ax1.text(deposit_mid, ax1.get_ylim()[1] * 0.9, 'Deposit Phase',
+                 ha='center', va='center', fontsize=22, fontweight='bold', color=colors[1])
+        ax1.text(transfer_mid, ax1.get_ylim()[1] * 0.9, 'Transfer Phase',
+                 ha='center', va='center', fontsize=22, fontweight='bold', color=colors[0])
+
+    plt.tight_layout(pad=2.0)
+    plt.savefig('repeated_overseas_transfers_timeline.png')
     print("✓ Timeline visualization saved as 'repeated_overseas_transfers_timeline.png'")
     plt.show()
 

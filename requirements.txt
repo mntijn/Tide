@@ -1,3 +1,4 @@
 networkx==3.4.2
 PyYAML
 forex-python
+pickle

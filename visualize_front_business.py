@@ -42,7 +42,7 @@ def generate_pattern_data():
 
         # Create config file
         config = create_h1_config()
-        config['random_seed'] = 69
+        config['random_seed'] = 42
         with open(config_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
 
@@ -101,9 +101,9 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
     print(f"Visualizing pattern: {pattern['pattern_id']}")
 
     # Create a single, clear network diagram
-    fig, ax = plt.subplots(1, 1, figsize=(16, 12))
+    fig, ax = plt.subplots(1, 1, figsize=(20, 15))
     ax.set_title(f'FrontBusinessActivity Pattern: {pattern["pattern_id"]}',
-                 fontsize=20, fontweight='bold')
+                 fontsize=26, fontweight='bold')
 
     # Extract pattern entities and transactions
     pattern_entities = set(pattern['entities'])
@@ -282,7 +282,7 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
 
         # Draw node
         ax.scatter(pos[entity][0], pos[entity][1], c=color, s=size,
-                   alpha=0.9, edgecolors='black', linewidth=1.5)
+                   alpha=0.9, edgecolors='black', linewidth=1.5, zorder=5)
 
         # Create clear label matching the example format
         if entity == cash_account:
@@ -305,9 +305,9 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
                 label = f"{entity}\n[{country}]"
 
         # Position label above the node for readability
-        label_y_offset = 0.5
+        label_y_offset = 0.7
         ax.text(pos[entity][0], pos[entity][1] + label_y_offset, label,
-                ha='center', va='bottom', fontsize=12, fontweight='bold')
+                ha='center', va='bottom', fontsize=22, fontweight='bold', zorder=10)
 
     # Draw edges and prepare for consolidated labels
     deposit_midpoints = []
@@ -342,25 +342,8 @@ def create_network_visualization(pattern_data, nodes_df, edges_df):
         ax.annotate('', xy=dest_pos, xytext=src_pos,
                     arrowprops=dict(arrowstyle='->', color=color, lw=3,
                                     linestyle=linestyle, alpha=alpha,
-                                    shrinkA=35, shrinkB=35))
-
-    # Draw a single, consolidated label for all deposits
-    if deposit_midpoints:
-        avg_x = sum(p[0] for p in deposit_midpoints) / len(deposit_midpoints)
-        avg_y = sum(p[1] for p in deposit_midpoints) / len(deposit_midpoints)
-        offset_y = 0.3
-        ax.text(avg_x, avg_y + offset_y, "Deposits",
-                ha='center', va='center', fontsize=12,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC", edgecolor=deposit_color, alpha=0.9))
-
-    # Draw a single, consolidated label for all transfers
-    if transfer_midpoints:
-        avg_x = sum(p[0] for p in transfer_midpoints) / len(transfer_midpoints)
-        avg_y = sum(p[1] for p in transfer_midpoints) / len(transfer_midpoints)
-        offset_y = 0.3
-        ax.text(avg_x, avg_y + offset_y, "Transfers",
-                ha='center', va='center', fontsize=12,
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFFCC", edgecolor=transfer_color, alpha=0.9))
+                                    shrinkA=35, shrinkB=35),
+                    zorder=1)
 
     # Set axis properties dynamically based on node positions so nothing is cut off
     all_x = [coord[0] for coord in pos.values()]
@@ -412,9 +395,9 @@ def create_timeline_visualization(pattern_data, pattern):
                  == 'TransactionType.TRANSFER']
 
     # Create timeline plot
-    fig, ax = plt.subplots(1, 1, figsize=(15, 8))
+    fig, ax = plt.subplots(1, 1, figsize=(18, 10))
     ax.set_title(f'FrontBusinessActivity Pattern Timeline: {pattern["pattern_id"]}',
-                 fontsize=18, fontweight='bold')
+                 fontsize=26, fontweight='bold')
 
     # Plot 1: Transaction amounts over time
     if deposits:
@@ -429,11 +412,12 @@ def create_timeline_visualization(pattern_data, pattern):
         ax.scatter(transfer_times, transfer_amounts, color=color_palette['transfers'], s=100, alpha=0.7,
                    marker='o', label=f'Transfers ({len(transfers)} txns)')
 
-    ax.set_ylabel('Amount (€)', fontsize=14)
+    ax.set_ylabel('Amount (€)', fontsize=16)
+    ax.tick_params(axis='y', labelsize=21)
     ax.set_title('Transaction Amounts Over Time',
-                 fontsize=16, fontweight='bold')
+                 fontsize=24, fontweight='bold')
     ax.grid(False)
-    ax.legend(frameon=False, fontsize=12)
+    ax.legend(frameon=False, fontsize=22)
     # Show only first and last (and optionally midpoint) timestamps to avoid clutter
     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
     all_times = [tx['datetime'] for tx in transactions]
@@ -453,12 +437,12 @@ def create_timeline_visualization(pattern_data, pattern):
             xticks.insert(1, mid_time)
         ax.set_xticks(xticks)
         plt.setp(ax.xaxis.get_majorticklabels(),
-                 rotation=0, ha='center', fontsize=12)
+                 rotation=0, ha='center', fontsize=22)
     else:
         ax.set_xticks([])
 
     sns.despine(ax=ax, trim=True)
-    plt.tight_layout()
+    plt.tight_layout(pad=2)
     plt.savefig('front_business_timeline.png', dpi=300, bbox_inches='tight')
     print("✓ Timeline visualization saved as 'front_business_timeline.png'")
     plt.show()

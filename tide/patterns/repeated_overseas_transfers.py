@@ -243,7 +243,7 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             "transfer_interval_days", [7, 14, 30])
 
         temporal_type = random_instance.choice(
-            ["high_frequency"])
+            ["periodic"])
         num_transactions = random_instance.randint(min_tx, max_tx)
 
         # Transfers start after a short delay following the last deposit

@@ -363,26 +363,27 @@ def create_timeline_visualization(pattern_data, pattern, colors):
                    == 'TransactionType.WITHDRAWAL']
 
     # Create timeline plot
-    fig, ax1 = plt.subplots(1, 1, figsize=(15, 6))
+    fig, ax1 = plt.subplots(1, 1, figsize=(15, 8))
     fig.suptitle(f'RapidFundMovement Pattern Timeline: {pattern["pattern_id"]}',
-                 fontsize=20, fontweight='bold')
+                 fontsize=22, fontweight='bold')
     # Plot transaction amounts over time
     if inflows:
         inflow_times = [tx['datetime'] for tx in inflows]
         inflow_amounts = [tx['amount'] for tx in inflows]
         ax1.scatter(inflow_times, inflow_amounts,
-                    color=colors[0], s=100, alpha=0.7, label=f'Inflows ({len(inflows)} txns)')
+                    color=colors[0], s=200, alpha=0.7, label=f'Inflows ({len(inflows)} txns)')
     if withdrawals:
         withdrawal_times = [tx['datetime'] for tx in withdrawals]
         withdrawal_amounts = [tx['amount'] for tx in withdrawals]
         ax1.scatter(withdrawal_times, withdrawal_amounts,
-                    color=colors[1], s=100, alpha=0.7, label=f'Withdrawals ({len(withdrawals)} txns)')
-    ax1.set_ylabel('Amount (€)', fontsize=14)
+                    color=colors[1], s=200, alpha=0.7, label=f'Withdrawals ({len(withdrawals)} txns)')
+    ax1.set_ylabel('Amount (€)', fontsize=22)
     ax1.set_ylim(bottom=0)
     ax1.set_title('Transaction Amounts Over Time',
-                  fontsize=16, fontweight='bold')
-    ax1.legend(fontsize=12)
+                  fontsize=22, fontweight='bold')
+    # ax1.legend(fontsize=18)
     ax1.grid(False)
+    ax1.tick_params(axis='both', which='major', labelsize=18)
     sns.despine(ax=ax1)
     # Force x-axis to show timestamps at the beginning and end of the timeline (horizontal)
     start_time = min(tx['datetime'] for tx in transactions)
@@ -400,9 +401,9 @@ def create_timeline_visualization(pattern_data, pattern, colors):
         inflow_mid = start_time + (inflow_end - start_time) / 2
         withdrawal_mid = withdrawal_start + (end_time - withdrawal_start) / 2
         ax1.text(inflow_mid, ax1.get_ylim()[
-                 1] * 0.9, 'Inflow Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[0])
+                 1] * 0.9, 'Inflow Phase', ha='center', va='center', fontsize=22, fontweight='bold', color=colors[0])
         ax1.text(withdrawal_mid, ax1.get_ylim()[
-                 1] * 0.9, 'Withdrawal Phase', ha='center', va='center', fontsize=12, fontweight='bold', color=colors[1])
+                 1] * 0.9, 'Withdrawal Phase', ha='center', va='center', fontsize=22, fontweight='bold', color=colors[1])
     plt.tight_layout(pad=1.5)
     plt.savefig('rapid_fund_movement_timeline.png')
     plt.show()

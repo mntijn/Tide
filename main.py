@@ -206,7 +206,7 @@ if __name__ == "__main__":
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
 
     # Export to CSV
-    if output_config.get('CSVfiles', False):
+    if output_config.get('CSVfiles', True):
         print("\nExporting to CSV...")
         export_to_csv(
             graph=graph,
