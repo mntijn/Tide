@@ -459,6 +459,21 @@ class CompositePattern(PatternInjector):
 
         return generated_edges
 
+    def inject_pattern_generator(self, entities: List[str]):
+        """Generate all edges for this pattern as a generator."""
+        try:
+            # Entity selection
+            entity_selection = self.structural.select_entities(entities)
+            if not entity_selection.central_entities:
+                return
+
+            # Yield transactions from each sequence
+            for sequence in self.temporal.generate_transaction_sequences(entity_selection):
+                yield from sequence.transactions
+
+        except Exception as e:
+            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
+
     @property
     def pattern_name(self) -> str:
         """Return a descriptive name for this pattern"""

@@ -7,3 +7,5 @@ __pycache__/
 *.graphml
 *.html
 *.png
+*.pt
+/test_dataset

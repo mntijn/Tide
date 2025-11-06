@@ -19,7 +19,7 @@ class LegitimateHighPaymentsPattern:
     def pattern_name(self) -> str:
         return "LegitimateHighPayments"
 
-    def inject_pattern(self, available_entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
+    def inject_pattern_generator(self, available_entities: List[str]):
         """Generate legitimate high-value transactions between wealthy individuals and large businesses."""
 
         # Get high-value transactors from existing clusters
@@ -43,7 +43,7 @@ class LegitimateHighPaymentsPattern:
                     all_high_value_accounts.append((neighbor, entity_id))
 
         if len(all_high_value_accounts) < 2:
-            return []
+            return
 
         # Get configuration
         high_payments_config = self.params.get(
@@ -71,10 +71,9 @@ class LegitimateHighPaymentsPattern:
             monthly_rate * total_months * len(all_high_value_accounts))
 
         if total_expected_txs == 0:
-            return []
+            return
 
         # Generate transactions efficiently
-        transactions = []
         pattern_injector = PatternInjector(self.graph_generator, self.params)
         total_seconds = max(1, (end_date - start_date).total_seconds())
 
@@ -125,6 +124,4 @@ class LegitimateHighPaymentsPattern:
                 is_fraudulent=False,
             )
 
-            transactions.append((src_account_id, dest_account_id, tx_attrs))
-
-        return transactions
+            yield (src_account_id, dest_account_id, tx_attrs)

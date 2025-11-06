@@ -1,0 +1,509 @@
+montijn@AMLbench (master) > p experiments/h2_scalability.py
+=== H2: Scalability Experiment ===
+Testing generation performance across different scales
+
+Running extra_small scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 142 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_4729
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 761), ('high_risk_business_categories', 35), ('high_risk_occupations', 39), ('high_paid_occupations', 16), ('high_risk_score', 31), ('super_high_risk', 37), ('intermediaries', 686), ('offshore_candidates', 12), ('structuring_candidates', 72)]
+INFO:tide.utils.clustering:  high_risk_countries: 761 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 35 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 39 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 16 entities
+INFO:tide.utils.clustering:  high_risk_score: 31 entities
+INFO:tide.utils.clustering:  super_high_risk: 37 entities
+INFO:tide.utils.clustering:  intermediaries: 686 entities
+INFO:tide.utils.clustering:  offshore_candidates: 12 entities
+INFO:tide.utils.clustering:  structuring_candidates: 72 entities
+INFO:tide.utils.clustering:Super high-risk entities: 37/1142 (3.2%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 2350 accounts from 761 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 132 accounts from 35 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 133 accounts from 39 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 55 accounts from 16 entities
+INFO:tide.utils.clustering:  high_risk_score: 100 accounts from 31 entities
+INFO:tide.utils.clustering:  super_high_risk: 120 accounts from 37 entities
+INFO:tide.utils.clustering:  intermediaries: 2400 accounts from 686 entities
+INFO:tide.utils.clustering:  offshore_candidates: 43 accounts from 12 entities
+INFO:tide.utils.clustering:  structuring_candidates: 248 accounts from 72 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 3515 accounts from 1142 entities
+INFO:tide.graph_generator:Injecting 1 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x13e371c90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x13e371c90>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 13 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 1 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 376,915
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x13fa80b10>>
+RandomPayments: Generating 376,808 transactions for 3,515 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x13fa80b10>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x13fa80c50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x13fa80c50>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x11fa99210>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x11fa99210>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x13fa80e10>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x13fa80e10>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 4730, Total edges: 375929
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpusyb3lor/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpusyb3lor/generated_edges.csv
+Extra small Scale Results:
+  Individuals: 1,000
+  Nodes: 4,730
+  Account Nodes: 3,534
+  Edges (Transactions): 372,273
+  Total Edges: 375,929
+  Configured Rate: 0.800 tx/account/day
+  Actual Rate: 0.786 tx/account/day
+  Total Elements (N): 377,003
+  Wall Time: 1.84 seconds
+  Memory Usage: 459.7 MB
+  Patterns Generated: 1/1 (✓)
+
+Running small scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 319 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_9459
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 1535), ('high_risk_business_categories', 59), ('high_risk_occupations', 82), ('high_paid_occupations', 30), ('high_risk_score', 59), ('super_high_risk', 73), ('intermediaries', 1357), ('offshore_candidates', 24), ('structuring_candidates', 151)]
+INFO:tide.utils.clustering:  high_risk_countries: 1535 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 59 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 82 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 30 entities
+INFO:tide.utils.clustering:  high_risk_score: 59 entities
+INFO:tide.utils.clustering:  super_high_risk: 73 entities
+INFO:tide.utils.clustering:  intermediaries: 1357 entities
+INFO:tide.utils.clustering:  offshore_candidates: 24 entities
+INFO:tide.utils.clustering:  structuring_candidates: 151 entities
+INFO:tide.utils.clustering:Super high-risk entities: 73/2319 (3.1%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 4683 accounts from 1535 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 192 accounts from 59 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 265 accounts from 82 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 98 accounts from 30 entities
+INFO:tide.utils.clustering:  high_risk_score: 189 accounts from 59 entities
+INFO:tide.utils.clustering:  super_high_risk: 236 accounts from 73 entities
+INFO:tide.utils.clustering:  intermediaries: 4716 accounts from 1357 entities
+INFO:tide.utils.clustering:  offshore_candidates: 75 accounts from 24 entities
+INFO:tide.utils.clustering:  structuring_candidates: 498 accounts from 151 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 7068 accounts from 2319 entities
+INFO:tide.graph_generator:Injecting 2 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x178abea50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x178abea50>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x178abebd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x178abebd0>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 30 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 2 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 947,246
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x178abf050>>
+RandomPayments: Generating 947,112 transactions for 7,068 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x178abf050>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x178abf150>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x178abf150>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x178abf5d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x178abf5d0>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x178abf550>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x178abf550>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 9460, Total edges: 948122
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpy6rapo7n/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpy6rapo7n/generated_edges.csv
+Small Scale Results:
+  Individuals: 2,000
+  Nodes: 9,460
+  Account Nodes: 7,118
+  Edges (Transactions): 940,735
+  Total Edges: 948,122
+  Configured Rate: 1.000 tx/account/day
+  Actual Rate: 0.986 tx/account/day
+  Total Elements (N): 950,195
+  Wall Time: 4.86 seconds
+  Memory Usage: 711.0 MB
+  Patterns Generated: 2/2 (✓)
+
+Running small_medium scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 535 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_16580
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 2706), ('high_risk_business_categories', 104), ('high_risk_occupations', 153), ('high_paid_occupations', 69), ('high_risk_score', 106), ('super_high_risk', 140), ('intermediaries', 2380), ('offshore_candidates', 37), ('structuring_candidates', 282)]
+INFO:tide.utils.clustering:  high_risk_countries: 2706 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 104 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 153 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 69 entities
+INFO:tide.utils.clustering:  high_risk_score: 106 entities
+INFO:tide.utils.clustering:  super_high_risk: 140 entities
+INFO:tide.utils.clustering:  intermediaries: 2380 entities
+INFO:tide.utils.clustering:  offshore_candidates: 37 entities
+INFO:tide.utils.clustering:  structuring_candidates: 282 entities
+INFO:tide.utils.clustering:Super high-risk entities: 140/4035 (3.5%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 8409 accounts from 2706 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 379 accounts from 104 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 569 accounts from 153 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 249 accounts from 69 entities
+INFO:tide.utils.clustering:  high_risk_score: 399 accounts from 106 entities
+INFO:tide.utils.clustering:  super_high_risk: 520 accounts from 140 entities
+INFO:tide.utils.clustering:  intermediaries: 8511 accounts from 2380 entities
+INFO:tide.utils.clustering:  offshore_candidates: 136 accounts from 37 entities
+INFO:tide.utils.clustering:  structuring_candidates: 1030 accounts from 282 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 12473 accounts from 4035 entities
+INFO:tide.graph_generator:Injecting 4 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x178e0e150>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x178e0e150>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x178b042d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x178b042d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x178b042d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x178b042d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x178e0e350>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x178e0e350>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 137 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 4 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 2,005,819
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x178d64b90>>
+RandomPayments: Generating 2,005,658 transactions for 12,473 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x178d64b90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x178bcc290>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x178bcc290>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x178ad8ad0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x178ad8ad0>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x178de6050>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x178de6050>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 16581, Total edges: 2010471
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmp9l9c5hkl/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmp9l9c5hkl/generated_edges.csv
+Small medium Scale Results:
+  Individuals: 3,500
+  Nodes: 16,581
+  Account Nodes: 12,563
+  Edges (Transactions): 1,997,464
+  Total Edges: 2,010,471
+  Configured Rate: 1.200 tx/account/day
+  Actual Rate: 1.187 tx/account/day
+  Total Elements (N): 2,014,045
+  Wall Time: 11.26 seconds
+  Memory Usage: 1027.2 MB
+  Patterns Generated: 4/4 (✓)
+
+Running medium scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 795 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_23661
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 3816), ('high_risk_business_categories', 133), ('high_risk_occupations', 235), ('high_paid_occupations', 96), ('high_risk_score', 154), ('super_high_risk', 196), ('intermediaries', 3384), ('offshore_candidates', 53), ('structuring_candidates', 395)]
+INFO:tide.utils.clustering:  high_risk_countries: 3816 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 133 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 235 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 96 entities
+INFO:tide.utils.clustering:  high_risk_score: 154 entities
+INFO:tide.utils.clustering:  super_high_risk: 196 entities
+INFO:tide.utils.clustering:  intermediaries: 3384 entities
+INFO:tide.utils.clustering:  offshore_candidates: 53 entities
+INFO:tide.utils.clustering:  structuring_candidates: 395 entities
+INFO:tide.utils.clustering:Super high-risk entities: 196/5795 (3.4%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 11752 accounts from 3816 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 444 accounts from 133 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 850 accounts from 235 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 336 accounts from 96 entities
+INFO:tide.utils.clustering:  high_risk_score: 534 accounts from 154 entities
+INFO:tide.utils.clustering:  super_high_risk: 673 accounts from 196 entities
+INFO:tide.utils.clustering:  intermediaries: 11922 accounts from 3384 entities
+INFO:tide.utils.clustering:  offshore_candidates: 199 accounts from 53 entities
+INFO:tide.utils.clustering:  structuring_candidates: 1390 accounts from 395 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 17794 accounts from 5795 entities
+INFO:tide.graph_generator:Injecting 5 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x12f8aec50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x12f8aec50>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x315c43010>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x315c43010>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x3155a0090>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x3155a0090>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x315be7cd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x315be7cd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x315c43010>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x315c43010>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 131 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 5 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 3,338,342
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x3158b4a50>>
+RandomPayments: Generating 3,338,154 transactions for 17,794 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x3158b4a50>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x315ae1690>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x315ae1690>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x3157225d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x3157225d0>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x315a4bb10>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x315a4bb10>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 23662, Total edges: 3346239
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpovl_m0tw/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpovl_m0tw/generated_edges.csv
+Medium Scale Results:
+  Individuals: 5,000
+  Nodes: 23,662
+  Account Nodes: 17,909
+  Edges (Transactions): 3,327,652
+  Total Edges: 3,346,239
+  Configured Rate: 1.400 tx/account/day
+  Actual Rate: 1.387 tx/account/day
+  Total Elements (N): 3,351,314
+  Wall Time: 24.80 seconds
+  Memory Usage: 465.7 MB
+  Patterns Generated: 5/5 (✓)
+
+Running medium_large scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 1148 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_37230
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 5997), ('high_risk_business_categories', 229), ('high_risk_occupations', 361), ('high_paid_occupations', 151), ('high_risk_score', 232), ('super_high_risk', 289), ('intermediaries', 5389), ('offshore_candidates', 93), ('structuring_candidates', 619)]
+INFO:tide.utils.clustering:  high_risk_countries: 5997 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 229 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 361 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 151 entities
+INFO:tide.utils.clustering:  high_risk_score: 232 entities
+INFO:tide.utils.clustering:  super_high_risk: 289 entities
+INFO:tide.utils.clustering:  intermediaries: 5389 entities
+INFO:tide.utils.clustering:  offshore_candidates: 93 entities
+INFO:tide.utils.clustering:  structuring_candidates: 619 entities
+INFO:tide.utils.clustering:Super high-risk entities: 289/9148 (3.2%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 18457 accounts from 5997 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 795 accounts from 229 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 1258 accounts from 361 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 512 accounts from 151 entities
+INFO:tide.utils.clustering:  high_risk_score: 813 accounts from 232 entities
+INFO:tide.utils.clustering:  super_high_risk: 994 accounts from 289 entities
+INFO:tide.utils.clustering:  intermediaries: 18811 accounts from 5389 entities
+INFO:tide.utils.clustering:  offshore_candidates: 292 accounts from 93 entities
+INFO:tide.utils.clustering:  structuring_candidates: 2098 accounts from 619 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 28010 accounts from 9148 entities
+INFO:tide.graph_generator:Injecting 9 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x34c416b50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x34c416b50>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x34be1c9d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x34be1c9d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x34c2ced90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x34bf4b010>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x34bf4b010>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x34c416b50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x34c416b50>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 174 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 9 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 6,005,558
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x34bce5f90>>
+RandomPayments: Generating 6,005,344 transactions for 28,010 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x34bce5f90>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x34c532e10>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x34c532e10>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x34b9aebd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x34b9aebd0>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x34bbc3a90>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x34bbc3a90>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 37231, Total edges: 6021688
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpqa2f_jbm/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpqa2f_jbm/generated_edges.csv
+Medium large Scale Results:
+  Individuals: 8,000
+  Nodes: 37,231
+  Account Nodes: 28,195
+  Edges (Transactions): 5,992,531
+  Total Edges: 6,021,688
+  Configured Rate: 1.600 tx/account/day
+  Actual Rate: 1.586 tx/account/day
+  Total Elements (N): 6,029,762
+  Wall Time: 79.23 seconds
+  Memory Usage: 1375.9 MB
+  Patterns Generated: 9/9 (✓)
+
+Running large scale test...
+INFO:tide.graph_generator:Starting graph generation...
+INFO:tide.utils.entity_initialization:Starting entity generation...
+INFO:tide.utils.entity_initialization:Deterministic mode enabled with seed 42
+INFO:tide.utils.entity_initialization:Generating institutions...
+INFO:tide.utils.entity_initialization:Generating individuals...
+INFO:tide.utils.entity_initialization:Created 1799 total businesses
+INFO:tide.utils.entity_initialization:Generating accounts...
+INFO:tide.utils.entity_initialization:Account generation completed
+INFO:tide.utils.entity_initialization:Created global cash system account: account_56168
+INFO:tide.utils.entity_initialization:Entity and account generation complete
+INFO:tide.utils.clustering:Building entity clusters...
+INFO:tide.utils.clustering:Built entity clusters: [('high_risk_countries', 9143), ('high_risk_business_categories', 367), ('high_risk_occupations', 532), ('high_paid_occupations', 215), ('high_risk_score', 385), ('super_high_risk', 479), ('intermediaries', 8133), ('offshore_candidates', 129), ('structuring_candidates', 959)]
+INFO:tide.utils.clustering:  high_risk_countries: 9143 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 367 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 532 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 215 entities
+INFO:tide.utils.clustering:  high_risk_score: 385 entities
+INFO:tide.utils.clustering:  super_high_risk: 479 entities
+INFO:tide.utils.clustering:  intermediaries: 8133 entities
+INFO:tide.utils.clustering:  offshore_candidates: 129 entities
+INFO:tide.utils.clustering:  structuring_candidates: 959 entities
+INFO:tide.utils.clustering:Super high-risk entities: 479/13799 (3.5%)
+INFO:tide.utils.clustering:Pre-computing account collections for clusters...
+INFO:tide.utils.clustering:  high_risk_countries: 28304 accounts from 9143 entities
+INFO:tide.utils.clustering:  high_risk_business_categories: 1368 accounts from 367 entities
+INFO:tide.utils.clustering:  high_risk_age_groups: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  high_risk_occupations: 1910 accounts from 532 entities
+INFO:tide.utils.clustering:  high_paid_occupations: 744 accounts from 215 entities
+INFO:tide.utils.clustering:  high_risk_score: 1389 accounts from 385 entities
+INFO:tide.utils.clustering:  super_high_risk: 1702 accounts from 479 entities
+INFO:tide.utils.clustering:  intermediaries: 28795 accounts from 8133 entities
+INFO:tide.utils.clustering:  offshore_candidates: 463 accounts from 129 entities
+INFO:tide.utils.clustering:  structuring_candidates: 3345 accounts from 959 entities
+INFO:tide.utils.clustering:  fraudulent: 0 accounts from 0 entities
+INFO:tide.utils.clustering:  legit: 42297 accounts from 13799 entities
+INFO:tide.graph_generator:Injecting 14 AML patterns randomly...
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x382b54dd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x382b54dd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x382b54dd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.u_turn_transactions.UTurnTransactionsPattern object at 0x382b54dd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.rapid_fund_movement.RapidFundMovementPattern object at 0x382a30bd0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.front_business_activity.FrontBusinessPattern object at 0x382ef23d0>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.repeated_overseas_transfers.RepeatedOverseasTransfersPattern object at 0x382d61450>> completed
+INFO:tide.graph_generator:Done injecting AML patterns. Added 377 fraudulent transaction edges.
+INFO:tide.graph_generator:Tracked 14 actual pattern instances.
+INFO:tide.graph_generator:Using rate-based count for background activity: 10,202,277
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x38179a650>>
+RandomPayments: Generating 10,202,036 transactions for 42,297 accounts
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.background_activity.RandomPaymentsPattern object at 0x38179a650>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x38164b650>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.salary_payments.SalaryPaymentsPattern object at 0x38164b650>> completed
+Running pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x382db7a50>>
+Pattern <bound method CompositePattern.inject_pattern of <tide.patterns.background.fraudster_background.FraudsterBackgroundPattern object at 0x382db7a50>> completed
+Running pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x382c8bc10>>
+Pattern <bound method LegitimateHighPaymentsPattern.inject_pattern of <tide.patterns.background.legitimate_high_payments.LegitimateHighPaymentsPattern object at 0x382c8bc10>> completed
+INFO:tide.graph_generator:Graph generation complete. Total nodes: 56169, Total edges: 10233158
+Exporting graph to CSV: /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpnad_0r06/generated_nodes.csv, /var/folders/c_/qqq51_59241ggyg53_g874f80000gn/T/tmpnad_0r06/generated_edges.csv
+Large Scale Results:
+  Individuals: 12,000
+  Nodes: 56,169
+  Account Nodes: 42,583
+  Edges (Transactions): 10,189,065
+  Total Edges: 10,233,158
+  Configured Rate: 1.800 tx/account/day
+  Actual Rate: 1.786 tx/account/day
+  Total Elements (N): 10,245,234
+  Wall Time: 241.18 seconds
+  Memory Usage: 2292.0 MB
+  Patterns Generated: 14/14 (✓)
+
+=== Scaling Analysis ===
+Power-law Model: T(N) = c × N^α
+  Scaling Exponent (α): 1.461
+  Log-log R²: 0.974
+  Complexity Class: Quadratic or near-quadratic
+
+Pearson Correlation (r): 0.962
+  P-value: 2.188e-03
+  Correlation Strength: Very strong
+
+Memory Efficiency Analysis:
+  Extra_small: 0.0012 MB/element
+  Small: 0.0007 MB/element
+  Small_medium: 0.0005 MB/element
+  Medium: 0.0001 MB/element
+  Medium_large: 0.0002 MB/element
+  Large: 0.0002 MB/element
+  Average: 0.0005 MB/element
+  Trend: Decreasing
+
+Traditional Scaling Factors:
+Extra → Small → To → Small:
+  Size increase: 2.0x
+  Time increase: 2.6x
+  Memory increase: 1.5x
+
+Small → To → Small → Medium:
+  Size increase: 1.8x
+  Time increase: 2.3x
+  Memory increase: 1.4x
+
+Small → Medium → To → Medium:
+  Size increase: 1.4x
+  Time increase: 2.2x
+  Memory increase: 0.5x
+
+Medium → To → Medium → Large:
+  Size increase: 1.6x
+  Time increase: 3.2x
+  Memory increase: 3.0x
+
+Medium → Large → To → Large:
+  Size increase: 1.5x
+  Time increase: 3.0x
+  Memory increase: 1.7x
+
+=== H2 Results ===
+✓ Tide demonstrates excellent scalability across different graph sizes
+✓ Pattern generation successful at all scales
+✓ Time complexity appears reasonable (α=1.461)
+✓ Strong correlation between size and time (r=0.962)

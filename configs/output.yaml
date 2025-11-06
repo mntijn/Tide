@@ -1,3 +1,5 @@
-CSVfiles: True
+CSVfiles: False
 GraphML: False
 Gpickle: False
+PyTorch: True
+TransactionsOnly: True

@@ -599,9 +599,9 @@ def run_h2_experiment():
     print("=== H2: Scalability Experiment ===")
     print("Testing generation performance across different scales with multiple runs\n")
 
-    NUM_RUNS = 3
+    NUM_RUNS = 1
     scales = ["extra_small", "small", "small_medium",
-              "medium", "medium_large", "large"]
+              "medium"]
     all_runs_results = []
 
     for i in range(NUM_RUNS):

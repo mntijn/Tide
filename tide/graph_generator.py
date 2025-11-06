@@ -511,7 +511,8 @@ class GraphGenerator:
             task_index = 0
 
             for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
-                task = (pattern_instance.inject_pattern, ([],), task_index)
+                task = (pattern_instance.inject_pattern_generator,
+                        ([],), task_index)
                 background_tasks.append(task)
                 task_index += 1
 
@@ -525,19 +526,25 @@ class GraphGenerator:
             # 5) Merge results back into the master graph
             # ------------------------------------------------------------------
             total_bg_edges_added = 0
-            for bg_edges in background_results:
+            for bg_edges_generator in background_results:
+                if bg_edges_generator is None:
+                    continue
 
-                edge_triplets = [
-                    (
-                        src,
-                        dest,
-                        (attrs.__dict__ if hasattr(attrs, "__dict__") else attrs),
-                    )
-                    for src, dest, attrs in bg_edges
-                ]
+                chunk_size = 10000
+                chunk = []
+                count = 0
+                for src, dest, attrs in bg_edges_generator:
+                    chunk.append(
+                        (src, dest, (attrs.__dict__ if hasattr(attrs, "__dict__") else attrs)))
+                    if len(chunk) >= chunk_size:
+                        self.graph.add_edges_from(chunk)
+                        chunk = []
+                    count += 1
 
-                self.graph.add_edges_from(edge_triplets)
-                total_bg_edges_added += len(bg_edges)
+                if chunk:
+                    self.graph.add_edges_from(chunk)
+
+                total_bg_edges_added += count
 
         except Exception as e:
             logger.error(f"Failed to inject background activity: {e}")

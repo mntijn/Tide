@@ -67,13 +67,12 @@ class SalaryPaymentsStructural(StructuralComponent):
 class SalaryPaymentsTemporal(TemporalComponent):
     """Temporal component: generate regular salary payments on scheduled dates."""
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    def _generate_transactions_stream(self, entity_selection: EntitySelection):
         business_accounts = entity_selection.central_entities
         individual_accounts = entity_selection.peripheral_entities
 
         if not business_accounts or not individual_accounts:
-            return sequences
+            return
 
         # Get salary payment configuration
         salary_config = self.params.get(
@@ -94,7 +93,6 @@ class SalaryPaymentsTemporal(TemporalComponent):
         end_date: datetime.datetime = self.time_span["end_date"]
 
         # Generate salary payments - businesses pay individuals regularly
-        all_transactions = []
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
         # Each business pays some random individuals
@@ -147,25 +145,33 @@ class SalaryPaymentsTemporal(TemporalComponent):
                         transaction_type=TransactionType.PAYMENT,
                         is_fraudulent=False,
                     )
-                    all_transactions.append(
-                        (business_account_id, individual_account_id, tx_attrs))
+                    yield (business_account_id, individual_account_id, tx_attrs)
 
-        # Create sequences grouped by business
-        if all_transactions:
-            # Sort by timestamp
-            all_transactions.sort(key=lambda x: x[2].timestamp)
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+        """
+        Returns a list containing a single TransactionSequence.
+        The sequence's 'transactions' attribute is a generator, not a list.
+        """
+        sequences: List[TransactionSequence] = []
+        business_accounts = entity_selection.central_entities
+        individual_accounts = entity_selection.peripheral_entities
 
-            sequence_name = "salary_payments"
-            timestamps = [tx[2].timestamp for tx in all_transactions]
-            sequences.append(
-                TransactionSequence(
-                    transactions=all_transactions,
-                    sequence_name=sequence_name,
-                    start_time=min(timestamps),
-                    duration=max(timestamps) - min(timestamps),
-                )
+        if not business_accounts or not individual_accounts:
+            return sequences
+
+        # The transaction data is provided by a generator for memory efficiency
+        transaction_generator = self._generate_transactions_stream(
+            entity_selection)
+
+        sequences.append(
+            TransactionSequence(
+                transactions=transaction_generator,
+                sequence_name="salary_payments",
+                start_time=self.time_span.get("start_date"),
+                duration=self.time_span.get(
+                    "end_date") - self.time_span.get("start_date"),
             )
-
+        )
         return sequences
 
     def _generate_payment_dates(self, start_date: datetime.datetime,

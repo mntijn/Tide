@@ -1,14 +1,14 @@
 graph_scale:
-  individuals: 5000
+  individuals: 2500
   # businesses: 0
-  institutions_per_country: 3
+  institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
-  business_accounts_per_institution_range: [1, 6]
+  business_accounts_per_institution_range: [1, 5]
 transaction_rates:
-  per_account_per_day: 1.5
+  per_account_per_day: 1.2
 time_span:
   start_date: '2023-01-01T00:00:00'
-  end_date: '2023-05-15T23:59:59'
+  end_date: '2023-12-31T23:59:59'
 account_balance_range_normal: [1000.0, 50000.0]
 
 company_size_range: [1, 1000]
@@ -74,12 +74,12 @@ backgroundPatterns:
 # Pattern generation settings
 pattern_frequency:
   random: False
-  num_illicit_patterns: 6
+  num_illicit_patterns: 50
 
   # If random is false these values are used instead of num_illicit patterns
-  RapidFundMovement: 4
-  FrontBusinessActivity: 2
-  RepeatedOverseasTransfers: 5
+  RapidFundMovement: 20
+  FrontBusinessActivity: 15
+  RepeatedOverseasTransfers: 15
 
 # Reporting threshold for structuring amounts
 reporting_threshold: 10000

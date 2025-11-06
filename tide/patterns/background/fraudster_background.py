@@ -56,13 +56,12 @@ class FraudsterBackgroundStructural(StructuralComponent):
 class FraudsterBackgroundTemporal(TemporalComponent):
     """Temporal component: generate low-frequency, small-amount camouflage transactions."""
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    def _generate_transactions_stream(self, entity_selection: EntitySelection):
         fraudster_accounts = entity_selection.central_entities
         legit_accounts = entity_selection.peripheral_entities
 
         if not fraudster_accounts or not legit_accounts:
-            return sequences
+            return
 
         # Get fraudster background configuration
         fraudster_config = self.params.get(
@@ -88,7 +87,9 @@ class FraudsterBackgroundTemporal(TemporalComponent):
         end_date: datetime.datetime = self.time_span["end_date"]
         total_days = (end_date - start_date).days
 
-        all_transactions = []
+        if total_days <= 0:
+            total_days = 1
+
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
         # Generate camouflage transactions for each fraudster account
@@ -163,21 +164,30 @@ class FraudsterBackgroundTemporal(TemporalComponent):
                     is_fraudulent=False,  # These are camouflage, not fraudulent
                 )
 
-                all_transactions.append((src_id, dest_id, tx_attrs))
+                yield (src_id, dest_id, tx_attrs)
 
-        # Create single sequence for all fraudster background activity
-        if all_transactions:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+        sequences: List[TransactionSequence] = []
+        fraudster_accounts = entity_selection.central_entities
+        legit_accounts = entity_selection.peripheral_entities
 
-            # Sort by timestamp
-            all_transactions.sort(key=lambda x: x[2].timestamp)
+        if not fraudster_accounts or not legit_accounts:
+            return sequences
 
-            sequences.append(TransactionSequence(
-                transactions=all_transactions,
+        # The transaction data is provided by a generator for memory efficiency
+        transaction_generator = self._generate_transactions_stream(
+            entity_selection)
+
+        # The framework expects a TransactionSequence, so we wrap the generator.
+        sequences.append(
+            TransactionSequence(
+                transactions=transaction_generator,
                 sequence_name="fraudster_background_camouflage",
-                start_time=all_transactions[0][2].timestamp,
-                duration=all_transactions[-1][2].timestamp -
-                all_transactions[0][2].timestamp
-            ))
+                start_time=self.time_span.get("start_date"),
+                duration=self.time_span.get(
+                    "end_date") - self.time_span.get("start_date"),
+            )
+        )
 
         return sequences
 
