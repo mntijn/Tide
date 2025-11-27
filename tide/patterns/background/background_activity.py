@@ -23,32 +23,52 @@ class NonFraudulentRandomStructural(StructuralComponent):
         if hasattr(self.graph_generator, 'account_clusters'):
             legit_accounts = self.graph_generator.account_clusters.get(
                 "legit", [])
-            if not legit_accounts:
-                print(
-                    "DEBUG [RandomPayments]: No legit accounts found in pre-computed clusters!")
-                return EntitySelection(central_entities=[], peripheral_entities=[])
+            fraud_accounts = self.graph_generator.account_clusters.get(
+                "fraudulent", [])
         else:
-
-            print(
-                "DEBUG [RandomPayments]: No legit accounts found in pre-computed clusters!")
             # Fallback to original method if clusters not available
             legit_entities = self.graph_generator.entity_clusters.get(
                 "legit", [])
-            if not legit_entities:
-                print("DEBUG [RandomPayments]: No legit entities found!")
-                return EntitySelection(central_entities=[], peripheral_entities=[])
+            fraud_entities = self.graph_generator.entity_clusters.get(
+                "fraudulent", [])
 
-                # Get accounts belonging to legitimate entities using the helper function
-                legit_accounts = []
-                for entity_id in legit_entities:
-                    entity_accounts = self._get_owned_accounts(entity_id)
-                    legit_accounts.extend(entity_accounts)
+            # Get accounts belonging to legitimate entities using the helper function
+            legit_accounts = []
+            for entity_id in legit_entities:
+                entity_accounts = self._get_owned_accounts(entity_id)
+                legit_accounts.extend(entity_accounts)
 
-              # Remove duplicates while preserving order
-                from ..base import deduplicate_preserving_order
-                legit_accounts = deduplicate_preserving_order(legit_accounts)
+            # Get accounts belonging to fraudulent entities
+            fraud_accounts = []
+            for entity_id in fraud_entities:
+                entity_accounts = self._get_owned_accounts(entity_id)
+                fraud_accounts.extend(entity_accounts)
 
-        return EntitySelection(central_entities=legit_accounts, peripheral_entities=[])
+            # Remove duplicates while preserving order
+            from ..base import deduplicate_preserving_order
+            legit_accounts = deduplicate_preserving_order(legit_accounts)
+            fraud_accounts = deduplicate_preserving_order(fraud_accounts)
+
+        # Select most fraud accounts (80-90%), but not all
+        if fraud_accounts:
+            # Randomly select 80-90% of fraud accounts
+            selection_rate = random_instance.uniform(0.8, 0.9)
+            num_fraud_to_select = max(
+                1, int(len(fraud_accounts) * selection_rate))
+            selected_fraud_accounts = random_instance.sample(
+                fraud_accounts, min(num_fraud_to_select, len(fraud_accounts)))
+        else:
+            selected_fraud_accounts = []
+
+        # Combine legit and selected fraud accounts
+        all_accounts = legit_accounts + selected_fraud_accounts
+
+        if not all_accounts:
+            print(
+                "DEBUG [RandomPayments]: No accounts found (legit or fraud)!")
+            return EntitySelection(central_entities=[], peripheral_entities=[])
+
+        return EntitySelection(central_entities=all_accounts, peripheral_entities=[])
 
 
 class RandomPaymentsTemporal(TemporalComponent):

@@ -13,7 +13,7 @@ import numpy as np
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
-from tide.datastructures.enums import EdgeType
+from tide.datastructures.enums import EdgeType, TransactionType
 
 
 def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, Any]:
@@ -349,6 +349,17 @@ def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
     ownership_edges = []
     transaction_attrs_list = []
     ownership_attrs_list = []
+    transaction_labels = []  # Store edge labels separately
+
+    # First pass: collect unique currencies for one-hot encoding
+    unique_currencies = set()
+    for src, dest, attrs in graph.edges(data=True):
+        if attrs.get('edge_type') in [EdgeType.TRANSACTION, 'transaction']:
+            currency = attrs.get('currency')
+            if currency:
+                unique_currencies.add(currency)
+    # Sort for consistent ordering
+    unique_currencies = sorted(unique_currencies)
 
     for src, dest, attrs in graph.edges(data=True):
         edge_type = attrs.get('edge_type')
@@ -358,15 +369,47 @@ def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
         if edge_type == EdgeType.TRANSACTION or edge_type == 'transaction':
             transaction_edges.append([src_idx, dest_idx])
 
-            # Extract transaction attributes
+            # Extract transaction attributes (FEATURES only - no labels!)
             trans_attrs = {
                 'amount': float(attrs.get('amount', 0.0)),
-                'is_fraudulent': float(attrs.get('is_fraudulent', False)),
+                # is_fraudulent removed - it's a LABEL, not a feature!
                 'timestamp': attrs.get('timestamp').timestamp() if attrs.get('timestamp') else 0.0,
                 'time_since_previous': float(attrs.get('time_since_previous_transaction').total_seconds())
                 if attrs.get('time_since_previous_transaction') else 0.0
             }
+
+            # Add transaction_type as one-hot encoded features
+            transaction_type = attrs.get('transaction_type')
+            if transaction_type:
+                # Handle both enum and string representations
+                if isinstance(transaction_type, str):
+                    # String format like "TransactionType.PAYMENT"
+                    type_str = transaction_type.split(
+                        '.')[-1] if '.' in transaction_type else transaction_type
+                else:
+                    # Enum format
+                    type_str = transaction_type.name
+
+                # One-hot encode transaction type
+                for tt in TransactionType:
+                    trans_attrs[f'transaction_type={tt.name.lower()}'] = float(
+                        type_str.upper() == tt.name)
+            else:
+                # If no transaction type, set all to 0
+                for tt in TransactionType:
+                    trans_attrs[f'transaction_type={tt.name.lower()}'] = 0.0
+
+            # Add currency as one-hot encoded features
+            currency = attrs.get('currency')
+            for curr in unique_currencies:
+                trans_attrs[f'currency={curr}'] = float(
+                    currency == curr if currency else False)
+
             transaction_attrs_list.append(trans_attrs)
+
+            # Store label separately
+            transaction_labels.append(
+                1 if attrs.get('is_fraudulent', False) else 0)
 
         elif edge_type == EdgeType.OWNERSHIP or edge_type == 'ownership':
             ownership_edges.append([src_idx, dest_idx])
@@ -404,11 +447,16 @@ def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
                                                 dtype=torch.float32)
         result['transaction_edge_attr'] = trans_feat_dict
         result['transaction_edge_attr_names'] = list(trans_feat_dict.keys())
+
+        # Add edge labels separately
+        result['transaction_edge_labels'] = torch.tensor(
+            transaction_labels, dtype=torch.long)
     else:
         result['transaction_edge_index'] = torch.empty(
             (2, 0), dtype=torch.long)
         result['transaction_edge_attr'] = {}
         result['transaction_edge_attr_names'] = []
+        result['transaction_edge_labels'] = torch.empty((0,), dtype=torch.long)
 
     # Add ownership edge data
     if ownership_edges:
@@ -598,8 +646,10 @@ if __name__ == "__main__":
                 pyg_data = Data(
                     x=pytorch_data['node_features'],
                     edge_index=pytorch_data['transaction_edge_index'],
-                    edge_attr=transaction_edge_features,
-                    y=node_labels_tensor,
+                    edge_attr=transaction_edge_features,  # Now WITHOUT is_fraudulent
+                    # Edge labels stored separately
+                    edge_y=pytorch_data['transaction_edge_labels'],
+                    y=node_labels_tensor,  # Node labels
                     num_nodes=pytorch_data['num_nodes']
                 )
 
@@ -621,8 +671,13 @@ if __name__ == "__main__":
                 print(
                     f"  - Fraudulent nodes: {pyg_data.y.sum().item()} ({100*pyg_data.y.sum().item()/pyg_data.num_nodes:.2f}%)")
                 print(f"  - Transaction edges: {pyg_data.edge_index.shape[1]}")
-                print(f"  - Edge features: {pyg_data.edge_attr.shape}")
+                print(
+                    f"  - Edge features (edge_attr): {pyg_data.edge_attr.shape}")
                 print(f"  - Edge feature names: {pyg_data.edge_attr_names}")
+                print(
+                    f"  - Edge labels (edge_y): {pyg_data.edge_y.shape}, classes: {pyg_data.edge_y.unique().tolist()}")
+                print(
+                    f"  - Fraudulent edges: {pyg_data.edge_y.sum().item()} ({100*pyg_data.edge_y.sum().item()/pyg_data.edge_index.shape[1]:.2f}%)")
             else:
                 # Fallback to dict if no transaction edges
                 torch.save(pytorch_data, pytorch_filepath)

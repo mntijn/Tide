@@ -1,4 +1,4 @@
-CSVfiles: False
+CSVfiles: True
 GraphML: False
 Gpickle: False
 PyTorch: True
