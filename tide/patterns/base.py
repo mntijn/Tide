@@ -295,6 +295,88 @@ class StructuralComponent(ABC):
         # Sort by risk count (descending), then by entity_id for stability
         return sorted(entities, key=lambda x: (-entity_risk_count.get(x, 0), x))
 
+    def get_mixed_risk_entities(
+        self,
+        high_risk_clusters: List[str],
+        fallback_pool: List[str],
+        num_needed: int,
+        high_risk_ratio: float = 0.65,
+        node_type_filter: NodeType = None
+    ) -> List[str]:
+        """
+        Get a mix of high-risk and general population entities.
+
+        This prevents data leakage where country_code alone predicts fraud.
+        Real fraud involves ~60-70% high-risk jurisdictions, not 100%.
+
+        Args:
+            high_risk_clusters: Cluster names to draw high-risk entities from
+            fallback_pool: General pool of entities (e.g., all individuals)
+            num_needed: Total number of entities to return
+            high_risk_ratio: Fraction from high-risk clusters (default 0.65 = 65%)
+            node_type_filter: Optional filter for entity type (INDIVIDUAL, BUSINESS)
+
+        Returns:
+            Mixed list of entities with realistic risk distribution
+        """
+        from ..utils.random_instance import random_instance
+
+        # Get high-risk entities from pre-computed clusters (efficient!)
+        high_risk_entities = self.get_combined_clusters(high_risk_clusters)
+
+        # Filter by node type if specified (using pre-computed all_nodes for efficiency)
+        if node_type_filter:
+            # Use pre-computed all_nodes instead of iterating graph
+            if hasattr(self.graph_generator, 'all_nodes'):
+                type_entities_set = set(
+                    self.graph_generator.all_nodes.get(node_type_filter, []))
+                high_risk_entities = [
+                    e for e in high_risk_entities if e in type_entities_set]
+                fallback_pool = [
+                    e for e in fallback_pool if e in type_entities_set]
+            else:
+                # Fallback to graph iteration only if all_nodes not available
+                high_risk_entities = [
+                    e for e in high_risk_entities
+                    if self.graph.nodes[e].get("node_type") == node_type_filter
+                ]
+                fallback_pool = [
+                    e for e in fallback_pool
+                    if self.graph.nodes[e].get("node_type") == node_type_filter
+                ]
+
+        # Remove duplicates
+        high_risk_entities = deduplicate_preserving_order(high_risk_entities)
+        fallback_pool = deduplicate_preserving_order(fallback_pool)
+
+        # Calculate how many from each pool
+        num_high_risk = int(num_needed * high_risk_ratio)
+        num_general = num_needed - num_high_risk
+
+        # Sample from high-risk (or all if not enough)
+        if len(high_risk_entities) >= num_high_risk:
+            selected_high_risk = random_instance.sample(
+                high_risk_entities, num_high_risk)
+        else:
+            selected_high_risk = high_risk_entities.copy()
+            num_general += (num_high_risk - len(high_risk_entities))
+
+        # Sample from general pool (excluding already selected)
+        # Use set for O(1) lookup instead of list iteration
+        selected_high_risk_set = set(selected_high_risk)
+        general_pool = [
+            e for e in fallback_pool if e not in selected_high_risk_set]
+        if len(general_pool) >= num_general:
+            selected_general = random_instance.sample(
+                general_pool, num_general)
+        else:
+            selected_general = general_pool.copy()
+
+        # Combine and shuffle
+        result = selected_high_risk + selected_general
+        random_instance.shuffle(result)
+        return result
+
 
 class TemporalComponent(ABC):
     """Base class for temporal components of patterns"""

@@ -39,24 +39,34 @@ class UTurnTransactionsStructural(StructuralComponent):
         originator_accounts = []
         return_account_id = None
 
-        # Prioritize entities with multiple accounts
-        potential_originators = []
+        # Get all individuals and businesses from pre-computed all_nodes
+        all_individuals = list(
+            self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+        all_businesses = list(
+            self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+        all_entities = all_individuals + all_businesses
 
-        # Look for entities from high-risk clusters with multiple accounts
-        for cluster_name in ["super_high_risk", "high_risk_score", "structuring_candidates"]:
-            cluster_entities = self.get_cluster(cluster_name)
-            for entity_id in sorted(list(cluster_entities)):
-                if self.graph.nodes[entity_id].get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]:
-                    # Count accounts
-                    owned_accounts = sorted([
-                        n for n in self.graph.neighbors(entity_id)
-                        if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
-                    ])
-                    if len(owned_accounts) >= 2:  # Need at least 2 accounts
-                        potential_originators.append(
-                            (entity_id, owned_accounts))
-                        logger.debug(
-                            f"Found potential originator {entity_id} with {len(owned_accounts)} accounts")
+        # Use mixed selection: ~65% high-risk, ~35% general population
+        originator_clusters = ["super_high_risk", "high_risk_score",
+                               "structuring_candidates", "high_risk_countries"]
+        mixed_originators = self.get_mixed_risk_entities(
+            high_risk_clusters=originator_clusters,
+            fallback_pool=all_entities,
+            num_needed=max(30, len(all_entities) // 10),
+            high_risk_ratio=0.65
+        )
+
+        # Find entities with multiple accounts
+        potential_originators = []
+        for entity_id in mixed_originators:
+            owned_accounts = sorted([
+                n for n in self.graph.neighbors(entity_id)
+                if self.graph.nodes[n].get("node_type") == NodeType.ACCOUNT
+            ])
+            if len(owned_accounts) >= 2:  # Need at least 2 accounts
+                potential_originators.append((entity_id, owned_accounts))
+                logger.debug(
+                    f"Found potential originator {entity_id} with {len(owned_accounts)} accounts")
 
         # Shuffle and try to find suitable originator
         random_instance.shuffle(potential_originators)
@@ -72,11 +82,8 @@ class UTurnTransactionsStructural(StructuralComponent):
 
         if not originator_id:
             logger.debug(
-                "No suitable originator found in high-risk clusters, trying fallback")
+                "No suitable originator found in mixed selection, trying all entities fallback")
             # Fallback: any entity with 2+ accounts
-            all_entities = self.filter_entities_by_criteria(
-                available_entities, {"node_type": NodeType.INDIVIDUAL}
-            )
             random_instance.shuffle(all_entities)
 
             for entity_id in all_entities:
@@ -97,40 +104,34 @@ class UTurnTransactionsStructural(StructuralComponent):
                 "Failed to find any suitable originator, returning empty selection")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
-        # Find intermediary accounts in high-risk jurisdictions
+        # Find intermediary accounts using mixed selection
         intermediary_accounts = []
         originator_country = self.graph.nodes[originator_id].get(
             "country_code")
 
-        # Look for accounts in high-risk countries
-        high_risk_accounts = []
-        # Get entities from high-risk countries cluster
-        high_risk_entities = self.get_cluster("high_risk_countries")
+        # Get all entities (excluding originator) for intermediary selection
+        all_other_entities = [e for e in all_entities if e != originator_id]
 
-        # For each entity, get their accounts
-        for entity_id in high_risk_entities:
+        # Use mixed selection for intermediaries: ~65% from high-risk, ~35% general
+        intermediary_clusters = ["high_risk_countries", "offshore_candidates"]
+        mixed_intermediary_entities = self.get_mixed_risk_entities(
+            high_risk_clusters=intermediary_clusters,
+            fallback_pool=all_other_entities,
+            num_needed=max_intermediaries * 3,  # Get more, then filter
+            high_risk_ratio=0.65
+        )
+
+        # Get accounts from these entities (excluding originator's country)
+        high_risk_accounts = []
+        for entity_id in mixed_intermediary_entities:
             entity_accounts = self._get_owned_accounts(entity_id)
             for acc_id in entity_accounts:
                 acc_country = self.graph.nodes[acc_id].get("country_code")
                 if acc_country and acc_country != originator_country:
                     high_risk_accounts.append(acc_id)
 
-        # Also consider offshore candidates
-        offshore_accounts = []
-        # Get entities from offshore candidates cluster
-        offshore_entities = self.get_cluster("offshore_candidates")
-
-        # For each entity, get their accounts
-        for entity_id in offshore_entities:
-            entity_accounts = self._get_owned_accounts(entity_id)
-            for acc_id in entity_accounts:
-                acc_country = self.graph.nodes[acc_id].get("country_code")
-                if acc_country and acc_country != originator_country:
-                    offshore_accounts.append(acc_id)
-
-        # Combine and deduplicate
-        potential_intermediaries = sorted(list(
-            set(high_risk_accounts + offshore_accounts)))
+        # Deduplicate and shuffle
+        potential_intermediaries = sorted(list(set(high_risk_accounts)))
         random_instance.shuffle(potential_intermediaries)
 
         # Select intermediaries
@@ -143,16 +144,12 @@ class UTurnTransactionsStructural(StructuralComponent):
 
         if len(intermediary_accounts) < min_intermediaries:
             logger.debug(
-                "Not enough cross-country intermediaries found, trying fallback with same-country accounts")
+                "Not enough cross-country intermediaries found, trying fallback with all accounts")
             # Fallback: allow same-country intermediaries if no cross-country found
-            all_potential_intermediaries = []
-            for cluster in ["high_risk_countries", "offshore_candidates"]:
-                for acc_id in self.get_cluster(cluster):
-                    if self.graph.nodes[acc_id].get("node_type") == NodeType.ACCOUNT:
-                        all_potential_intermediaries.append(acc_id)
-
-            potential_intermediaries = sorted(
-                list(set(all_potential_intermediaries)))
+            all_accounts = list(
+                self.graph_generator.all_nodes.get(NodeType.ACCOUNT, []))
+            potential_intermediaries = [
+                acc for acc in all_accounts if acc not in originator_accounts]
             # Exclude originator's own accounts
             potential_intermediaries = [
                 acc for acc in potential_intermediaries if acc not in originator_accounts]

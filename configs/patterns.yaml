@@ -1,97 +1,94 @@
 # Pattern configuration for AML pattern generation
+#
+# IMPORTANT: Fraud amounts are REALISTIC but legitimate background patterns
+# now include similar high-value transactions to prevent amount-based leakage.
+# The distinguishing factor should be GRAPH STRUCTURE, not raw amounts.
+#
+# Key insight: Structuring (amounts just below $10K) is kept, but legitimate
+# patterns also include high-value rent, insurance, and car payments in the
+# same range, so amount alone doesn't predict fraud.
 
 # Front Business Activity Pattern
 # Simulates a business acting as a front for money laundering
 frontBusiness:
-  # Minimum number of accounts required for a business to be considered as a front business
   min_accounts_for_front_business: 2
-  # Number of front business accounts to use in the pattern
   num_front_business_accounts_to_use: 3
-  # Minimum number of overseas destination accounts required
   min_overseas_destination_accounts: 2
-  # Maximum number of overseas destination accounts to use for a front business
   max_overseas_destination_accounts_for_front: 4
-  # Transaction parameters
   transaction_params:
-    # Minimum number of deposit cycles
     min_deposit_cycles: 5
-    # Maximum number of deposit cycles
     max_deposit_cycles: 15
-    # Base amount range for deposits (min, max)
-    deposit_amount_range: [10000, 50000]
-    # Number of deposits per cycle (min, max)
+    # REALISTIC: Large cash deposits typical of front businesses
+    # Legitimate high-value payments (rent, insurance) now overlap
+    deposit_amount_range: [5000, 15000]
     deposits_per_cycle: [1, 3]
 
 # Repeated Overseas Transfers Pattern
-# Simulates repeated transfers to overseas accounts
+# Simulates repeated transfers to overseas accounts with STRUCTURING
 repeatedOverseas:
-  # Minimum number of overseas entities required
   min_overseas_entities: 2
-  # Maximum number of overseas entities to use
   max_overseas_entities: 5
-  # Transaction parameters
+  # Deposit phase: CLASSIC STRUCTURING - just below $10K threshold
+  deposit_params:
+    min_deposits: 3
+    max_deposits: 8
+    # STRUCTURING: Deliberately below $10K reporting threshold
+    amount_range: [7500, 9900]
   transaction_params:
-    # Minimum number of transactions
     min_transactions: 10
-    # Maximum number of transactions
     max_transactions: 30
-    # Base amount range for transfers (min, max)
-    transfer_amount_range: [5000, 20000]
-    # Time between transfers (in days)
+    # Transfer amounts: moderate to avoid detection
+    transfer_amount_range: [2000, 8000]
     transfer_interval_days: [7, 14, 30]
+  transfer_leakage_ratio: 0.95
 
 # Rapid Fund Movement Pattern
 # Simulates rapid movement of funds through multiple accounts
+# Uses SMALLER amounts (smurfing) that aggregate to large sums
 rapidMovement:
-  # Minimum number of accounts required for the pattern
   min_accounts_for_pattern: 2
-  # Maximum number of sender entities to consider
   max_sender_entities: 15
-  # Transaction parameters
   transaction_params:
-    # Inflow parameters
     inflows:
-      # Minimum number of incoming transfers
       min_inflows: 5
-      # Maximum number of incoming transfers
       max_inflows: 10
-      # Base amount range for inflows (min, max)
-      amount_range: [500, 5000]
-    # Withdrawal parameters
+      # SMURFING: Many smaller transfers that aggregate
+      # Overlaps with legitimate transfers/salary
+      amount_range: [500, 3000]
     withdrawals:
-      # Minimum number of withdrawals
       min_withdrawals: 3
-      # Maximum number of withdrawals
       max_withdrawals: 8
-      # Base amount range for withdrawals (min, max)
-      amount_range: [100, 2000]
-    # Time between inflow and withdrawal (in hours)
+      # Withdrawal amounts - some below reporting, some not
+      amount_range: [200, 2000]
     inflow_to_withdrawal_delay: [1, 24]
+  validation_params:
+    outflow_ratio_range: [0.85, 0.95]
 
 # U-Turn Transactions Pattern
 # Simulates funds being sent through intermediaries and returning to origin
 uTurnTransactions:
-  # Minimum number of intermediary accounts required
   min_intermediaries: 2
-  # Maximum number of intermediary accounts to use
   max_intermediaries: 5
-  # Transaction parameters
   transaction_params:
-    # Base amount range for initial transfer (min, max)
-    initial_amount_range: [10000, 100000]
-    # Percentage of initial amount that returns (min, max)
+    # REALISTIC: Significant amounts for international transfers
+    # Legitimate chains also now use similar amounts
+    initial_amount_range: [3000, 15000]
     return_percentage_range: [0.7, 0.9]
-    # Time between international transfers (in days)
     international_delay_days: [1, 5]
-    # Time variability parameters
     time_variability:
-      # Business hours range for transactions (start_hour, end_hour, 24-hour format)
       business_hours: [9, 16]
-      # Whether to include random minutes in timing
       include_minutes: true
-      # Whether to include random hours in delays
       include_hours: true
-  # Validation parameters
   validation_params:
-    # Fee percentage range for transactions (min, max)
     fee_percentage_range: [0.01, 0.03]
+
+# Synchronized Transactions Pattern
+# Multiple entities coordinate deposits followed by transfers
+synchronisedTransactions:
+  min_coordinating_entities: 3
+  max_coordinating_entities: 8
+  transaction_params:
+    # STRUCTURING: Coordinated deposits below threshold
+    deposit_amount_range: [5000, 9500]
+    sync_window_hours: 2
+    transfer_delay_hours: [1, 6]

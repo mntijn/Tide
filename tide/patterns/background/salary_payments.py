@@ -20,16 +20,32 @@ class SalaryPaymentsStructural(StructuralComponent):
         return 2  # Need at least 1 business and 1 individual
 
     def select_entities(self, available_entities: List[str]) -> EntitySelection:
-        # Get legitimate entities only
-        legit_entities = self.graph_generator.entity_clusters.get("legit", [])
-        if not legit_entities:
+        # Get legitimate entities
+        legit_entities = list(
+            self.graph_generator.entity_clusters.get("legit", []))
+
+        # Also include a significant portion of fraudulent entities
+        # Fraudsters (front businesses) pay salaries, and fraudsters (individuals) receive them
+        # This topological mixing is crucial to prevent easy detection
+        fraud_entities = list(
+            self.graph_generator.entity_clusters.get("fraudulent", []))
+        if fraud_entities:
+            # Include 50% of fraud entities in the salary economy
+            selected_fraud = random_instance.sample(
+                fraud_entities, min(len(fraud_entities), int(len(fraud_entities) * 0.9)))
+            legit_entities.extend(selected_fraud)
+
+        # Dedup just in case
+        all_candidate_entities = list(set(legit_entities))
+
+        if not all_candidate_entities:
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         # Separate businesses and individuals
         business_entities = []
         individual_entities = []
 
-        for entity_id in legit_entities:
+        for entity_id in all_candidate_entities:
             node_data = self.graph_generator.graph.nodes[entity_id]
             if node_data.get("node_type") == NodeType.BUSINESS:
                 business_entities.append(entity_id)
@@ -95,6 +111,10 @@ class SalaryPaymentsTemporal(TemporalComponent):
         # Generate salary payments - businesses pay individuals regularly
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
+        # Respect tx_budget if set
+        budget = getattr(self, "tx_budget", None)
+        tx_count = 0
+
         # Each business pays some random individuals
         available_individuals = individual_accounts.copy()
         random_instance.shuffle(available_individuals)
@@ -132,6 +152,9 @@ class SalaryPaymentsTemporal(TemporalComponent):
 
                 # Create salary payment transactions
                 for payment_date in payment_dates:
+                    if budget is not None and tx_count >= budget:
+                        return
+
                     # Add small variation to salary amount
                     variation_factor = random_instance.uniform(
                         1 - salary_variation, 1 + salary_variation)
@@ -145,6 +168,7 @@ class SalaryPaymentsTemporal(TemporalComponent):
                         transaction_type=TransactionType.PAYMENT,
                         is_fraudulent=False,
                     )
+                    tx_count += 1
                     yield (business_account_id, individual_account_id, tx_attrs)
 
     def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:

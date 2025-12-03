@@ -14,10 +14,18 @@ class LegitimateHighPaymentsPattern:
         self.graph_generator = graph_generator
         self.params = params
         self.time_span = params.get("time_span", {})
+        self.tx_budget = None  # Set by pattern manager if capping is enabled
 
     @property
     def pattern_name(self) -> str:
         return "LegitimateHighPayments"
+
+    def set_tx_budget(self, n):
+        """Set an optional upper bound for transactions to generate."""
+        try:
+            self.tx_budget = None if n is None else int(max(0, n))
+        except Exception:
+            self.tx_budget = None
 
     def inject_pattern_generator(self, available_entities: List[str]):
         """Generate legitimate high-value transactions between wealthy individuals and large businesses."""
@@ -67,8 +75,14 @@ class LegitimateHighPaymentsPattern:
         end_date = self.time_span["end_date"]
         total_months = max(1, ((end_date.year - start_date.year)
                            * 12 + (end_date.month - start_date.month)))
-        total_expected_txs = int(
+        rate_based_count = int(
             monthly_rate * total_months * len(all_high_value_accounts))
+
+        # Respect tx_budget if set
+        if self.tx_budget is not None and self.tx_budget < rate_based_count:
+            total_expected_txs = self.tx_budget
+        else:
+            total_expected_txs = rate_based_count
 
         if total_expected_txs == 0:
             return

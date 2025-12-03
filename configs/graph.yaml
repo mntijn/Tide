@@ -1,11 +1,19 @@
 graph_scale:
-  individuals: 1500
+  individuals: 3000
   # businesses: 0
   institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 5]
+
+# Target fraud ratio: background transactions are capped so that
+# fraud_count / total_transactions ≈ target_fraud_ratio.
+# E.g., 0.02 means ~2% of transactions will be fraudulent.
+# Set to null or remove to disable capping (use raw per_account_per_day rate).
+target_fraud_ratio: 0.01
+
 transaction_rates:
-  per_account_per_day: 1
+  # This rate is used as the *maximum* rate; actual count is capped by target_fraud_ratio.
+  per_account_per_day: 2
 time_span:
   start_date: '2023-01-01T00:00:00'
   end_date: '2023-12-31T23:59:59'
@@ -16,65 +24,105 @@ random_seed: 42
 business_creation_date_range: [90, 5475]
 
 backgroundPatterns:
+  # Weights are rebalanced to introduce more diverse legitimate patterns
+  # that mimic fraud signals (cash ops, periodic timing, chains)
+
   randomPayments:
-    weight: 0.6  # 60% of total background transactions
-    # Transaction rate multiplier for legitimate accounts (fraction of base rate)
-    legit_rate_multiplier: [0.3, 0.8]  # Random between 30%-80% of base rate
-    # Transaction type probabilities (must sum to 1.0)
+    weight: 0.45  # Hub-and-spoke random payments
+    legit_rate_multiplier: [0.3, 0.8]
     transaction_type_probabilities:
-      transfer: 0.4      # P2P transfers
-      payment: 0.3       # Payments for goods/services
-      deposit: 0.15      # Cash deposits
-      withdrawal: 0.15   # Cash withdrawals
-    # Amount ranges per transaction type
+      transfer: 0.4
+      payment: 0.3
+      deposit: 0.15
+      withdrawal: 0.15
     amount_ranges:
-      payment: [10.0, 2000.0]     # Higher amounts, more varied
-      transfer: [5.0, 800.0]      # Moderate amounts
-      cash_operations: [20.0, 1500.0]  # Deposits/withdrawals, rounded to nearest 10
+      payment: [10.0, 2000.0]
+      transfer: [5.0, 800.0]
+      cash_operations: [20.0, 1500.0]
 
   salaryPayments:
-    weight: 0.25  # 25% of total background transactions
-    # Payment schedule options (monthly=30, bi-weekly=14, weekly=7)
-    payment_intervals: [14, 30]  # bi-weekly or monthly
-    # Salary amount range per payment
+    weight: 0.10
+    payment_intervals: [14, 30]
     salary_range: [2500.0, 7500.0]
-    # Amount variation around base salary (±percentage)
-    salary_variation: 0.05  # ±5% variation
-    # Days of month for salary payments (for monthly payments)
-    preferred_payment_days: [1, 15, 30]  # 1st, 15th, end of month
+    salary_variation: 0.05
+    preferred_payment_days: [1, 15, 30]
 
   fraudsterBackground:
-    weight: 0.1  # 10% of total background transactions
-    # Rate multiplier for fraudulent entities' background activity
-    fraudster_rate_multiplier: [0.1, 0.5]  # Lower than legit (10%-50%)
-    # Different amount distribution for fraudster background
-    amount_ranges:
-      small_transactions: [5.0, 200.0]    # Smaller amounts to stay under radar
-      medium_transactions: [200.0, 1000.0] # Medium amounts occasionally
-    # Probability of small vs medium transactions
-    transaction_size_probabilities:
-      small: 0.8   # 80% small transactions
-      medium: 0.2  # 20% medium transactions
+    weight: 0.3  # Fraudsters mimicking legit behavior
+    # NOTE: This pattern now uses legitimate amount ranges internally (no leak)
 
   legitimateHighPayments:
-    weight: 0.05  # 5% of total background transactions
-    # High payment amount ranges
+    weight: 0.1
     high_payment_ranges:
-      property_transactions: [50000.0, 500000.0]  # Real estate, major purchases
-      business_deals: [10000.0, 100000.0]         # B2B transactions
-      luxury_purchases: [5000.0, 50000.0]         # Cars, jewelry, etc
-    # Probability distribution for high payment types
+      property_transactions: [50000.0, 500000.0]
+      business_deals: [10000.0, 100000.0]
+      luxury_purchases: [5000.0, 50000.0]
     high_payment_type_probabilities:
-      property: 0.2      # 20% property transactions
-      business: 0.5      # 50% business deals
-      luxury: 0.3        # 30% luxury purchases
-    # Rate of high payments (per account per month)
-    high_payment_rate_per_month: 0.1  # 10% chance per account per month
+      property: 0.2
+      business: 0.5
+      luxury: 0.3
+    high_payment_rate_per_month: 0.1
+
+  legitimateBurst:
+    weight: 0.1  # Shopping sprees, dinner + movie nights
+    burst_user_fraction: 0.05
+    burst_size_range: [3, 6]
+    amount_range: [50.0, 500.0]
+
+  # NEW: Legitimate cash operations (prevents DEPOSIT/WITHDRAWAL from being fraud-only)
+  # INCLUDES HIGH-VALUE deposits to overlap with fraud structuring
+  legitimateCashOperations:
+    weight: 0.15  # Important: makes cash ops common in legitimate activity
+    cash_user_fraction: 0.3  # 30% of legit users do cash operations
+    operations_per_month_range: [2, 8]  # 2-8 cash ops per month
+    # Mix of small (ATM) and large (depositing paycheck, selling car) amounts
+    withdrawal_amount_range: [20.0, 500.0]  # ATM withdrawals
+    deposit_amount_ranges:
+      small: [50.0, 500.0]           # Tips, small cash income
+      medium: [500.0, 2000.0]        # Freelance payment, selling items
+      large: [2000.0, 5000.0]        # Larger cash income
+      very_large: [5000.0, 9500.0]   # Car sale, tax refund cash, bonus
+    deposit_probabilities:
+      small: 0.5
+      medium: 0.3
+      large: 0.15
+      very_large: 0.05  # 5% are in structuring range!
+    deposit_probability: 0.3  # 30% deposits, 70% withdrawals
+
+  # NEW: Legitimate periodic payments (prevents regular intervals from being fraud-only)
+  # INCLUDES HIGH-VALUE payments (rent, insurance) to overlap with fraud structuring
+  legitimatePeriodicPayments:
+    weight: 0.15  # Bills, subscriptions, recurring payments
+    periodic_user_fraction: 0.4  # 40% of users have recurring payments
+    payment_intervals: [7, 14, 30]  # Weekly, bi-weekly, monthly
+    # Mix of small (subscriptions) and large (rent/insurance) payments
+    amount_ranges:
+      small_bills: [20.0, 200.0]        # Netflix, gym, utilities
+      medium_bills: [200.0, 1000.0]     # Phone, internet, car payment
+      large_bills: [1000.0, 5000.0]     # Rent, mortgage, insurance
+      very_large: [5000.0, 9500.0]      # High rent, tuition payments
+    amount_probabilities:
+      small_bills: 0.4
+      medium_bills: 0.35
+      large_bills: 0.2
+      very_large: 0.05  # 5% are in structuring range!
+    subscriptions_per_user_range: [1, 4]
+
+  # NEW: Legitimate transaction chains (prevents path structures from being fraud-only)
+  # Uses realistic scenarios with appropriate amounts and timing:
+  #   - Group expenses: $50-$500, minutes-hours delay, 2-3 hops
+  #   - Family support: $500-$5K, same day, 2-3 hops
+  #   - Event collection: $200-$2K, days delay, 3-4 hops
+  #   - Business supply: $1K-$15K, 1-7 days delay, 3-5 hops
+  legitimateChains:
+    weight: 0.15  # Family transfers, business supply chains, group payments
+    num_chains_per_generation: 50  # Base number; scales with account count
+    amount_decay_range: [0.95, 1.0]  # 0-5% fee/loss per hop
 
 # Pattern generation settings
 pattern_frequency:
   random: True
-  num_illicit_patterns: 180
+  num_illicit_patterns: 3000
 
   # If random is false these values are used instead of num_illicit patterns
   RapidFundMovement: 20

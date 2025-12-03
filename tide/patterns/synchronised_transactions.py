@@ -33,24 +33,23 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         recipient_id = None
         recipient_account_id = None
 
-        # Prioritize businesses or individuals in high-risk jurisdictions as recipients
-        potential_recipients = []
+        # Get all individuals and businesses from pre-computed all_nodes
+        all_individuals = list(
+            self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+        all_businesses = list(
+            self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+        all_entities = all_individuals + all_businesses
 
-        # Try super high-risk entities first
-        super_high_risk = self.get_cluster("super_high_risk")
-        potential_recipients.extend(super_high_risk)
+        # Use mixed selection for recipients: ~65% high-risk, ~35% general population
+        recipient_clusters = ["super_high_risk",
+                              "offshore_candidates", "high_risk_countries"]
+        potential_recipients = self.get_mixed_risk_entities(
+            high_risk_clusters=recipient_clusters,
+            fallback_pool=all_entities,
+            num_needed=max(20, len(all_entities) // 10),
+            high_risk_ratio=0.65
+        )
 
-        # Add offshore candidates
-        if len(potential_recipients) < 10:
-            offshore_candidates = self.get_cluster("offshore_candidates")
-            potential_recipients.extend(offshore_candidates)
-
-        # Add high-risk countries
-        if len(potential_recipients) < 10:
-            high_risk_countries = self.get_cluster("high_risk_countries")
-            potential_recipients.extend(high_risk_countries)
-
-        # Remove duplicates deterministically and shuffle
         from .base import deduplicate_preserving_order
         potential_recipients = deduplicate_preserving_order(
             potential_recipients)
@@ -71,8 +70,6 @@ class SynchronisedTransactionsStructural(StructuralComponent):
 
         if not recipient_id or not recipient_account_id:
             # Fallback: pick any entity with an account
-            all_entities = [e for e in available_entities
-                            if self.graph.nodes[e].get("node_type") in [NodeType.INDIVIDUAL, NodeType.BUSINESS]]
             random_instance.shuffle(all_entities)
 
             for entity_id in all_entities:
@@ -93,14 +90,18 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         coordinating_entities = []
         coordinating_accounts = []
 
-        # Look for individuals with accounts (preferably with risk factors)
-        potential_coordinators = self.filter_entities_by_criteria(
-            available_entities, {"node_type": NodeType.INDIVIDUAL}
+        # Use mixed selection for coordinators: ~65% high-risk, ~35% general population
+        coordinator_clusters = ["intermediaries",
+                                "high_risk_countries", "high_risk_age_groups"]
+        potential_coordinators = self.get_mixed_risk_entities(
+            high_risk_clusters=coordinator_clusters,
+            fallback_pool=all_individuals,
+            num_needed=max(max_coordinating_entities *
+                           2, len(all_individuals) // 5),
+            high_risk_ratio=0.65,
+            node_type_filter=NodeType.INDIVIDUAL
         )
 
-        # Prioritize those with risk factors
-        potential_coordinators = self.prioritize_by_risk_factors(
-            potential_coordinators)
         random_instance.shuffle(potential_coordinators)
 
         for ind_id in potential_coordinators:

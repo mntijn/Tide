@@ -255,9 +255,11 @@ def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
             encoding_maps[field] = mapping
 
     # Numeric/boolean fields to include
+    # NOTE: risk_score, is_high_risk_category, is_high_risk_country are EXCLUDED
+    # because fraud patterns SELECT entities based on these features, creating
+    # indirect data leakage (high risk → selected for fraud → is_fraudulent=True)
     numeric_fields = [
-        'risk_score', 'incorporation_year', 'number_of_employees',
-        'is_high_risk_category', 'is_high_risk_country'
+        'incorporation_year'
     ]
 
     # Build feature names list order

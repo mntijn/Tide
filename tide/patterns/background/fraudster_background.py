@@ -2,8 +2,12 @@ import datetime
 from typing import List, Dict, Any, Tuple
 
 from ..base import (
-    StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
-    CompositePattern, PatternInjector
+    StructuralComponent,
+    TemporalComponent,
+    EntitySelection,
+    TransactionSequence,
+    CompositePattern,
+    PatternInjector,
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
@@ -54,7 +58,13 @@ class FraudsterBackgroundStructural(StructuralComponent):
 
 
 class FraudsterBackgroundTemporal(TemporalComponent):
-    """Temporal component: generate low-frequency, small-amount camouflage transactions."""
+    """
+    Temporal component: generate camouflage transactions that mimic legitimate
+    background activity statistics (rate and amount ranges).
+
+    Fraudster grooming behaviour should look statistically identical to normal
+    users in edge attributes so that models must rely on graph structure.
+    """
 
     def _generate_transactions_stream(self, entity_selection: EntitySelection):
         fraudster_accounts = entity_selection.central_entities
@@ -63,25 +73,26 @@ class FraudsterBackgroundTemporal(TemporalComponent):
         if not fraudster_accounts or not legit_accounts:
             return
 
-        # Get fraudster background configuration
-        fraudster_config = self.params.get(
-            "backgroundPatterns", {}).get("fraudsterBackground", {})
+        # Copy configuration from legitimate random background activity so that
+        # fraudster "grooming" behaviour is statistically indistinguishable
+        # from normal users in edge attributes (rate, amounts, timing).
+        background_cfg = self.params.get("backgroundPatterns", {})
+        random_payments_cfg = background_cfg.get("randomPayments", {})
 
-        # Rate multiplier (much lower than legitimate activity)
-        rate_multiplier_range = fraudster_config.get(
-            "fraudster_rate_multiplier", [0.1, 0.5])
+        # Use the same per-account daily transaction rate as legitimate random payments.
+        tx_rate = self.params.get("transaction_rates", {}).get(
+            "per_account_per_day", 0.2
+        )
 
-        # Amount ranges (smaller amounts to stay under radar)
-        amount_ranges = fraudster_config.get("amount_ranges", {
-            "small_transactions": [5.0, 200.0],
-            "medium_transactions": [200.0, 1000.0]
-        })
-
-        # Transaction size probabilities (mostly small)
-        size_probs = fraudster_config.get("transaction_size_probabilities", {
-            "small": 0.8,
-            "medium": 0.2
-        })
+        # Amount ranges: reuse legitimate ranges, especially for payments.
+        legit_amount_ranges = random_payments_cfg.get(
+            "amount_ranges",
+            {
+                "payment": [10.0, 2000.0],
+                "transfer": [5.0, 800.0],
+            },
+        )
+        payment_range = legit_amount_ranges.get("payment", [10.0, 2000.0])
 
         start_date: datetime.datetime = self.time_span["start_date"]
         end_date: datetime.datetime = self.time_span["end_date"]
@@ -92,21 +103,20 @@ class FraudsterBackgroundTemporal(TemporalComponent):
 
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
+        # Respect tx_budget if set
+        budget = getattr(self, "tx_budget", None)
+        tx_count = 0
+
         # Generate camouflage transactions for each fraudster account
         for fraudster_account_id, fraudster_entity_id in fraudster_accounts:
-            # Determine this fraudster's activity rate (lower than legitimate)
-            rate_multiplier = random_instance.uniform(
-                rate_multiplier_range[0], rate_multiplier_range[1])
-
-            # Base rate per day for this fraudster (much lower than legitimate background)
-            base_daily_rate = 0.1  # Very low base rate
-            daily_rate = base_daily_rate * rate_multiplier
+            # Match legitimate background rate as closely as possible.
+            daily_rate = tx_rate
 
             # Total expected transactions over time span
             expected_total_txs = int(daily_rate * total_days)
             if expected_total_txs == 0:
-                expected_total_txs = random_instance.randint(
-                    1, 3)  # Minimum camouflage activity
+                # Ensure at least minimal background activity to avoid trivial patterns
+                expected_total_txs = random_instance.randint(1, 3)
 
             # Generate random transaction dates
             tx_dates = []
@@ -127,6 +137,8 @@ class FraudsterBackgroundTemporal(TemporalComponent):
             random_instance.shuffle(available_counterparts)
 
             for i, tx_date in enumerate(tx_dates):
+                if budget is not None and tx_count >= budget:
+                    return
 
                 if not available_counterparts:
                     available_counterparts = legit_accounts.copy()
@@ -134,14 +146,12 @@ class FraudsterBackgroundTemporal(TemporalComponent):
 
                 counterpart_account_id, counterpart_entity_id = available_counterparts.pop()
 
-                # Determine transaction amount (mostly small)
-                if random_instance.random() < size_probs.get("small", 0.8):
-                    amount_range = amount_ranges["small_transactions"]
-                else:
-                    amount_range = amount_ranges["medium_transactions"]
-
-                amount = round(random_instance.uniform(
-                    amount_range[0], amount_range[1]), 2)
+                # Determine transaction amount using *legitimate* payment range.
+                # This deliberately removes the previous "mostly small" tell.
+                amount = round(
+                    random_instance.uniform(
+                        payment_range[0], payment_range[1]), 2
+                )
 
                 # Randomly choose direction (fraudster pays or receives)
                 if random_instance.random() < 0.5:
@@ -164,6 +174,7 @@ class FraudsterBackgroundTemporal(TemporalComponent):
                     is_fraudulent=False,  # These are camouflage, not fraudulent
                 )
 
+                tx_count += 1
                 yield (src_id, dest_id, tx_attrs)
 
     def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:

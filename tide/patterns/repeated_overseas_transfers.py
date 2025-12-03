@@ -35,22 +35,26 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
         min_overseas_entities = pattern_config.get("min_overseas_entities", 2)
         max_overseas_entities = pattern_config.get("max_overseas_entities", 5)
 
-        # Build prioritized list of potential source entities
-        source_entity_candidates = []
-        cluster_priority = ["offshore_candidates",
-                            "super_high_risk", "high_risk_countries"]
-        for cluster_name in cluster_priority:
-            entities = list(self.get_cluster(cluster_name))
-            random_instance.shuffle(entities)
-            source_entity_candidates.extend(entities)
+        # Get all individuals from pre-computed all_nodes
+        all_individuals = list(
+            self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
 
-        # Deduplicate while preserving order to respect priority
-        potential_source_entities = list(
-            dict.fromkeys(source_entity_candidates))
+        # Use mixed selection: ~65% high-risk, ~35% general population
+        # This prevents country_code from being perfectly predictive of fraud
+        source_clusters = ["offshore_candidates",
+                           "super_high_risk", "high_risk_countries"]
+        potential_source_entities = self.get_mixed_risk_entities(
+            high_risk_clusters=source_clusters,
+            fallback_pool=all_individuals,
+            num_needed=max(20, len(all_individuals) // 10),
+            high_risk_ratio=0.65,
+            node_type_filter=NodeType.INDIVIDUAL
+        )
 
         if not potential_source_entities:
-            raise ValueError(
-                "No potential source entities found in high-risk clusters.")
+            # Fallback to all individuals if mixed selection fails
+            potential_source_entities = all_individuals.copy()
+            random_instance.shuffle(potential_source_entities)
 
         for entity_id in potential_source_entities:
             try:
@@ -82,31 +86,43 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
                 source_account_id = random_instance.choice(
                     owned_domestic_accounts)
 
-                # Search for overseas destination accounts (owned by individuals/businesses)
+                # Search for overseas destination accounts using mixed selection
+                # Get all entities (excluding source) from pre-computed all_nodes
+                all_individuals_dest = list(
+                    self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+                all_businesses_dest = list(
+                    self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+                all_other_entities = [e for e in (
+                    all_individuals_dest + all_businesses_dest) if e != entity_id]
+
+                # Use mixed selection: ~65% from high-risk countries, ~35% general
+                dest_clusters = ["high_risk_countries", "offshore_candidates"]
+                mixed_dest_entities = self.get_mixed_risk_entities(
+                    high_risk_clusters=dest_clusters,
+                    fallback_pool=all_other_entities,
+                    num_needed=max_overseas_entities * 3,  # Get more, then filter
+                    high_risk_ratio=0.65
+                )
+
+                # Get overseas accounts from these entities
                 potential_overseas_accounts = []
-
-                # Priority: high_risk_countries
-                high_risk_owners = self.get_cluster("high_risk_countries")
-                random_instance.shuffle(high_risk_owners)
-                for owner_id in high_risk_owners:
+                for owner_id in mixed_dest_entities:
                     try:
-                        owner_data = self.graph.nodes[owner_id]
-
-                        owner_country = owner_data.get("country_code")
+                        owner_country = self.graph.nodes[owner_id].get(
+                            "country_code")
                         if not owner_country or owner_country == entity_country:
                             continue
 
-                        # Get accounts owned by this high-risk entity
                         owned_accounts = self._get_owned_accounts(owner_id)
                         for acc_id in owned_accounts:
-                            acc_node_data = self.graph.nodes[acc_id]
-                            acc_country = acc_node_data.get("country_code")
+                            acc_country = self.graph.nodes[acc_id].get(
+                                "country_code")
                             if acc_country and acc_country != entity_country:
                                 potential_overseas_accounts.append(acc_id)
                     except KeyError:
                         continue
 
-                # If not enough, expand to any overseas account
+                # If still not enough, expand to any overseas account
                 if len(potential_overseas_accounts) < min_overseas_entities:
                     # Sort nodes for deterministic order
                     all_account_ids = [nid for nid, ndata in sorted(self.graph.nodes(

@@ -553,8 +553,25 @@ class GraphGenerator:
         logger.info("Starting graph generation...")
         self.initialize_entities()
         self.build_entity_clusters()
-        self.inject_aml_patterns()
-        self.simulate_background_activity()
+        fraud_edge_count = self.inject_aml_patterns() or 0
+
+        # Determine background transaction cap based on target_fraud_ratio
+        target_fraud_ratio = self.params.get("target_fraud_ratio")
+        if target_fraud_ratio and target_fraud_ratio > 0 and fraud_edge_count > 0:
+            # max_background = fraud / ratio - fraud
+            # e.g., 2650 fraud, 2% ratio -> 2650/0.02 - 2650 = 129,850 background
+            max_background = int(fraud_edge_count /
+                                 target_fraud_ratio) - fraud_edge_count
+            max_background = max(0, max_background)
+            logger.info(
+                f"Target fraud ratio: {target_fraud_ratio:.2%} -> capping background to {max_background:,} transactions"
+            )
+            self.simulate_background_activity(
+                target_transaction_count=max_background)
+        else:
+            # No ratio cap; use raw rate-based count
+            self.simulate_background_activity()
+
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
         return self.graph

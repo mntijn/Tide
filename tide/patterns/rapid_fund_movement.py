@@ -49,23 +49,24 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         logger.debug(
             f"RapidFundMovement: Looking for individual with {min_accounts_for_pattern}+ accounts, {min_senders}-{max_senders} senders from max {max_sender_entities} entities")
 
-        # Select high-risk individual as receiver from the most risky clusters
-        receiver_clusters = ["super_high_risk",
-                             "high_risk_score", "structuring_candidates"]
-        potential_receivers = self.get_high_risk_individuals(
-            cluster_names=receiver_clusters, max_entities=25)
+        # Get all individuals from pre-computed all_nodes (efficient!)
+        all_individuals = list(
+            self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+
+        # Use mixed selection: ~65% high-risk, ~35% general population
+        # This prevents country_code from being perfectly predictive of fraud
+        receiver_clusters = ["super_high_risk", "high_risk_score",
+                             "structuring_candidates", "high_risk_countries"]
+        potential_receivers = self.get_mixed_risk_entities(
+            high_risk_clusters=receiver_clusters,
+            fallback_pool=all_individuals,
+            num_needed=max(25, len(all_individuals) // 10),
+            high_risk_ratio=0.65,
+            node_type_filter=NodeType.INDIVIDUAL
+        )
 
         logger.debug(
-            f"RapidFundMovement: Found {len(potential_receivers)} potential receivers from clusters")
-
-        # Fallback to all individuals if clusters yield too few
-        if len(potential_receivers) < 5:
-            all_individuals = [e for e in available_entities
-                               if self.graph.nodes[e].get("node_type") == NodeType.INDIVIDUAL]
-            potential_receivers.extend(all_individuals)
-            potential_receivers = list(dict.fromkeys(potential_receivers))
-            logger.debug(
-                f"RapidFundMovement: Expanded to {len(potential_receivers)} total potential receivers")
+            f"RapidFundMovement: Selected {len(potential_receivers)} potential receivers (mixed risk)")
 
         random_instance.shuffle(potential_receivers)
 
@@ -88,24 +89,31 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         # Get individual's accounts to exclude them from sender selection
         individual_accounts = self._get_owned_accounts(selected_individual)
 
-        # Select overseas sender entities from high-risk clusters
-        sender_entity_clusters = ["high_risk_countries", "offshore_candidates"]
-        potential_sender_entities = self.get_combined_clusters(
-            sender_entity_clusters)
+        # Get all entities (excluding the selected individual) from pre-computed all_nodes
+        all_individuals = list(
+            self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
+        all_businesses = list(
+            self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+        all_entities = [e for e in (
+            all_individuals + all_businesses) if e != selected_individual]
+
+        # Use mixed selection for senders: ~65% from high-risk, ~35% general
+        sender_clusters = ["high_risk_countries",
+                           "offshore_candidates", "super_high_risk"]
+        mixed_sender_entities = self.get_mixed_risk_entities(
+            high_risk_clusters=sender_clusters,
+            fallback_pool=all_entities,
+            num_needed=max_sender_entities,
+            high_risk_ratio=0.65
+        )
 
         logger.debug(
-            f"RapidFundMovement: Found {len(potential_sender_entities)} potential sender entities from clusters")
+            f"RapidFundMovement: Selected {len(mixed_sender_entities)} sender entities (mixed risk)")
 
-        # Limit the number of sender entities to prevent too many accounts
-        random_instance.shuffle(potential_sender_entities)
-        limited_sender_entities = potential_sender_entities[:max_sender_entities]
-
-        logger.debug(
-            f"RapidFundMovement: Limited to {len(limited_sender_entities)} sender entities")
-
-        # Get accounts owned by these limited high-risk entities
+        # Get accounts owned by these entities
+        from .base import deduplicate_preserving_order
         potential_sender_accounts = []
-        for entity_id in limited_sender_entities:
+        for entity_id in mixed_sender_entities:
             entity_accounts = self._get_owned_accounts(entity_id)
             potential_sender_accounts.extend(entity_accounts)
 
@@ -113,36 +121,12 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         potential_sender_accounts = [acc for acc in potential_sender_accounts
                                      if acc not in individual_accounts]
 
-        # Remove duplicates deterministically
-        from .base import deduplicate_preserving_order
+        # Remove duplicates
         potential_sender_accounts = deduplicate_preserving_order(
             potential_sender_accounts)
 
         logger.debug(
-            f"RapidFundMovement: Found {len(potential_sender_accounts)} potential sender accounts from high-risk entities")
-
-        # If we don't have enough from clusters, expand to all accounts from high-risk countries
-        if len(potential_sender_accounts) < min_senders:
-            all_accounts = [e for e in available_entities
-                            if self.graph.nodes[e].get("node_type") == NodeType.ACCOUNT]
-
-            high_risk_accounts_added = 0
-            for account_id in all_accounts:
-                if account_id in individual_accounts:
-                    continue
-
-                account_country = self.graph.nodes[account_id].get(
-                    "country_code", "US")
-                if self._is_high_risk_jurisdiction(account_country):
-                    potential_sender_accounts.append(account_id)
-                    high_risk_accounts_added += 1
-
-            logger.debug(
-                f"RapidFundMovement: Added {high_risk_accounts_added} more accounts from high-risk countries")
-
-        # Remove duplicates again deterministically
-        potential_sender_accounts = deduplicate_preserving_order(
-            potential_sender_accounts)
+            f"RapidFundMovement: Found {len(potential_sender_accounts)} potential sender accounts")
 
         if not potential_sender_accounts:
             logger.warning("RapidFundMovement: No sender accounts found")

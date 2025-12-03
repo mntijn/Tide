@@ -25,46 +25,24 @@ class FrontBusinessStructural(StructuralComponent):
         business_accounts_ids = []
         overseas_business_accounts_ids = []
 
-        # Use the new clustering logic to find better candidates for front businesses
-        # Priority order: super_high_risk -> offshore_candidates -> high_risk_business_categories -> all businesses
-        potential_front_businesses = []
+        # Get all businesses from pre-computed all_nodes (efficient!)
+        all_businesses = list(
+            self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
 
-        # First try super high-risk entities (multiple risk factors)
-        super_high_risk = self.get_cluster("super_high_risk")
-        businesses_super_high_risk = self.filter_entities_by_criteria(
-            super_high_risk, {"node_type": NodeType.BUSINESS})
-        if businesses_super_high_risk:
-            potential_front_businesses.extend(businesses_super_high_risk)
+        # Use mixed selection: ~65% high-risk, ~35% general population
+        # This prevents business_category/country from being perfectly predictive
+        front_business_clusters = ["super_high_risk", "offshore_candidates",
+                                   "high_risk_business_categories", "high_risk_countries"]
+        potential_front_businesses = self.get_mixed_risk_entities(
+            high_risk_clusters=front_business_clusters,
+            fallback_pool=all_businesses,
+            num_needed=max(20, len(all_businesses) // 5),
+            high_risk_ratio=0.65,
+            node_type_filter=NodeType.BUSINESS
+        )
 
-        # Then try businesses that are likely offshore candidates
-        if len(potential_front_businesses) < 10:  # If we need more candidates
-            offshore_candidates = self.get_cluster("offshore_candidates")
-            businesses_offshore = self.filter_entities_by_criteria(
-                offshore_candidates, {"node_type": NodeType.BUSINESS})
-            potential_front_businesses.extend(businesses_offshore)
-
-        # Then try high-risk business categories
-        if len(potential_front_businesses) < 10:
-            high_risk_biz = self.get_cluster("high_risk_business_categories")
-            potential_front_businesses.extend(high_risk_biz)
-
-        # Finally, use traditional filtering as fallback
-        if len(potential_front_businesses) < 5:
-            traditional_candidates = self.filter_entities_by_criteria(
-                available_entities, {"node_type": NodeType.BUSINESS})
-            potential_front_businesses.extend(traditional_candidates)
-
-        # Remove duplicates and prioritize by risk factors
-            from .base import deduplicate_preserving_order
-            potential_front_businesses = deduplicate_preserving_order(
-                potential_front_businesses)
-        potential_front_businesses = self.prioritize_by_risk_factors(
-            potential_front_businesses)
-
-        # If still no businesses found, fall back to all businesses in graph
         if not potential_front_businesses:
-            potential_front_businesses = list(
-                self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
+            potential_front_businesses = all_businesses.copy()
 
         random_instance.shuffle(potential_front_businesses)
 
