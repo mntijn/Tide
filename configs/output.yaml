@@ -2,4 +2,11 @@ CSVfiles: True
 GraphML: False
 Gpickle: False
 PyTorch: True
+
+# TransactionsOnly: If True, only export transaction edges (not ownership edges)
 TransactionsOnly: True
+
+# RemoveIsolatedNodes: If True, remove nodes with no edges after filtering
+# (e.g., Individuals/Businesses/Institutions that only had ownership edges)
+# Recommended True for GNN training on transaction fraud detection
+RemoveIsolatedNodes: True

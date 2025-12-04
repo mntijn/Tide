@@ -97,7 +97,7 @@ class LegitimateChainStructural(StructuralComponent):
         # Mix in 50% of fraud accounts so they participate in normal chains
         if fraud_accounts:
             selected_fraud = random_instance.sample(
-                fraud_accounts, min(len(fraud_accounts), int(len(fraud_accounts) * 0.5)))
+                fraud_accounts, min(len(fraud_accounts), int(len(fraud_accounts) * 0.9)))
             legit_accounts.extend(selected_fraud)
 
         legit_accounts = deduplicate_preserving_order(legit_accounts)

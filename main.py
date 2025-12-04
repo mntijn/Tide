@@ -154,6 +154,64 @@ def filter_transactions_only(graph: nx.DiGraph) -> nx.DiGraph:
     return filtered
 
 
+def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.DiGraph:
+    """
+    Filter graph to only include edges where at least one endpoint account
+    belongs to an institution in the specified country.
+
+    Args:
+        graph: The original NetworkX graph
+        filter_country: Country code to filter by (e.g., "NL" for Netherlands)
+
+    Returns:
+        A filtered copy of the graph with only relevant edges
+    """
+    from tide.datastructures.enums import NodeType
+
+    # Find all institution IDs in the target country
+    target_institutions = set()
+    for node_id, attrs in graph.nodes(data=True):
+        node_type = attrs.get('node_type')
+        if node_type == NodeType.INSTITUTION or str(node_type) == 'institution':
+            if attrs.get('country_code') == filter_country:
+                target_institutions.add(node_id)
+
+    # Find all accounts belonging to those institutions
+    filtered_accounts = set()
+    for node_id, attrs in graph.nodes(data=True):
+        node_type = attrs.get('node_type')
+        if node_type == NodeType.ACCOUNT or str(node_type) == 'account':
+            if attrs.get('institution_id') in target_institutions:
+                filtered_accounts.add(node_id)
+
+    print(f"Institution filter: country={filter_country}, "
+          f"found {len(target_institutions)} institutions, {len(filtered_accounts)} accounts")
+
+    # Create filtered graph copy
+    filtered = graph.copy()
+    edges_to_remove = []
+    for u, v, attrs in filtered.edges(data=True):
+        # Keep edge if at least one endpoint is in filtered accounts
+        if u not in filtered_accounts and v not in filtered_accounts:
+            edges_to_remove.append((u, v))
+
+    filtered.remove_edges_from(edges_to_remove)
+
+    total_edges = graph.number_of_edges()
+    remaining_edges = filtered.number_of_edges()
+
+    # Remove isolated nodes (nodes with no edges after filtering)
+    isolated_nodes = list(nx.isolates(filtered))
+    total_nodes = filtered.number_of_nodes()
+    filtered.remove_nodes_from(isolated_nodes)
+    remaining_nodes = filtered.number_of_nodes()
+
+    print(f"Institution filter applied: {remaining_edges}/{total_edges} edges retained, "
+          f"{remaining_nodes}/{total_nodes} nodes retained ({len(isolated_nodes)} isolated nodes removed)")
+
+    return filtered
+
+
 def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
     """
     Convert NetworkX graph to PyTorch format suitable for Graph Neural Networks.
@@ -561,6 +619,16 @@ if __name__ == "__main__":
     print(f"Number of nodes: {aml_graph_gen.num_of_nodes()}")
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
 
+    # Get institution filter setting from config
+    institution_filter_country = generator_parameters.get(
+        'institution_filter_country')
+    if institution_filter_country:
+        print(
+            f"\nInstitution filter enabled: filtering to country '{institution_filter_country}'")
+
+    # Get node/edge filter settings
+    remove_isolated_nodes = output_config.get('RemoveIsolatedNodes', True)
+
     # Export to CSV
     if output_config.get('CSVfiles', True):
         print("\nExporting to CSV...")
@@ -568,7 +636,9 @@ if __name__ == "__main__":
             graph=graph,
             nodes_filepath=nodes_filepath,
             edges_filepath=edges_filepath,
-            transactions_filepath=transactions_filepath
+            transactions_filepath=transactions_filepath,
+            institution_filter_country=institution_filter_country,
+            remove_isolated_nodes=remove_isolated_nodes
         )
 
     # Export tracked patterns as JSON
@@ -591,12 +661,28 @@ if __name__ == "__main__":
         f"Exported {len(aml_graph_gen.injected_patterns)} tracked patterns to: {patterns_filepath}")
     print(f"Generated files saved to: {args.output_dir}")
 
-    # Respect export filter setting
+    # Respect export filter settings
     transactions_only = output_config.get('TransactionsOnly', False)
 
     # Optionally create a transactions-only view for exports that use the graph structure
     graph_for_exports = filter_transactions_only(
         graph) if transactions_only else graph
+
+    # Apply institution filter for graph-based exports (GraphML, Gpickle, PyTorch)
+    # Note: filter_by_institution_country already removes isolated nodes
+    if institution_filter_country:
+        graph_for_exports = filter_by_institution_country(
+            graph_for_exports, institution_filter_country)
+    elif remove_isolated_nodes:
+        # Remove isolated nodes even without institution filter
+        # (e.g., Individuals/Businesses/Institutions with only ownership edges after TransactionsOnly)
+        isolated = list(nx.isolates(graph_for_exports))
+        if isolated:
+            total_before = graph_for_exports.number_of_nodes()
+            graph_for_exports = graph_for_exports.copy()
+            graph_for_exports.remove_nodes_from(isolated)
+            print(f"Removed {len(isolated)} isolated nodes "
+                  f"({graph_for_exports.number_of_nodes()}/{total_before} nodes retained)")
 
     # Export to GraphML for visualization
     if output_config.get('GraphML', False):
