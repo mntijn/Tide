@@ -37,8 +37,15 @@ logger = logging.getLogger(__name__)
 
 class GraphGenerator:
     def __init__(self, params: Dict[str, Any]):
+        # CRITICAL: Reset all random seeds IMMEDIATELY before anything else
+        # This ensures determinism even when running multiple times in the same process
+        from .utils.random_instance import reset_random_seed
+        seed = params.get("random_seed")
+        if seed is not None:
+            reset_random_seed(seed)
+
         self.params = params
-        self.random_seed: Optional[int] = params.get("random_seed")
+        self.random_seed: Optional[int] = seed
 
         self.graph = nx.DiGraph()
         self.node_counter = 0
@@ -498,7 +505,10 @@ class GraphGenerator:
             # ------------------------------------------------------------------
             # 3) Allocate budget and inform patterns (if supported)
             # ------------------------------------------------------------------
-            for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
+            # Sort patterns by name to ensure deterministic execution order
+            background_patterns = sorted(self.background_pattern_manager.patterns.items())
+
+            for pattern_name, pattern_instance in background_patterns:
                 weight = pattern_weights.get(pattern_name, 0.0)
                 pattern_budget = int(total_budget * (weight / sum_weights))
                 if hasattr(pattern_instance, "set_tx_budget"):
@@ -510,7 +520,7 @@ class GraphGenerator:
             background_tasks = []
             task_index = 0
 
-            for pattern_name, pattern_instance in self.background_pattern_manager.patterns.items():
+            for pattern_name, pattern_instance in background_patterns:
                 task = (pattern_instance.inject_pattern_generator,
                         ([],), task_index)
                 background_tasks.append(task)
@@ -563,8 +573,22 @@ class GraphGenerator:
             max_background = int(fraud_edge_count /
                                  target_fraud_ratio) - fraud_edge_count
             max_background = max(0, max_background)
+
+            # Check if the target is achievable given graph capacity
+            max_possible_background = self.expected_background_transactions()
+            if max_background > max_possible_background:
+                achievable_ratio = fraud_edge_count / \
+                    (fraud_edge_count + max_possible_background)
+                logger.warning(
+                    f"Target fraud ratio {target_fraud_ratio:.4%} requires {max_background:,} background transactions, "
+                    f"but graph capacity is only {max_possible_background:,}. "
+                    f"Achievable ratio: {achievable_ratio:.4%} ({achievable_ratio/target_fraud_ratio:.1f}x target). "
+                    f"Consider: reducing num_illicit_patterns, disabling layering, or increasing graph_scale."
+                )
+
             logger.info(
-                f"Target fraud ratio: {target_fraud_ratio:.2%} -> capping background to {max_background:,} transactions"
+                f"Target fraud ratio: {target_fraud_ratio:.4%} -> capping background to {max_background:,} transactions "
+                f"(fraud transactions: {fraud_edge_count:,})"
             )
             self.simulate_background_activity(
                 target_transaction_count=max_background)
@@ -572,6 +596,22 @@ class GraphGenerator:
             # No ratio cap; use raw rate-based count
             self.simulate_background_activity()
 
+        # Calculate and report actual fraud ratio
+        total_edges = self.num_of_edges()
+        fraud_edges = sum(1 for _, _, attrs in self.graph.edges(data=True)
+                          if attrs.get('is_fraudulent', False))
+        actual_fraud_ratio = fraud_edges / total_edges if total_edges > 0 else 0
+
         logger.info(
             f"Graph generation complete. Total nodes: {self.num_of_nodes()}, Total edges: {self.num_of_edges()}")
+        logger.info(
+            f"Fraud statistics: {fraud_edges:,} fraudulent / {total_edges:,} total = {actual_fraud_ratio:.4%} fraud ratio")
+
+        if target_fraud_ratio and target_fraud_ratio > 0:
+            ratio_diff = abs(actual_fraud_ratio -
+                             target_fraud_ratio) / target_fraud_ratio
+            if ratio_diff > 0.1:  # More than 10% deviation
+                logger.warning(
+                    f"Actual fraud ratio ({actual_fraud_ratio:.4%}) deviates significantly from target ({target_fraud_ratio:.4%})")
+
         return self.graph

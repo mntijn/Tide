@@ -1,7 +1,7 @@
 CSVfiles: True
 GraphML: False
 Gpickle: False
-PyTorch: True
+PyTorch: False
 
 # TransactionsOnly: If True, only export transaction edges (not ownership edges)
 TransactionsOnly: True

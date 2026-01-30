@@ -1,94 +1,117 @@
 # Pattern configuration for AML pattern generation
 #
-# IMPORTANT: Fraud amounts are REALISTIC but legitimate background patterns
+# ENHANCED VERSION: Increased structural complexity for GNN benchmark validation
+#
+# Changes from original:
+# - Increased entity counts and hop depths within each pattern's natural structure
+# - Kept the fundamental AML typology logic unchanged
+# - Patterns still represent: structuring, layering, integration
+#
+# Key insight: Fraud amounts are REALISTIC but legitimate background patterns
 # now include similar high-value transactions to prevent amount-based leakage.
 # The distinguishing factor should be GRAPH STRUCTURE, not raw amounts.
 #
-# Key insight: Structuring (amounts just below $10K) is kept, but legitimate
-# patterns also include high-value rent, insurance, and car payments in the
-# same range, so amount alone doesn't predict fraud.
+# NEW: Camouflage probability setting for each pattern
+# This makes ~30% of fraud transactions use "average user" amounts ($20-$500)
+# which lowers ROC-AUC by blending fraud with the general population, not just outliers.
 
 # Front Business Activity Pattern
 # Simulates a business acting as a front for money laundering
+# Enhanced: More accounts and destinations to increase graph complexity
 frontBusiness:
-  min_accounts_for_front_business: 2
-  num_front_business_accounts_to_use: 3
-  min_overseas_destination_accounts: 2
-  max_overseas_destination_accounts_for_front: 4
+  min_accounts_for_front_business: 3
+  num_front_business_accounts_to_use: 5
+  min_overseas_destination_accounts: 4
+  max_overseas_destination_accounts_for_front: 8
   transaction_params:
-    min_deposit_cycles: 5
-    max_deposit_cycles: 15
+    min_deposit_cycles: 8
+    max_deposit_cycles: 20
     # REALISTIC: Large cash deposits typical of front businesses
     # Legitimate high-value payments (rent, insurance) now overlap
     deposit_amount_range: [5000, 15000]
-    deposits_per_cycle: [1, 3]
+    deposits_per_cycle: [2, 4]
+    # 40% of deposits use smaller amounts for camouflage
+    # 60% retain distinctive amounts (keeps task solvable)
+    camouflage_probability: 0.25
 
 # Repeated Overseas Transfers Pattern
 # Simulates repeated transfers to overseas accounts with STRUCTURING
+# Enhanced: More overseas entities to create larger fan-out patterns
 repeatedOverseas:
-  min_overseas_entities: 2
-  max_overseas_entities: 5
+  min_overseas_entities: 4
+  max_overseas_entities: 8
   # Deposit phase: CLASSIC STRUCTURING - just below $10K threshold
   deposit_params:
-    min_deposits: 3
-    max_deposits: 8
+    min_deposits: 5
+    max_deposits: 12
     # STRUCTURING: Deliberately below $10K reporting threshold
     amount_range: [7500, 9900]
+    # 40% of deposits use smaller amounts (balanced camouflage)
+    camouflage_probability: 0.25
   transaction_params:
-    min_transactions: 10
-    max_transactions: 30
+    min_transactions: 15
+    max_transactions: 40
     # Transfer amounts: moderate to avoid detection
     transfer_amount_range: [2000, 8000]
     transfer_interval_days: [7, 14, 30]
+    # 40% of transfers use smaller amounts
+    camouflage_probability: 0.25
   transfer_leakage_ratio: 0.95
 
 # Rapid Fund Movement Pattern
 # Simulates rapid movement of funds through multiple accounts
 # Uses SMALLER amounts (smurfing) that aggregate to large sums
+# Enhanced: More sender entities creates larger graph neighborhoods
 rapidMovement:
-  min_accounts_for_pattern: 2
-  max_sender_entities: 15
+  min_accounts_for_pattern: 3
+  max_sender_entities: 30
   transaction_params:
     inflows:
-      min_inflows: 5
-      max_inflows: 10
+      min_inflows: 10
+      max_inflows: 20
       # SMURFING: Many smaller transfers that aggregate
       # Overlaps with legitimate transfers/salary
       amount_range: [500, 3000]
     withdrawals:
-      min_withdrawals: 3
-      max_withdrawals: 8
+      min_withdrawals: 5
+      max_withdrawals: 12
       # Withdrawal amounts - some below reporting, some not
       amount_range: [200, 2000]
     inflow_to_withdrawal_delay: [1, 24]
+    # 15% of transactions use smaller amounts for light camouflage
+    camouflage_probability: 0.15
   validation_params:
     outflow_ratio_range: [0.85, 0.95]
 
 # U-Turn Transactions Pattern
 # Simulates funds being sent through intermediaries and returning to origin
+# Enhanced: More intermediaries creates longer chains requiring more hops to detect
 uTurnTransactions:
-  min_intermediaries: 2
-  max_intermediaries: 5
+  min_intermediaries: 4
+  max_intermediaries: 8
   transaction_params:
     # REALISTIC: Significant amounts for international transfers
     # Legitimate chains also now use similar amounts
     initial_amount_range: [3000, 15000]
     return_percentage_range: [0.7, 0.9]
-    international_delay_days: [1, 5]
+    international_delay_days: [1, 7]
     time_variability:
       business_hours: [9, 16]
       include_minutes: true
       include_hours: true
+    # 15% of U-turn patterns use smaller amounts
+    camouflage_probability: 0.15
   validation_params:
     fee_percentage_range: [0.01, 0.03]
 
 # Synchronized Transactions Pattern
 # Multiple entities coordinate deposits followed by transfers
+# Enhanced: More coordinating entities creates larger fan-in patterns
 synchronisedTransactions:
-  min_coordinating_entities: 3
-  max_coordinating_entities: 8
+  min_coordinating_entities: 5
+  max_coordinating_entities: 12
   transaction_params:
     # STRUCTURING: Coordinated deposits below threshold
     deposit_amount_range: [5000, 9500]
-    sync_window_hours: 2
-    transfer_delay_hours: [1, 6]
+    sync_window_hours: 3
+    transfer_delay_hours: [1, 8]

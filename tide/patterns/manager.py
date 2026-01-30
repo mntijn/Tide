@@ -28,6 +28,6 @@ class PatternManager:
             ]}
 
     def get_available_patterns(self) -> List[str]:
-        """Return list of available pattern names"""
-        available = list(self.patterns.keys())
+        """Return list of available pattern names (sorted for determinism)"""
+        available = sorted(self.patterns.keys())
         return available

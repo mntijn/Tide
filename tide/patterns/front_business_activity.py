@@ -8,6 +8,7 @@ from .base import (
 )
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
+from ..utils.amount_interleaving import generate_fraud_with_camouflage
 
 
 class FrontBusinessStructural(StructuralComponent):
@@ -29,15 +30,15 @@ class FrontBusinessStructural(StructuralComponent):
         all_businesses = list(
             self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
 
-        # Use mixed selection: ~65% high-risk, ~35% general population
-        # This prevents business_category/country from being perfectly predictive
+        # Use mixed selection: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         front_business_clusters = ["super_high_risk", "offshore_candidates",
                                    "high_risk_business_categories", "high_risk_countries"]
         potential_front_businesses = self.get_mixed_risk_entities(
             high_risk_clusters=front_business_clusters,
             fallback_pool=all_businesses,
             num_needed=max(20, len(all_businesses) // 5),
-            high_risk_ratio=0.65,
+            # high_risk_ratio read from fraud_selection_config in graph config
             node_type_filter=NodeType.BUSINESS
         )
 
@@ -150,12 +151,45 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
 
         num_cycles = random_instance.randint(min_deposits, max_deposits)
 
+        # Account for layering time in start offset
+        layering_config = self.params.get("layering_config", {})
+        max_extra_hops = layering_config.get(
+            "max_extra_hops", 5) if layering_config.get("enabled", False) else 0
+
         day_span = (self.time_span["end_date"] -
                     self.time_span["start_date"]).days
         start_day_offset = random_instance.randint(
-            0, max(0, day_span - (num_cycles * 2)))
+            0, max(0, day_span - (num_cycles * 2) - max_extra_hops * 3))
         current_time = self.time_span["start_date"] + \
             datetime.timedelta(days=start_day_offset)
+
+        # Create PatternInjector for layering
+        pattern_injector = PatternInjector(self.graph_generator, self.params)
+
+        # Build exclusion list
+        exclude_accounts = front_business_accounts + overseas_dest_accounts
+
+        # NEW: Camouflage probability for front business
+        # Some deposits should be smaller to look like normal business operations
+        camouflage_probability = tx_params.get("camouflage_probability", 0.25)
+
+        # Pre-generate deposit amounts with camouflage
+        if camouflage_probability > 0:
+            deposit_amounts = generate_fraud_with_camouflage(
+                count=num_cycles,
+                camouflage_probability=camouflage_probability,
+                # Small cash like average user
+                small_amount_range=(50.0, 300.0),
+                medium_amount_range=(300.0, 2000.0),  # Medium deposits
+                high_amount_range=(
+                    deposit_amount_range[0], deposit_amount_range[1]),
+            )
+        else:
+            deposit_amounts = [
+                round(random_instance.uniform(
+                    deposit_amount_range[0], deposit_amount_range[1]), 2)
+                for _ in range(num_cycles)
+            ]
 
         all_txs = []
         for i in range(num_cycles):
@@ -163,10 +197,9 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
             deposit_time = current_time
             target_deposit_account = random_instance.choice(
                 front_business_accounts)
-            deposit_amount = round(random_instance.uniform(
-                deposit_amount_range[0], deposit_amount_range[1]), 2)
+            deposit_amount = deposit_amounts[i]
 
-            deposit_tx = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
+            deposit_tx = pattern_injector._create_transaction_edge(
                 src_id=self.graph_generator.cash_account_id,
                 dest_id=target_deposit_account,
                 timestamp=deposit_time,
@@ -177,7 +210,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
             all_txs.append(
                 (self.graph_generator.cash_account_id, target_deposit_account, deposit_tx))
 
-            # --- Transfer ---
+            # --- Transfer with LAYERING ---
             delay_hours = random_instance.uniform(0.5, 6)
             transfer_time = deposit_time + \
                 datetime.timedelta(hours=delay_hours)
@@ -189,8 +222,29 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
             dest_transfer_account = random_instance.choice(
                 overseas_dest_accounts)
 
-            transfer_tx = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                src_id=source_transfer_account,
+            # === ADD LAYERING HOPS ===
+            layering_txs, final_time, final_amount = self.generate_layering_transactions(
+                source_account=source_transfer_account,
+                dest_account=dest_transfer_account,
+                amount=transfer_amount,
+                start_time=transfer_time,
+                pattern_injector=pattern_injector,
+                exclude_accounts=exclude_accounts
+            )
+
+            # Add layering transactions
+            all_txs.extend(layering_txs)
+
+            # Determine actual source for final transfer
+            if layering_txs:
+                actual_src = layering_txs[-1][1]
+                transfer_time = final_time
+                transfer_amount = final_amount
+            else:
+                actual_src = source_transfer_account
+
+            transfer_tx = pattern_injector._create_transaction_edge(
+                src_id=actual_src,
                 dest_id=dest_transfer_account,
                 timestamp=transfer_time,
                 amount=transfer_amount,
@@ -198,7 +252,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
                 is_fraudulent=True
             )
             all_txs.append(
-                (source_transfer_account, dest_transfer_account, transfer_tx))
+                (actual_src, dest_transfer_account, transfer_tx))
 
             # --- Advance time for the next cycle ---
             current_time += datetime.timedelta(

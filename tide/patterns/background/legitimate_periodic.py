@@ -24,6 +24,7 @@ from ..base import (
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 class LegitimatePeriodicStructural(StructuralComponent):
@@ -116,22 +117,10 @@ class LegitimatePeriodicTemporal(TemporalComponent):
         intervals = periodic_cfg.get("payment_intervals", [7, 14, 30])
         subscriptions_per_user = periodic_cfg.get(
             "subscriptions_per_user_range", [1, 4])
-
-        # Tiered amount ranges (small bills to very large rent/tuition)
-        amount_ranges = periodic_cfg.get("amount_ranges", {
-            "small_bills": [20.0, 200.0],
-            "medium_bills": [200.0, 1000.0],
-            "large_bills": [1000.0, 5000.0],
-            "very_large": [5000.0, 9500.0]
-        })
-        amount_probs = periodic_cfg.get("amount_probabilities", {
-            "small_bills": 0.4,
-            "medium_bills": 0.35,
-            "large_bills": 0.2,
-            "very_large": 0.05
-        })
-        tier_names = list(amount_probs.keys())
-        tier_weights = [amount_probs[t] for t in tier_names]
+        use_lognormal = periodic_cfg.get("use_lognormal", True)
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {}).get("payment", {})
 
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
@@ -154,12 +143,12 @@ class LegitimatePeriodicTemporal(TemporalComponent):
                 # Pick a random interval
                 interval_days = random_instance.choice(intervals)
 
-                # Select amount tier based on probabilities
-                tier = random_instance.choices(
-                    tier_names, weights=tier_weights)[0]
-                tier_range = amount_ranges.get(tier, [20.0, 200.0])
-                base_amount = random_instance.uniform(
-                    tier_range[0], tier_range[1])
+                # Sample base amount from log-normal or uniform
+                if use_lognormal:
+                    base_amount = sample_lognormal_scalar(
+                        "payment", config=dist_config)
+                else:
+                    base_amount = random_instance.uniform(20.0, 5000.0)
 
                 # Random start day within first interval
                 start_offset = random_instance.randint(

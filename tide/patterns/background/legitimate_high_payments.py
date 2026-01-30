@@ -5,6 +5,7 @@ from ..base import PatternInjector
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 class LegitimateHighPaymentsPattern:
@@ -67,6 +68,11 @@ class LegitimateHighPaymentsPattern:
             "property": 0.2, "business": 0.6, "luxury": 0.2
         })
 
+        use_lognormal = high_payments_config.get("use_lognormal", True)
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {}).get("high_value", {})
+
         monthly_rate = high_payments_config.get(
             "high_payment_rate_per_month", 0.1)
 
@@ -126,7 +132,10 @@ class LegitimateHighPaymentsPattern:
                 amount_range = amount_ranges["luxury_purchases"]
 
             # Generate realistic amount (rounded to nearest 100)
-            amount = random_instance.uniform(amount_range[0], amount_range[1])
+            if use_lognormal:
+                amount = sample_lognormal_scalar("high_value", config=dist_config)
+            else:
+                amount = random_instance.uniform(amount_range[0], amount_range[1])
             amount = round(amount / 100) * 100
 
             tx_attrs = pattern_injector._create_transaction_edge(

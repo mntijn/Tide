@@ -8,6 +8,7 @@ from ..entities import Account
 from ..utils.business import map_occupation_to_business_category, get_random_business_category
 from ..utils.accounts import process_individual, process_business
 from ..utils.faker_instance import reset_faker_seed
+from ..utils.random_instance import reset_random_seed
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +25,8 @@ def initialize_entities(graph_generator):
     if graph_generator.random_seed:
         logger.info(
             f"Deterministic mode enabled with seed {graph_generator.random_seed}")
-        graph_generator.random_instance.seed(graph_generator.random_seed)
-        # Also reset global random module
-        import random
-        random.seed(graph_generator.random_seed)
-        # Reset NumPy random state for complete reproducibility
-        import numpy as np
-        np.random.seed(graph_generator.random_seed)
+        # Use the centralized reset function for all random sources
+        reset_random_seed(graph_generator.random_seed)
         # Reset Faker instance
         reset_faker_seed()
 

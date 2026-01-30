@@ -9,6 +9,7 @@ from .base import (
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
+from ..utils.amount_interleaving import generate_fraud_with_camouflage
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +47,15 @@ class UTurnTransactionsStructural(StructuralComponent):
             self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
         all_entities = all_individuals + all_businesses
 
-        # Use mixed selection: ~65% high-risk, ~35% general population
+        # Use mixed selection: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         originator_clusters = ["super_high_risk", "high_risk_score",
                                "structuring_candidates", "high_risk_countries"]
         mixed_originators = self.get_mixed_risk_entities(
             high_risk_clusters=originator_clusters,
             fallback_pool=all_entities,
             num_needed=max(30, len(all_entities) // 10),
-            high_risk_ratio=0.65
+            # high_risk_ratio read from fraud_selection_config in graph config
         )
 
         # Find entities with multiple accounts
@@ -112,13 +114,14 @@ class UTurnTransactionsStructural(StructuralComponent):
         # Get all entities (excluding originator) for intermediary selection
         all_other_entities = [e for e in all_entities if e != originator_id]
 
-        # Use mixed selection for intermediaries: ~65% from high-risk, ~35% general
+        # Use mixed selection for intermediaries: ~40% from high-risk, ~60% general
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         intermediary_clusters = ["high_risk_countries", "offshore_candidates"]
         mixed_intermediary_entities = self.get_mixed_risk_entities(
             high_risk_clusters=intermediary_clusters,
             fallback_pool=all_other_entities,
             num_needed=max_intermediaries * 3,  # Get more, then filter
-            high_risk_ratio=0.65
+            # high_risk_ratio read from fraud_selection_config in graph config
         )
 
         # Get accounts from these entities (excluding originator's country)
@@ -230,9 +233,23 @@ class UTurnTransactionsTemporal(TemporalComponent):
             datetime.timedelta(days=start_day_offset,
                                hours=start_hour, minutes=start_minute)
 
-        # Initial amount
-        initial_amount = random_instance.uniform(
-            initial_amount_range[0], initial_amount_range[1])
+        # Initial amount with camouflage option
+        # Some U-turn patterns should use smaller amounts to blend with average users
+        camouflage_probability = tx_params.get("camouflage_probability", 0.25)
+
+        if random_instance.random() < camouflage_probability:
+            # Use smaller amounts that look more like normal transactions
+            amounts = generate_fraud_with_camouflage(
+                count=1,
+                camouflage_probability=0.6,
+                small_amount_range=(100.0, 500.0),
+                medium_amount_range=(500.0, 2000.0),
+                high_amount_range=(2000.0, initial_amount_range[0]),
+            )
+            initial_amount = amounts[0]
+        else:
+            initial_amount = random_instance.uniform(
+                initial_amount_range[0], initial_amount_range[1])
         current_amount = initial_amount
 
         all_transactions = []

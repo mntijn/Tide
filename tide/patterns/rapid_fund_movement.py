@@ -10,6 +10,7 @@ from .base import (
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.constants import HIGH_RISK_COUNTRIES
+from ..utils.amount_interleaving import generate_fraud_with_camouflage
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +54,15 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         all_individuals = list(
             self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
 
-        # Use mixed selection: ~65% high-risk, ~35% general population
-        # This prevents country_code from being perfectly predictive of fraud
+        # Use mixed selection: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         receiver_clusters = ["super_high_risk", "high_risk_score",
                              "structuring_candidates", "high_risk_countries"]
         potential_receivers = self.get_mixed_risk_entities(
             high_risk_clusters=receiver_clusters,
             fallback_pool=all_individuals,
             num_needed=max(25, len(all_individuals) // 10),
-            high_risk_ratio=0.65,
+            # high_risk_ratio read from fraud_selection_config in graph config,
             node_type_filter=NodeType.INDIVIDUAL
         )
 
@@ -97,14 +98,15 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         all_entities = [e for e in (
             all_individuals + all_businesses) if e != selected_individual]
 
-        # Use mixed selection for senders: ~65% from high-risk, ~35% general
+        # Use mixed selection for senders: ~40% from high-risk, ~60% general
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         sender_clusters = ["high_risk_countries",
                            "offshore_candidates", "super_high_risk"]
         mixed_sender_entities = self.get_mixed_risk_entities(
             high_risk_clusters=sender_clusters,
             fallback_pool=all_entities,
             num_needed=max_sender_entities,
-            high_risk_ratio=0.65
+            # high_risk_ratio read from fraud_selection_config in graph config
         )
 
         logger.debug(
@@ -225,16 +227,31 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         inflow_account_currency = self.graph.nodes[sample_account].get(
             "currency", "EUR")
 
-        inflow_amounts = self.generate_structured_amounts(
-            count=num_incoming_transfers,
-            base_amount=round(random_instance.uniform(
-                inflow_amount_range[0], inflow_amount_range[1]), 2),
-            target_currency=inflow_account_currency
-        )
+        # NEW: Use camouflage amounts to lower ROC-AUC
+        # Some transactions should look like average user behavior
+        camouflage_probability = tx_params.get("camouflage_probability", 0.30)
 
-        # Cap inflow amounts to respect the configured range
-        inflow_amounts = [min(max(amount, inflow_amount_range[0]), inflow_amount_range[1])
-                          for amount in inflow_amounts]
+        if camouflage_probability > 0:
+            # Mix of structured and normal-looking amounts
+            inflow_amounts = generate_fraud_with_camouflage(
+                count=num_incoming_transfers,
+                camouflage_probability=camouflage_probability,
+                small_amount_range=(50.0, 300.0),
+                medium_amount_range=(300.0, 1500.0),
+                high_amount_range=(
+                    inflow_amount_range[0], inflow_amount_range[1]),
+            )
+        else:
+            # Original: all structured amounts
+            inflow_amounts = self.generate_structured_amounts(
+                count=num_incoming_transfers,
+                base_amount=round(random_instance.uniform(
+                    inflow_amount_range[0], inflow_amount_range[1]), 2),
+                target_currency=inflow_account_currency
+            )
+
+        # Cap inflow amounts to respect the configured range (for non-camouflage)
+        inflow_amounts = [max(20.0, amount) for amount in inflow_amounts]
 
         inflow_transactions = []
         inflow_duration = datetime.timedelta(days=0)
@@ -243,6 +260,12 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 
         # Track which accounts receive money and how much
         account_balances = {acc: 0.0 for acc in receiving_accounts}
+
+        # Create PatternInjector for layering
+        pattern_injector = PatternInjector(self.graph_generator, self.params)
+
+        # Build exclusion list for layering
+        exclude_accounts = individual_accounts + overseas_sender_accounts
 
         for i in range(min(num_incoming_transfers, len(inflow_timestamps))):
             # Select from overseas sender accounts (entity selection peripheral entities)
@@ -255,23 +278,49 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             # Track the money going into this account
             account_balances[dest_account] += inflow_amounts[i]
 
-            tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                src_id=source_overseas_account,
-                dest_id=dest_account,
-                timestamp=inflow_timestamps[i],
+            # === ADD LAYERING HOPS BETWEEN SENDER AND RECEIVER ===
+            layering_txs, current_time, current_amount = self.generate_layering_transactions(
+                source_account=source_overseas_account,
+                dest_account=dest_account,
                 amount=inflow_amounts[i],
+                start_time=inflow_timestamps[i],
+                pattern_injector=pattern_injector,
+                exclude_accounts=exclude_accounts
+            )
+
+            # Add layering transactions
+            inflow_transactions.extend(layering_txs)
+
+            # Determine actual source for final hop
+            if layering_txs:
+                actual_src = layering_txs[-1][1]
+                final_timestamp = current_time
+                final_amount = current_amount
+            else:
+                actual_src = source_overseas_account
+                final_timestamp = inflow_timestamps[i]
+                final_amount = inflow_amounts[i]
+
+            tx_attrs = pattern_injector._create_transaction_edge(
+                src_id=actual_src,
+                dest_id=dest_account,
+                timestamp=final_timestamp,
+                amount=final_amount,
                 transaction_type=TransactionType.TRANSFER,
                 is_fraudulent=True
             )
             inflow_transactions.append(
-                (source_overseas_account, dest_account, tx_attrs))
+                (actual_src, dest_account, tx_attrs))
 
         if inflow_transactions:
+            # Get actual start and end times
+            start_time = inflow_transactions[0][2].timestamp
+            end_time = inflow_transactions[-1][2].timestamp
             sequences.append(TransactionSequence(
                 transactions=inflow_transactions,
                 sequence_name="rapid_inflows",
-                start_time=inflow_timestamps[0] if inflow_timestamps else inflow_start_time,
-                duration=inflow_duration
+                start_time=start_time,
+                duration=end_time - start_time
             ))
 
         last_inflow_time = inflow_timestamps[-1] if inflow_timestamps else inflow_start_time
@@ -295,16 +344,26 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         # Calculate target total withdrawal amount based on inflow
         target_total_withdrawal = total_inflow * target_outflow_ratio
 
-        # Generate structured withdrawal amounts (below reporting thresholds)
-        # Use a base amount that's reasonable for the withdrawal range
-        base_withdrawal_amount = (
-            inflow_amount_range[0] + inflow_amount_range[1]) / 2
-
-        withdrawal_amounts = self.generate_structured_amounts(
-            count=num_withdrawals,
-            base_amount=base_withdrawal_amount,
-            target_currency=inflow_account_currency
-        )
+        # Generate withdrawal amounts with camouflage
+        # Use same camouflage probability as inflows for consistency
+        if camouflage_probability > 0:
+            withdrawal_amounts = generate_fraud_with_camouflage(
+                count=num_withdrawals,
+                camouflage_probability=camouflage_probability,
+                small_amount_range=(30.0, 200.0),
+                medium_amount_range=(200.0, 1000.0),
+                high_amount_range=(
+                    inflow_amount_range[0], inflow_amount_range[1]),
+            )
+        else:
+            # Original: all structured amounts
+            base_withdrawal_amount = (
+                inflow_amount_range[0] + inflow_amount_range[1]) / 2
+            withdrawal_amounts = self.generate_structured_amounts(
+                count=num_withdrawals,
+                base_amount=base_withdrawal_amount,
+                target_currency=inflow_account_currency
+            )
 
         # Scale all amounts proportionally to match the target total
         current_total = sum(withdrawal_amounts)
@@ -313,8 +372,8 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             withdrawal_amounts = [
                 amount * scale_factor for amount in withdrawal_amounts]
 
-        # Round all amounts
-        withdrawal_amounts = [round(amount, 2)
+        # Round all amounts and ensure minimum
+        withdrawal_amounts = [max(20.0, round(amount, 2))
                               for amount in withdrawal_amounts]
 
         withdrawal_transactions = []
@@ -334,8 +393,9 @@ class RapidInflowOutflowTemporal(TemporalComponent):
             return []  # No transactions can be made if cash account is missing for withdrawal step
 
         # Only withdraw from accounts that actually received money
-        accounts_with_money = [
-            acc for acc, balance in account_balances.items() if balance > 0]
+        # Sort for deterministic order
+        accounts_with_money = sorted([
+            acc for acc, balance in account_balances.items() if balance > 0])
 
         if not accounts_with_money:
             logger.warning(

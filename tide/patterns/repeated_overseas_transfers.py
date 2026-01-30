@@ -7,6 +7,7 @@ from .base import (
     CompositePattern, PatternInjector
 )
 from ..datastructures.enums import NodeType, TransactionType
+from ..utils.amount_interleaving import generate_fraud_with_camouflage
 import logging
 
 
@@ -39,15 +40,15 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
         all_individuals = list(
             self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
 
-        # Use mixed selection: ~65% high-risk, ~35% general population
-        # This prevents country_code from being perfectly predictive of fraud
+        # Use mixed selection: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         source_clusters = ["offshore_candidates",
                            "super_high_risk", "high_risk_countries"]
         potential_source_entities = self.get_mixed_risk_entities(
             high_risk_clusters=source_clusters,
             fallback_pool=all_individuals,
             num_needed=max(20, len(all_individuals) // 10),
-            high_risk_ratio=0.65,
+            # high_risk_ratio read from fraud_selection_config in graph config
             node_type_filter=NodeType.INDIVIDUAL
         )
 
@@ -95,13 +96,13 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
                 all_other_entities = [e for e in (
                     all_individuals_dest + all_businesses_dest) if e != entity_id]
 
-                # Use mixed selection: ~65% from high-risk countries, ~35% general
+                # Use mixed selection: ~40% from high-risk countries, ~60% general
+                # Reduced from 65% to prevent risk_score from being predictive of fraud
                 dest_clusters = ["high_risk_countries", "offshore_candidates"]
                 mixed_dest_entities = self.get_mixed_risk_entities(
                     high_risk_clusters=dest_clusters,
                     fallback_pool=all_other_entities,
-                    num_needed=max_overseas_entities * 3,  # Get more, then filter
-                    high_risk_ratio=0.65
+                    num_needed=max_overseas_entities * 3  # Get more, then filter
                 )
 
                 # Get overseas accounts from these entities
@@ -221,8 +222,24 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
         if not deposit_timestamps:
             return []  # Not enough time to even make deposits
 
-        deposit_amounts = [round(random_instance.uniform(
-            deposit_amount_range[0], deposit_amount_range[1]), 2) for _ in range(len(deposit_timestamps))]
+        # NEW: Use camouflage amounts to lower ROC-AUC
+        # Some deposits should look like average user deposits
+        camouflage_probability = deposit_params.get(
+            "camouflage_probability", 0.30)
+
+        if camouflage_probability > 0:
+            deposit_amounts = generate_fraud_with_camouflage(
+                count=len(deposit_timestamps),
+                camouflage_probability=camouflage_probability,
+                small_amount_range=(100.0, 500.0),
+                medium_amount_range=(500.0, 3000.0),
+                high_amount_range=(
+                    deposit_amount_range[0], deposit_amount_range[1]),
+            )
+        else:
+            deposit_amounts = [round(random_instance.uniform(
+                deposit_amount_range[0], deposit_amount_range[1]), 2)
+                for _ in range(len(deposit_timestamps))]
 
         deposit_transactions = []
         for i in range(len(deposit_timestamps)):
@@ -287,14 +304,28 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
             return sequences  # Not enough time for transfers
 
         actual_num_transactions = len(transfer_timestamps)
-        raw_amounts = self.generate_structured_amounts(
-            count=actual_num_transactions,
-            base_amount=round(random_instance.uniform(
-                amount_range[0], amount_range[1]), 2),
-            target_currency="EUR"
-        )
-        raw_amounts = [min(max(amount, amount_range[0]), amount_range[1])
-                       for amount in raw_amounts]
+
+        # NEW: Use camouflage for transfer amounts too
+        transfer_camouflage_prob = tx_params.get(
+            "camouflage_probability", 0.25)
+
+        if transfer_camouflage_prob > 0:
+            raw_amounts = generate_fraud_with_camouflage(
+                count=actual_num_transactions,
+                camouflage_probability=transfer_camouflage_prob,
+                small_amount_range=(100.0, 600.0),
+                medium_amount_range=(600.0, 2500.0),
+                high_amount_range=(amount_range[0], amount_range[1]),
+            )
+        else:
+            raw_amounts = self.generate_structured_amounts(
+                count=actual_num_transactions,
+                base_amount=round(random_instance.uniform(
+                    amount_range[0], amount_range[1]), 2),
+                target_currency="EUR"
+            )
+            raw_amounts = [min(max(amount, amount_range[0]), amount_range[1])
+                           for amount in raw_amounts]
 
         # Scale transfer amounts to match total_deposited (optionally allow a small leakage, e.g. 98%)
         transfer_leakage_ratio = pattern_config.get(
@@ -311,28 +342,61 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
         else:
             amounts = raw_amounts
 
+        # Create PatternInjector for layering
+        pattern_injector = PatternInjector(self.graph_generator, self.params)
+
+        # Build exclusion list
+        exclude_accounts = [source_account_id] + overseas_account_ids
+
         transactions_for_sequence = []
         for i in range(actual_num_transactions):
             destination_account_id = random_instance.choice(
                 overseas_account_ids)
-            tx_attrs = PatternInjector(self.graph_generator, self.params)._create_transaction_edge(
-                src_id=source_account_id,
-                dest_id=destination_account_id,
-                timestamp=transfer_timestamps[i],
+
+            # === ADD LAYERING HOPS ===
+            layering_txs, final_time, final_amount = self.generate_layering_transactions(
+                source_account=source_account_id,
+                dest_account=destination_account_id,
                 amount=amounts[i],
+                start_time=transfer_timestamps[i],
+                pattern_injector=pattern_injector,
+                exclude_accounts=exclude_accounts
+            )
+
+            # Add layering transactions
+            transactions_for_sequence.extend(layering_txs)
+
+            # Determine actual source for final transfer
+            if layering_txs:
+                actual_src = layering_txs[-1][1]
+                final_timestamp = final_time
+                tx_amount = final_amount
+            else:
+                actual_src = source_account_id
+                final_timestamp = transfer_timestamps[i]
+                tx_amount = amounts[i]
+
+            tx_attrs = pattern_injector._create_transaction_edge(
+                src_id=actual_src,
+                dest_id=destination_account_id,
+                timestamp=final_timestamp,
+                amount=tx_amount,
                 transaction_type=TransactionType.TRANSFER,
                 is_fraudulent=True
             )
             transactions_for_sequence.append(
-                (source_account_id, destination_account_id, tx_attrs))
+                (actual_src, destination_account_id, tx_attrs))
 
         if transactions_for_sequence:
+            # Get actual start and end times
+            start_time = transactions_for_sequence[0][2].timestamp
+            end_time = transactions_for_sequence[-1][2].timestamp
             sequences.append(
                 TransactionSequence(
                     transactions=transactions_for_sequence,
                     sequence_name=f"repeated_transfers_{temporal_type}",
-                    start_time=transfer_timestamps[0],
-                    duration=transfer_timestamps[-1] - transfer_timestamps[0]
+                    start_time=start_time,
+                    duration=end_time - start_time
                 )
             )
         return sequences

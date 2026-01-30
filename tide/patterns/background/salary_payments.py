@@ -4,12 +4,13 @@ from typing import List, Dict, Any, Tuple, Optional
 
 from ..base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
-    CompositePattern, PatternInjector
+    CompositePattern, PatternInjector, deduplicate_preserving_order
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
 from ...utils.constants import HIGH_PAID_OCCUPATIONS
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 class SalaryPaymentsStructural(StructuralComponent):
@@ -35,8 +36,8 @@ class SalaryPaymentsStructural(StructuralComponent):
                 fraud_entities, min(len(fraud_entities), int(len(fraud_entities) * 0.9)))
             legit_entities.extend(selected_fraud)
 
-        # Dedup just in case
-        all_candidate_entities = list(set(legit_entities))
+        # Dedup while preserving order for determinism
+        all_candidate_entities = deduplicate_preserving_order(legit_entities)
 
         if not all_candidate_entities:
             return EntitySelection(central_entities=[], peripheral_entities=[])
@@ -96,12 +97,24 @@ class SalaryPaymentsTemporal(TemporalComponent):
 
         payment_intervals = salary_config.get(
             "payment_intervals", [14, 30])  # bi-weekly or monthly
+        salary_variation = salary_config.get("salary_variation", 0.05)  # ±5%
+
+        # Distribution config
+        use_lognormal = salary_config.get("use_lognormal", True)
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {}).get("salary", {})
+        high_earner_dist = {
+            "mu": salary_config.get("high_earner_mu", 8.5),
+            "sigma": salary_config.get("high_earner_sigma", 0.5),
+            "min": dist_config.get("min", 200.0),
+            "max": dist_config.get("max", 30000.0),
+        }
+        # Legacy fallback ranges
         salary_range = salary_config.get("salary_range", [2500.0, 7500.0])
         high_earner_salary_range = salary_config.get(
-            # Higher range for specific occupations
             "high_earner_salary_range", [8000.0, 20000.0]
         )
-        salary_variation = salary_config.get("salary_variation", 0.05)  # ±5%
         preferred_days = salary_config.get(
             "preferred_payment_days", [1, 15, 30])
 
@@ -137,13 +150,22 @@ class SalaryPaymentsTemporal(TemporalComponent):
                 individual_node = self.graph_generator.graph.nodes[individual_entity_id]
                 occupation = individual_node.get("occupation")
 
-                current_salary_range = salary_range
-                if occupation and occupation in HIGH_PAID_OCCUPATIONS:
-                    current_salary_range = high_earner_salary_range
+                is_high_earner = (
+                    occupation and occupation in HIGH_PAID_OCCUPATIONS
+                )
 
-                # Random salary and payment interval for this recipient
-                base_salary = random_instance.uniform(
-                    current_salary_range[0], current_salary_range[1])
+                # Sample base salary from log-normal or uniform
+                if use_lognormal:
+                    cfg = high_earner_dist if is_high_earner else dist_config
+                    base_salary = sample_lognormal_scalar("salary", config=cfg)
+                else:
+                    current_salary_range = (
+                        high_earner_salary_range if is_high_earner
+                        else salary_range
+                    )
+                    base_salary = random_instance.uniform(
+                        current_salary_range[0], current_salary_range[1]
+                    )
                 payment_interval = random_instance.choice(payment_intervals)
 
                 # Generate payment dates

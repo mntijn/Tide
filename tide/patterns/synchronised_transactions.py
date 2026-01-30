@@ -40,14 +40,15 @@ class SynchronisedTransactionsStructural(StructuralComponent):
             self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
         all_entities = all_individuals + all_businesses
 
-        # Use mixed selection for recipients: ~65% high-risk, ~35% general population
+        # Use mixed selection for recipients: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         recipient_clusters = ["super_high_risk",
                               "offshore_candidates", "high_risk_countries"]
         potential_recipients = self.get_mixed_risk_entities(
             high_risk_clusters=recipient_clusters,
             fallback_pool=all_entities,
             num_needed=max(20, len(all_entities) // 10),
-            high_risk_ratio=0.65
+            # high_risk_ratio read from fraud_selection_config in graph config
         )
 
         from .base import deduplicate_preserving_order
@@ -90,7 +91,8 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         coordinating_entities = []
         coordinating_accounts = []
 
-        # Use mixed selection for coordinators: ~65% high-risk, ~35% general population
+        # Use mixed selection for coordinators: ~40% high-risk, ~60% general population
+        # Reduced from 65% to prevent risk_score from being predictive of fraud
         coordinator_clusters = ["intermediaries",
                                 "high_risk_countries", "high_risk_age_groups"]
         potential_coordinators = self.get_mixed_risk_entities(
@@ -98,7 +100,7 @@ class SynchronisedTransactionsStructural(StructuralComponent):
             fallback_pool=all_individuals,
             num_needed=max(max_coordinating_entities *
                            2, len(all_individuals) // 5),
-            high_risk_ratio=0.65,
+            # high_risk_ratio read from fraud_selection_config in graph config,
             node_type_filter=NodeType.INDIVIDUAL
         )
 

@@ -1,25 +1,39 @@
+# HIGH FRAUD-CLASS HOMOPHILY configuration
+#
+# Goal: Produce a dataset with the same scale and edge count as graph_low_homophily.yaml,
+# but where fraudulent edges cluster tightly together in the graph (high homophily).
+#
+# Design choices:
+# - Layering (2-5 hops) + TIGHT entity pool creates dense fraud chains
+#   that reuse the same intermediary nodes. Low-homophily uses 4-8 hops + BROAD
+#   pool, spreading chains across unrelated intermediaries.
+# - REDUCED legitimateHighRiskActivity: fewer legitimate edges around fraud
+#   entities so fraud edges are a larger fraction of each node's neighborhood.
+# - Tight fraud entity pool: high min_risk_score (0.70) means only a small set
+#   of entities participate in fraud, so patterns reuse the same nodes.
+# - High reuse probability: 0.30 base probability means fraud entities are
+#   selected repeatedly across different patterns.
+# - high_risk_ratio: 0.80 means 80% of pattern participants come from the same
+#   high-risk clusters, concentrating fraud edges in tight neighborhoods.
+# - Background patterns match graph_low_homophily.yaml for comparable edge volume.
+#
+# Differences vs graph_low_homophily.yaml:
+#   - layering_config: 2-5 hops (vs 4-8) + tight pool — reused intermediaries
+#   - fraud_selection_config: tight entity pool (vs broad) — reuse intermediaries
+#   - legitimateHighRiskActivity: reduced (weight=0.05, fraction=0.30, txns=[2,8])
+
 graph_scale:
   individuals: 8000
-  # businesses: 0
   institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 5]
 
-# Target fraud ratio: background transactions are capped so that
-# fraud_count / total_transactions ≈ target_fraud_ratio.
-# E.g., 0.02 means ~2% of transactions will be fraudulent.
-# Set to null or remove to disable capping (use raw per_account_per_day rate).
 target_fraud_ratio: 0.0003
 
-# Institution filter: only export transactions where at least one account
-# belongs to an institution in the specified country.
-# Set to null or remove to export all transactions (default behavior).
-# Example: "NL" for Netherlands-based institutions only.
 institution_filter_country: null
 
 transaction_rates:
-  # This rate is used as the *maximum* rate; actual count is capped by target_fraud_ratio.
-  per_account_per_day: 2
+  per_account_per_day: 1.5
 time_span:
   start_date: '2025-01-01T00:00:00'
   end_date: '2025-12-31T23:59:59'
@@ -30,14 +44,8 @@ random_seed: 42
 business_creation_date_range: [90, 5475]
 
 backgroundPatterns:
-  # Weights are rebalanced to introduce more diverse legitimate patterns
-  # that mimic fraud signals (cash ops, periodic timing, chains, rapid flows)
-  #
-  # ENHANCED: Added structuring lookalikes and rapid flow patterns to reduce
-  # feature-based data leakage (targeting ROC-AUC reduction from 99.9% to 92-97%)
-
   randomPayments:
-    weight: 0.35  # Hub-and-spoke random payments
+    weight: 0.35
     legit_rate_multiplier: [0.3, 0.8]
     transaction_type_probabilities:
       transfer: 0.35
@@ -48,26 +56,26 @@ backgroundPatterns:
       payment: [10.0, 500.0]
       transfer: [5.0, 300.0]
       cash_operations: [20.0, 500.0]
-    # Light amount interleaving
     structured_amount_probability: 0.03
     structuring_range: [7000.0, 9900.0]
-    # Light temporal interleaving
     burst_probability: 0.10
     burst_duration_minutes: 240
 
   salaryPayments:
-    weight: 0.08  # Reduced from 0.10
+    weight: 0.08
     payment_intervals: [14, 30]
     salary_range: [2500.0, 7500.0]
     salary_variation: 0.05
     preferred_payment_days: [1, 15, 30]
 
+  # REDUCED for high homophily: this pattern specifically adds legitimate edges
+  # to fraudulent entities (~73 legit txns/fraudster over 365 days at default rate).
+  # Low-homophily config uses weight=0.25.
   fraudsterBackground:
-    weight: 0.25  # Reduced from 0.30
-    # NOTE: This pattern now uses legitimate amount ranges internally (no leak)
+    weight: 0.001
 
   legitimateHighPayments:
-    weight: 0.08  # Reduced from 0.10
+    weight: 0.08
     high_payment_ranges:
       property_transactions: [50000.0, 500000.0]
       business_deals: [10000.0, 100000.0]
@@ -78,7 +86,6 @@ backgroundPatterns:
       luxury: 0.3
     high_payment_rate_per_month: 0.1
 
-  # Legitimate burst activity (light interleaving)
   legitimateBurst:
     weight: 0.08
     burst_user_fraction: 0.05
@@ -89,28 +96,25 @@ backgroundPatterns:
     cash_ops_probability: 0.10
     cash_amount_range: [50.0, 300.0]
     bursts_per_user_range: [1, 2]
-    # Light fraud-like amounts
     structuring_burst_probability: 0.05
     structuring_amount_range: [7000.0, 9900.0]
 
-  # ENHANCED: Extended ranges to exactly match fraud structuring
   legitimateCashOperations:
     weight: 0.15
-    cash_user_fraction: 0.35  # Increased from 0.30
+    cash_user_fraction: 0.35
     operations_per_month_range: [2, 8]
     withdrawal_amount_range: [20.0, 500.0]
     deposit_amount_ranges:
       small: [50.0, 500.0]
       medium: [500.0, 2000.0]
       large: [2000.0, 5000.0]
-      very_large: [7500.0, 9999.0]  # Extended from 9500 to exactly match fraud!
+      very_large: [7500.0, 9999.0]
     deposit_probabilities:
-      small: 0.45  # Rebalanced
+      small: 0.45
       medium: 0.28
       large: 0.15
-      very_large: 0.12  # Increased from 0.05 to 0.12!
-    deposit_probability: 0.35  # Slightly increased
-    # NEW: Rapid deposit sequence mode (mimics small business cash handling)
+      very_large: 0.12
+    deposit_probability: 0.35
     rapid_deposit_mode:
       enabled: true
       probability: 0.08
@@ -118,27 +122,26 @@ backgroundPatterns:
       interval_days: [1, 5]
 
   legitimatePeriodicPayments:
-    weight: 0.12  # Reduced from 0.15
+    weight: 0.12
     periodic_user_fraction: 0.4
     payment_intervals: [7, 14, 30]
     amount_ranges:
       small_bills: [20.0, 200.0]
       medium_bills: [200.0, 1000.0]
       large_bills: [1000.0, 5000.0]
-      very_large: [7500.0, 9999.0]  # Extended to match fraud
+      very_large: [7500.0, 9999.0]
     amount_probabilities:
       small_bills: 0.38
       medium_bills: 0.32
       large_bills: 0.20
-      very_large: 0.10  # Increased from 0.05
+      very_large: 0.10
     subscriptions_per_user_range: [1, 4]
 
   legitimateChains:
-    weight: 0.12  # Reduced from 0.15
+    weight: 0.12
     num_chains_per_generation: 50
     amount_decay_range: [0.95, 1.0]
 
-  # Legitimate structuring-like deposits (light)
   legitimateStructuring:
     weight: 0.05
     user_fraction: 0.04
@@ -146,7 +149,6 @@ backgroundPatterns:
     deposits_per_month_range: [1, 3]
     burst_probability: 0.15
 
-  # Legitimate rapid fund flows (light)
   legitimateRapidFlow:
     weight: 0.05
     events_per_1000_users: 15
@@ -154,16 +156,16 @@ backgroundPatterns:
     outflows_per_event: [1, 4]
     amount_range: [500.0, 3000.0]
     inflow_to_outflow_delay_hours: [4, 72]
-    # Light fraud-like structuring
     structuring_amount_probability: 0.05
     structuring_amount_range: [7000.0, 9900.0]
 
-  # NEW: Legitimate high-risk entity activity (breaks risk_score -> fraud correlation)
-  # High-risk entities doing normal, legitimate transactions
+  # REDUCED for high homophily: less legitimate noise around fraud entities
+  # so fraud edges are a larger fraction of each fraud node's neighborhood.
+  # Low-homophily config uses weight=0.25, fraction=0.95, txns=[15,40].
   legitimateHighRiskActivity:
-    weight: 0.15  # Important: ensures high-risk entities have significant legit activity
-    activity_fraction: 0.85  # 85% of high-risk accounts have legitimate activity
-    transactions_per_account_range: [8, 25]  # More transactions per account
+    weight: 0.01
+    activity_fraction: 0.15
+    transactions_per_account_range: [1, 4]
     amount_ranges:
       small: [20.0, 200.0]
       medium: [200.0, 1000.0]
@@ -173,43 +175,37 @@ backgroundPatterns:
       medium: 0.35
       large: 0.15
 
-# Pattern generation settings
-# NOTE: With layering enabled (2-5 extra hops), each pattern generates ~4-5x more
-# transactions. Reduce num_illicit_patterns accordingly to maintain target fraud ratio.
-# Formula: max_fraud_txs ≈ background_capacity × target_ratio / (1 - target_ratio)
-#          For 0.07% with ~1.3M background: max_fraud ≈ 910 transactions
-#          With ~20-50 txs per pattern (layered): ~20-45 patterns max
 pattern_frequency:
   random: True
-  num_illicit_patterns: 90
+  num_illicit_patterns: 70
 
-  # If random is false these values are used instead of num_illicit patterns
   RapidFundMovement: 33
   FrontBusinessActivity: 33
   RepeatedOverseasTransfers: 33
   UTurnTransactions: 901
 
-# Layering configuration: adds intermediate hops to fraud patterns
-# This increases graph depth and requires more GNN message passing iterations
+# Layering for high edge-label homophily:
+# Longer chains (2-5 hops, same as graph_HI/LI) create more fraud-edge overlap
+# at intermediary nodes. Combined with the TIGHT entity pool, the same
+# intermediaries appear in multiple patterns, accumulating fraud edges.
+# Low-homophily config uses 4-8 hops with a BROAD entity pool — longer chains
+# but spread across unrelated intermediaries, so no node accumulates many.
 layering_config:
   enabled: true
-  min_extra_hops: 2  # Minimum layering hops per major fraud step
-  max_extra_hops: 5  # Maximum layering hops per major fraud step
-  # Use legitimate-looking amounts (drawn from background pattern ranges)
+  min_extra_hops: 2
+  max_extra_hops: 5
   use_legit_amounts: true
-  # Delay between layering hops (in hours)
   hop_delay_hours: [1, 48]
-  # Amount decay per hop (simulates fees/splits)
   amount_decay_range: [0.95, 0.99]
+  # Route layering hops through high-risk entity accounts instead of random
+  # accounts. This causes the same intermediary nodes to appear across multiple
+  # fraud chains, concentrating fraud edges and raising edge-label homophily.
+  use_clustered_intermediaries: true
 
-# Reporting threshold for structuring amounts
 reporting_threshold: 10000
 reporting_currency: 'USD'
-# Base probability for high-risk business selection
 high_risk_business_probability: 0.05
-# Probability for creating a random business when occupation doesn't suggest one
 random_business_probability: 0.15
-# Probability for an account to be an offshore account
 offshore_account_probability: 0.1
 
 high_transaction_amount_ratio: 0.05
@@ -236,8 +232,9 @@ risk_weights:
   very_small_company: 0.10
   max_score: 1.0
 
+# TIGHT fraud entity pool: concentrates fraud among the same entities
+# This is the ONLY section that differs from graph_low_homophily.yaml
 fraud_selection_config:
-  # An entity's risk_score must be >= this to be considered for being marked fraudulent.
-  min_risk_score_for_fraud_consideration: 0.50
-  # If entity is high risk, what is the chance they're selected for a pattern
-  base_fraud_probability_if_considered: 0.10
+  min_risk_score_for_fraud_consideration: 0.70  # Low-homophily: 0.25
+  base_fraud_probability_if_considered: 0.30    # Low-homophily: 0.05
+  high_risk_ratio: 0.80                         # Low-homophily: 0.15

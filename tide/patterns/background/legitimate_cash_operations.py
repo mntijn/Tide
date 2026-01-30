@@ -24,6 +24,7 @@ from ..base import (
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 class LegitimateCashStructural(StructuralComponent):
@@ -90,6 +91,11 @@ class LegitimateCashTemporal(TemporalComponent):
 
     This creates the same transaction types (DEPOSIT, WITHDRAWAL) that fraud
     patterns use, so that these types are no longer unique fraud signals.
+
+    Enhanced to support:
+    - Extended very_large deposit range to $9,999 (exact fraud overlap)
+    - Increased very_large probability to 12%
+    - Rapid deposit sequence mode (3-5 deposits within days) mimicking business cash handling
     """
 
     def _generate_transactions_stream(self, entity_selection: EntitySelection):
@@ -111,25 +117,20 @@ class LegitimateCashTemporal(TemporalComponent):
             "legitimateCashOperations", {}
         )
         ops_per_month = cash_cfg.get("operations_per_month_range", [2, 8])
-        withdrawal_range = cash_cfg.get(
-            "withdrawal_amount_range", [20.0, 500.0])
         deposit_prob = cash_cfg.get("deposit_probability", 0.3)
+        use_lognormal = cash_cfg.get("use_lognormal", True)
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {})
 
-        # Tiered deposit amounts (small tips to large car sale deposits)
-        deposit_ranges = cash_cfg.get("deposit_amount_ranges", {
-            "small": [50.0, 500.0],
-            "medium": [500.0, 2000.0],
-            "large": [2000.0, 5000.0],
-            "very_large": [5000.0, 9500.0]
-        })
-        deposit_probs = cash_cfg.get("deposit_probabilities", {
-            "small": 0.5,
-            "medium": 0.3,
-            "large": 0.15,
-            "very_large": 0.05
-        })
-        tier_names = list(deposit_probs.keys())
-        tier_weights = [deposit_probs[t] for t in tier_names]
+        # NEW: Rapid deposit sequence mode configuration
+        rapid_deposit_cfg = cash_cfg.get("rapid_deposit_mode", {})
+        rapid_deposit_enabled = rapid_deposit_cfg.get("enabled", True)
+        rapid_deposit_probability = rapid_deposit_cfg.get("probability", 0.15)
+        rapid_deposits_per_sequence = rapid_deposit_cfg.get(
+            "deposits_per_sequence", [3, 5])
+        rapid_deposit_interval_days = rapid_deposit_cfg.get(
+            "interval_days", [1, 3])
 
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
@@ -140,7 +141,71 @@ class LegitimateCashTemporal(TemporalComponent):
         total_months = max(1, total_days // 30)
 
         for account_id in cash_users:
-            # Random number of cash operations for this account
+            # Decide if this user will have a rapid deposit sequence
+            has_rapid_sequence = rapid_deposit_enabled and random_instance.random(
+            ) < rapid_deposit_probability
+
+            if has_rapid_sequence:
+                # Generate rapid deposit sequence (mimics small business cash handling)
+                # INTERLEAVING: Now uses HOURS between deposits (like fraud) instead of days
+                num_rapid_deposits = random_instance.randint(
+                    rapid_deposits_per_sequence[0], rapid_deposits_per_sequence[1]
+                )
+
+                # Start of sequence - pick a random day
+                sequence_start_day = random_instance.randint(
+                    0, max(0, total_days - 5))
+                sequence_start = start_date + datetime.timedelta(
+                    days=sequence_start_day,
+                    hours=random_instance.randint(9, 12)  # Morning start
+                )
+
+                # Some rapid deposits use hours-based timing, some use days
+                use_hours_timing = random_instance.random() < 0.50
+
+                current_time = sequence_start
+                for _ in range(num_rapid_deposits):
+                    if budget is not None and tx_count >= budget:
+                        return
+
+                    if use_hours_timing:
+                        # Hours-based timing: deposits hours apart
+                        hour_offset = random_instance.uniform(2, 12)
+                        current_time += datetime.timedelta(hours=hour_offset)
+                    else:
+                        # Day-based timing
+                        day_offset = random_instance.randint(
+                            rapid_deposit_interval_days[0], rapid_deposit_interval_days[1]
+                        )
+                        current_time += datetime.timedelta(days=day_offset)
+
+                    tx_time = current_time
+
+                    # Rapid deposits tend to be larger (business cash)
+                    if use_lognormal:
+                        cfg = dist_config.get("deposit", {})
+                        # Shift up for business deposits
+                        rapid_cfg = dict(cfg)
+                        rapid_cfg["mu"] = rapid_cfg.get("mu", 5.3) + 1.5
+                        amount = sample_lognormal_scalar(
+                            "deposit", config=rapid_cfg)
+                    else:
+                        amount = random_instance.uniform(5000.0, 9999.0)
+                    # Round to realistic denominations
+                    amount = round(amount / 100) * 100
+
+                    tx_attrs = pattern_injector._create_transaction_edge(
+                        src_id=cash_account_id,
+                        dest_id=account_id,
+                        timestamp=tx_time,
+                        amount=amount,
+                        transaction_type=TransactionType.DEPOSIT,
+                        is_fraudulent=False,
+                    )
+                    tx_count += 1
+                    yield (cash_account_id, account_id, tx_attrs)
+
+            # Regular cash operations (in addition to any rapid sequence)
             num_ops = random_instance.randint(
                 ops_per_month[0] * total_months,
                 ops_per_month[1] * total_months
@@ -165,14 +230,13 @@ class LegitimateCashTemporal(TemporalComponent):
                 is_deposit = random_instance.random() < deposit_prob
 
                 if is_deposit:
-                    # Cash deposit - select tier based on probabilities
-                    tier = random_instance.choices(
-                        tier_names, weights=tier_weights)[0]
-                    tier_range = deposit_ranges.get(tier, [50.0, 500.0])
-                    amount = round(
-                        random_instance.uniform(
-                            tier_range[0], tier_range[1]), 2
-                    )
+                    # Cash deposit from log-normal distribution
+                    if use_lognormal:
+                        amount = sample_lognormal_scalar(
+                            "deposit",
+                            config=dist_config.get("deposit", {}))
+                    else:
+                        amount = random_instance.uniform(50.0, 5000.0)
                     # Round to realistic denominations
                     amount = round(amount / 10) * 10
 
@@ -188,11 +252,12 @@ class LegitimateCashTemporal(TemporalComponent):
                     yield (cash_account_id, account_id, tx_attrs)
                 else:
                     # Cash withdrawal (ATM, spending money)
-                    amount = round(
-                        random_instance.uniform(
-                            withdrawal_range[0], withdrawal_range[1]
-                        ), 2
-                    )
+                    if use_lognormal:
+                        amount = sample_lognormal_scalar(
+                            "withdrawal",
+                            config=dist_config.get("withdrawal", {}))
+                    else:
+                        amount = random_instance.uniform(20.0, 500.0)
                     # ATM withdrawals are often in $20 increments
                     amount = round(amount / 20) * 20
                     amount = max(20.0, amount)

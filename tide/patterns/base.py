@@ -271,8 +271,8 @@ class StructuralComponent(ABC):
                 entity_risk_count[entity_id] = entity_risk_count.get(
                     entity_id, 0) + 1
 
-        # Return entities with 2+ risk factors
-        return [entity_id for entity_id, count in entity_risk_count.items() if count >= 2]
+        # Return entities with 2+ risk factors (sorted for determinism)
+        return sorted([entity_id for entity_id, count in entity_risk_count.items() if count >= 2])
 
     def prioritize_by_risk_factors(self, entities: List[str]) -> List[str]:
         """Sort entities by number of risk factors (highest risk first)."""
@@ -300,26 +300,30 @@ class StructuralComponent(ABC):
         high_risk_clusters: List[str],
         fallback_pool: List[str],
         num_needed: int,
-        high_risk_ratio: float = 0.65,
+        high_risk_ratio: float = None,
         node_type_filter: NodeType = None
     ) -> List[str]:
         """
         Get a mix of high-risk and general population entities.
 
-        This prevents data leakage where country_code alone predicts fraud.
-        Real fraud involves ~60-70% high-risk jurisdictions, not 100%.
 
         Args:
             high_risk_clusters: Cluster names to draw high-risk entities from
             fallback_pool: General pool of entities (e.g., all individuals)
             num_needed: Total number of entities to return
-            high_risk_ratio: Fraction from high-risk clusters (default 0.65 = 65%)
+            high_risk_ratio: Fraction from high-risk clusters. If None, reads from
+                fraud_selection_config.high_risk_ratio in graph config (default 0.40).
             node_type_filter: Optional filter for entity type (INDIVIDUAL, BUSINESS)
 
         Returns:
             Mixed list of entities with realistic risk distribution
         """
         from ..utils.random_instance import random_instance
+
+        # Read default from graph config if not explicitly passed
+        if high_risk_ratio is None:
+            high_risk_ratio = self.graph_generator.params.get(
+                'fraud_selection_config', {}).get('high_risk_ratio', 0.40)
 
         # Get high-risk entities from pre-computed clusters (efficient!)
         high_risk_entities = self.get_combined_clusters(high_risk_clusters)
@@ -501,6 +505,150 @@ class TemporalComponent(ABC):
             target_currency=target_currency,
             base_amount=base_amount
         )
+
+    def generate_layering_transactions(
+        self,
+        source_account: str,
+        dest_account: str,
+        amount: float,
+        start_time: datetime.datetime,
+        pattern_injector: 'PatternInjector',
+        exclude_accounts: List[str] = None
+    ) -> Tuple[List[Tuple[str, str, TransactionAttributes]], datetime.datetime, float]:
+        """
+        Generate intermediate layering transactions between source and destination.
+
+        This adds extra hops to make fraud patterns harder to detect with shallow models.
+        The layering hops use legitimate-looking amounts and timing.
+
+        Args:
+            source_account: Starting account ID
+            dest_account: Final destination account ID
+            amount: Amount to transfer through the chain
+            start_time: Starting timestamp for the chain
+            pattern_injector: PatternInjector instance for creating edges
+            exclude_accounts: Accounts to exclude from intermediate selection
+
+        Returns:
+            Tuple of (transactions_list, final_timestamp, remaining_amount)
+        """
+        layering_config = self.params.get("layering_config", {})
+
+        # Check if layering is enabled
+        if not layering_config.get("enabled", False):
+            return [], start_time, amount
+
+        min_hops = layering_config.get("min_extra_hops", 2)
+        max_hops = layering_config.get("max_extra_hops", 5)
+        hop_delay_hours = layering_config.get("hop_delay_hours", [1, 48])
+        amount_decay_range = layering_config.get(
+            "amount_decay_range", [0.95, 0.99])
+
+        # Determine number of layering hops
+        num_hops = random_instance.randint(min_hops, max_hops)
+
+        if num_hops == 0:
+            return [], start_time, amount
+
+        # Build exclusion set
+        exclude_set = set(exclude_accounts or [])
+        exclude_set.add(source_account)
+        exclude_set.add(dest_account)
+
+        # Get pool of potential intermediate accounts
+        use_clustered = layering_config.get(
+            "use_clustered_intermediaries", False)
+
+        if use_clustered:
+            # Use accounts owned by high-risk entities as intermediaries.
+            # This concentrates layering hops at the same nodes across patterns,
+            # increasing edge-label homophily.
+            if not hasattr(self.graph_generator, '_clustered_intermediary_pool'):
+                entity_clusters = getattr(
+                    self.graph_generator, 'entity_clusters', {})
+                high_risk_entities = set()
+                for cluster_name in [
+                    "high_risk_score", "super_high_risk",
+                    "high_risk_countries", "high_risk_business_categories",
+                    "high_risk_occupations"
+                ]:
+                    high_risk_entities.update(
+                        entity_clusters.get(cluster_name, []))
+                # Collect their accounts
+                hr_accounts = []
+                for entity_id in high_risk_entities:
+                    hr_accounts.extend(self._get_owned_accounts(entity_id))
+                self.graph_generator._clustered_intermediary_pool = list(
+                    set(hr_accounts))
+            intermediate_pool = [
+                acc for acc in
+                self.graph_generator._clustered_intermediary_pool
+                if acc not in exclude_set]
+        else:
+            all_accounts = list(
+                self.graph_generator.all_nodes.get(NodeType.ACCOUNT, []))
+            intermediate_pool = [
+                acc for acc in all_accounts if acc not in exclude_set]
+
+        if len(intermediate_pool) < num_hops:
+            # Not enough accounts for layering, skip
+            return [], start_time, amount
+
+        # Select random intermediate accounts
+        intermediate_accounts = random_instance.sample(
+            intermediate_pool, num_hops)
+
+        # Build the chain: source -> inter1 -> inter2 -> ... -> (returns before dest)
+        chain = [source_account] + intermediate_accounts
+
+        transactions = []
+        current_time = start_time
+        current_amount = amount
+
+        # Get legitimate amount range for transfers (from background patterns)
+        background_cfg = self.params.get("backgroundPatterns", {})
+        random_payments_cfg = background_cfg.get("randomPayments", {})
+        amount_ranges = random_payments_cfg.get("amount_ranges", {})
+        transfer_range = amount_ranges.get("transfer", [5.0, 800.0])
+
+        for i in range(len(chain) - 1):
+            src = chain[i]
+            dest = chain[i + 1]
+
+            # Apply amount decay (simulating fees/splits)
+            decay = random_instance.uniform(
+                amount_decay_range[0], amount_decay_range[1])
+            current_amount *= decay
+
+            # If using legit amounts, blend with legitimate transfer range
+            # But keep the overall amount proportional to maintain flow balance
+            use_legit = layering_config.get("use_legit_amounts", True)
+            if use_legit and current_amount > transfer_range[1]:
+                # For large amounts, just apply decay (realistic for layering)
+                tx_amount = round(current_amount, 2)
+            else:
+                tx_amount = round(current_amount, 2)
+
+            # Create transaction
+            tx_attrs = pattern_injector._create_transaction_edge(
+                src_id=src,
+                dest_id=dest,
+                timestamp=current_time,
+                amount=tx_amount,
+                transaction_type=TransactionType.TRANSFER,
+                is_fraudulent=True  # These are fraudulent layering hops
+            )
+
+            transactions.append((src, dest, tx_attrs))
+
+            # Add delay before next hop
+            delay_hours = random_instance.uniform(
+                hop_delay_hours[0], hop_delay_hours[1])
+            current_time += datetime.timedelta(hours=delay_hours)
+
+        # Return the transactions, final time, and remaining amount
+        # The caller should continue from the last intermediate to dest_account
+        return transactions, current_time, current_amount
 
 
 class CompositePattern(PatternInjector):

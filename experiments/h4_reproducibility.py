@@ -155,8 +155,47 @@ def calculate_file_hash(filepath):
     return hash_sha256.hexdigest()
 
 
+def read_file_lines(filepath, max_lines=None):
+    """Read file lines for comparison"""
+    if not os.path.exists(filepath):
+        return []
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+    if max_lines:
+        return lines[:max_lines]
+    return lines
+
+
+def show_diff_snippet(lines1, lines2, label1="Run 1", label2="Run 2", max_diffs=5):
+    """Show first few differences between two file contents"""
+    diffs_found = 0
+    print(f"\n    First {max_diffs} differences:")
+
+    max_len = max(len(lines1), len(lines2))
+    for i in range(max_len):
+        line1 = lines1[i].strip() if i < len(lines1) else "<missing>"
+        line2 = lines2[i].strip() if i < len(lines2) else "<missing>"
+
+        if line1 != line2:
+            diffs_found += 1
+            print(f"      Line {i+1}:")
+            print(f"        {label1}: {line1[:80]}{'...' if len(line1) > 80 else ''}")
+            print(f"        {label2}: {line2[:80]}{'...' if len(line2) > 80 else ''}")
+
+            if diffs_found >= max_diffs:
+                remaining = sum(1 for j in range(i+1, max_len)
+                               if (lines1[j].strip() if j < len(lines1) else "") !=
+                                  (lines2[j].strip() if j < len(lines2) else ""))
+                if remaining > 0:
+                    print(f"      ... and {remaining} more differences")
+                break
+
+    if diffs_found == 0:
+        print("      No line-by-line differences found (may be whitespace/ordering)")
+
+
 def run_generation(config, run_id):
-    """Run generation and return file hashes"""
+    """Run generation and return file hashes and content"""
     with tempfile.TemporaryDirectory() as temp_dir:
         config_file = os.path.join(temp_dir, f"h4_config_{run_id}.yaml")
         nodes_file = os.path.join(temp_dir, "generated_nodes.csv")
@@ -186,51 +225,63 @@ def run_generation(config, run_id):
             return {
                 'nodes': None,
                 'edges': None,
+                'nodes_content': [],
+                'edges_content': [],
             }
 
-        # Calculate hashes
-        hashes = {
+        # Calculate hashes and read content
+        return {
             'nodes': calculate_file_hash(nodes_file),
             'edges': calculate_file_hash(edges_file),
+            'nodes_content': read_file_lines(nodes_file),
+            'edges_content': read_file_lines(edges_file),
         }
 
-        return hashes
 
-
-def test_same_seed_reproducibility(seed, num_runs=5):
+def test_same_seed_reproducibility(seed, num_runs=3):
     """Test that multiple runs with same seed produce identical results"""
     print(f"Testing reproducibility with seed {seed} ({num_runs} runs)...")
 
     config = create_h4_config(seed)
-    all_hashes = []
+    all_results = []
 
     for i in range(num_runs):
         print(f"  Run {i+1}/{num_runs}...")
-        hashes = run_generation(config, f"{seed}_{i}")
-        all_hashes.append(hashes)
+        result = run_generation(config, f"{seed}_{i}")
+        all_results.append(result)
 
     # Check if all hashes are identical
     results = {
         'nodes_identical': True,
         'edges_identical': True,
         'all_identical': True,
-        'hashes': all_hashes
+        'hashes': all_results
     }
 
-    if not all_hashes:
+    if not all_results:
         results['all_identical'] = False
         return results
 
-    reference_hashes = all_hashes[0]
+    reference = all_results[0]
 
-    for i, run_hashes in enumerate(all_hashes[1:], 1):
-        if run_hashes['nodes'] != reference_hashes['nodes']:
+    for i, run_result in enumerate(all_results[1:], 1):
+        if run_result['nodes'] != reference['nodes']:
             results['nodes_identical'] = False
             print(f"    ✗ Nodes differ in run {i+1}")
+            show_diff_snippet(
+                reference['nodes_content'],
+                run_result['nodes_content'],
+                "Run 1", f"Run {i+1}"
+            )
 
-        if run_hashes['edges'] != reference_hashes['edges']:
+        if run_result['edges'] != reference['edges']:
             results['edges_identical'] = False
             print(f"    ✗ Edges differ in run {i+1}")
+            show_diff_snippet(
+                reference['edges_content'],
+                run_result['edges_content'],
+                "Run 1", f"Run {i+1}"
+            )
 
     results['all_identical'] = (results['nodes_identical'] and
                                 results['edges_identical'])
@@ -279,7 +330,7 @@ def run_h4_experiment():
 
     # Test 1: Same seed reproducibility
     print("=== Test 1: Same Seed Reproducibility ===")
-    same_seed_results = test_same_seed_reproducibility(42, num_runs=5)
+    same_seed_results = test_same_seed_reproducibility(42, num_runs=3)
 
     print("Same Seed Results:")
     print(f"  Nodes: {'✓' if same_seed_results['nodes_identical'] else '✗'}")

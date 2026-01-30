@@ -8,6 +8,9 @@ from .legitimate_burst import LegitimateBurstPattern
 from .legitimate_cash_operations import LegitimateCashOperationsPattern
 from .legitimate_periodic import LegitimatePeriodicPaymentsPattern
 from .legitimate_chains import LegitimateChainsPattern
+from .legitimate_structuring import LegitimateStructuringPattern
+from .legitimate_rapid_flow import LegitimateRapidFlowPattern
+from .legitimate_high_risk_activity import LegitimateHighRiskActivityPattern
 
 
 class BackgroundPatternManager:
@@ -27,10 +30,15 @@ class BackgroundPatternManager:
                 LegitimateCashOperationsPattern(graph_generator, params),
                 LegitimatePeriodicPaymentsPattern(graph_generator, params),
                 LegitimateChainsPattern(graph_generator, params),
+                # Patterns to reduce feature-based data leakage
+                LegitimateStructuringPattern(graph_generator, params),
+                LegitimateRapidFlowPattern(graph_generator, params),
+                # Breaks risk_score -> fraud correlation
+                LegitimateHighRiskActivityPattern(graph_generator, params),
             ]
         }
 
     def get_available_patterns(self) -> List[str]:
-        """Return list of available background pattern names"""
-        available = list(self.patterns.keys())
+        """Return list of available background pattern names (sorted for determinism)"""
+        available = sorted(self.patterns.keys())
         return available

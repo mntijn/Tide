@@ -16,6 +16,124 @@ from tide.outputs import export_to_csv
 from tide.datastructures.enums import EdgeType, TransactionType
 
 
+def compute_homophily(graph: nx.DiGraph) -> Dict[str, float]:
+    """
+    Compute fraud-class homophily metrics over transaction edges.
+
+    Returns dict with:
+      - edge_homophily: fraction of transaction edges connecting same-class nodes
+      - fraud_homophily: among edges with at least one fraud endpoint,
+                         fraction where both endpoints are fraud
+      - fraud_node_ratio: fraction of nodes labeled fraudulent
+      - fraud_edge_ratio: fraction of transaction edges labeled fraudulent
+    """
+    fraud_set = set()
+    for node_id, attrs in graph.nodes(data=True):
+        if attrs.get('is_fraudulent', False):
+            fraud_set.add(node_id)
+
+    same_class = 0
+    total_tx = 0
+    fraud_incident = 0  # edges with >= 1 fraud endpoint
+    both_fraud = 0      # edges with both endpoints fraud
+    fraud_edges = 0
+
+    for u, v, attrs in graph.edges(data=True):
+        et = attrs.get('edge_type')
+        if not (et == EdgeType.TRANSACTION or str(et) == 'transaction'):
+            continue
+        total_tx += 1
+        if attrs.get('is_fraudulent', False):
+            fraud_edges += 1
+
+        u_fraud = u in fraud_set
+        v_fraud = v in fraud_set
+        if u_fraud == v_fraud:
+            same_class += 1
+        if u_fraud or v_fraud:
+            fraud_incident += 1
+            if u_fraud and v_fraud:
+                both_fraud += 1
+
+    total_nodes = graph.number_of_nodes()
+    return {
+        'edge_homophily': same_class / total_tx if total_tx else 0.0,
+        'fraud_homophily': both_fraud / fraud_incident if fraud_incident else 0.0,
+        'fraud_node_ratio': len(fraud_set) / total_nodes if total_nodes else 0.0,
+        'fraud_edge_ratio': fraud_edges / total_tx if total_tx else 0.0,
+    }
+
+
+def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
+    """
+    Compute edge-label homophily in the line graph (same method as model_comparison).
+
+    For each edge, measures what fraction of its neighboring edges (edges sharing
+    a node) have the same label. This is the metric reported as 'homophily' in
+    the model_comparison benchmark.
+
+    Returns dict with:
+      - homophily_overall: weighted average across all classes
+      - homophily_class_0: for legitimate edges, fraction of neighbors also legitimate
+      - homophily_class_1: for fraud edges, fraction of neighbors also fraud
+      - fraud_rate: fraction of transaction edges that are fraudulent
+    """
+    from collections import defaultdict
+
+    # Collect transaction edges with labels
+    tx_edges = []
+    for u, v, attrs in graph.edges(data=True):
+        et = attrs.get('edge_type')
+        if not (et == EdgeType.TRANSACTION or str(et) == 'transaction'):
+            continue
+        label = 1 if attrs.get('is_fraudulent', False) else 0
+        tx_edges.append((u, v, label))
+
+    if not tx_edges:
+        return {'homophily_overall': 0.0, 'fraud_rate': 0.0}
+
+    # Per-node: count incident transaction edges by class, and total degree
+    node_class_counts = defaultdict(lambda: defaultdict(int))
+    node_degree = defaultdict(int)
+
+    for u, v, label in tx_edges:
+        node_class_counts[u][label] += 1
+        node_class_counts[v][label] += 1
+        node_degree[u] += 1
+        node_degree[v] += 1
+
+    # For each edge, count same-class neighbors and total neighbors
+    class_same = defaultdict(float)
+    class_total = defaultdict(float)
+
+    for u, v, label in tx_edges:
+        # same-class neighbors at both endpoints, minus the edge itself (counted twice)
+        same = node_class_counts[u][label] + node_class_counts[v][label] - 2
+        # total neighbors at both endpoints, minus the edge itself (counted twice)
+        total = node_degree[u] + node_degree[v] - 2
+        class_same[label] += same
+        class_total[label] += total
+
+    result = {}
+    total_same_all = 0.0
+    total_all = 0.0
+
+    for c in sorted(class_same.keys()):
+        if class_total[c] > 0:
+            result[f'homophily_class_{c}'] = class_same[c] / class_total[c]
+        else:
+            result[f'homophily_class_{c}'] = 0.0
+        total_same_all += class_same[c]
+        total_all += class_total[c]
+
+    result['homophily_overall'] = total_same_all / total_all if total_all > 0 else 0.0
+
+    num_fraud = sum(1 for _, _, l in tx_edges if l == 1)
+    result['fraud_rate'] = num_fraud / len(tx_edges)
+
+    return result
+
+
 def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, Any]:
     """Load and merge main config and patterns config"""
     with open(config_file, 'r') as f:
@@ -618,6 +736,25 @@ if __name__ == "__main__":
     print(f"\n--- Graph Summary ---")
     print(f"Number of nodes: {aml_graph_gen.num_of_nodes()}")
     print(f"Number of edges: {aml_graph_gen.num_of_edges()}")
+
+    homophily = compute_homophily(graph)
+    edge_label_h = compute_edge_label_homophily(graph)
+
+    print(f"\n--- Node-label homophily (AMLbench method) ---")
+    print(f"  For each edge: do the two NODES it connects share the same fraud label?")
+    print(f"  Edge homophily (all classes):  {homophily['edge_homophily']:.6f}")
+    print(f"  Fraud-class homophily:         {homophily['fraud_homophily']:.6f}")
+    print(f"  Fraud node ratio:              {homophily['fraud_node_ratio']:.6f}")
+    print(f"  Fraud edge ratio:              {homophily['fraud_edge_ratio']:.6f}")
+
+    print(f"\n--- Edge-label homophily (model_comparison method) ---")
+    print(f"  For each edge: what fraction of NEIGHBORING EDGES (sharing a node) have the same label?")
+    print(f"  Homophily (overall):           {edge_label_h['homophily_overall']:.6f}")
+    if 'homophily_class_0' in edge_label_h:
+        print(f"  Homophily (class 0 - legit):   {edge_label_h['homophily_class_0']:.6f}")
+    if 'homophily_class_1' in edge_label_h:
+        print(f"  Homophily (class 1 - fraud):   {edge_label_h['homophily_class_1']:.6f}")
+    print(f"  Fraud rate:                    {edge_label_h['fraud_rate']:.6f}")
 
     # Get institution filter setting from config
     institution_filter_country = generator_parameters.get(

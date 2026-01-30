@@ -29,6 +29,7 @@ from ..base import (
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 # Chain scenario configurations for realism
@@ -144,9 +145,13 @@ class LegitimateChainTemporal(TemporalComponent):
         base_chains = chain_cfg.get("num_chains_per_generation", 50)
         num_chains = max(base_chains, len(all_accounts) // 100)
         amount_decay = chain_cfg.get("amount_decay_range", [0.95, 1.0])
+        use_lognormal = chain_cfg.get("use_lognormal", True)
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {})
 
         # Build scenario weights for random selection
-        scenario_names = list(CHAIN_SCENARIOS.keys())
+        scenario_names = sorted(CHAIN_SCENARIOS.keys())
         scenario_weights = [CHAIN_SCENARIOS[s]["weight"]
                             for s in scenario_names]
 
@@ -185,10 +190,18 @@ class LegitimateChainTemporal(TemporalComponent):
             if len(chain) < 2:
                 continue
 
-            # Initial amount from scenario range
-            initial_amount = random_instance.uniform(
-                amount_range[0], amount_range[1]
-            )
+            # Initial amount from scenario range or log-normal
+            if use_lognormal:
+                # Map scenario to distribution key
+                dist_key = "transfer" if tx_type == TransactionType.TRANSFER else "payment"
+                if scenario_name == "business_supply":
+                    dist_key = "high_value"
+                initial_amount = sample_lognormal_scalar(
+                    dist_key, config=dist_config.get(dist_key, {}))
+            else:
+                initial_amount = random_instance.uniform(
+                    amount_range[0], amount_range[1]
+                )
             current_amount = initial_amount
 
             # Random start time

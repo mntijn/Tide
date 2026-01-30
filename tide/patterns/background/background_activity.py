@@ -13,7 +13,8 @@ from ..base import (
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
-from ...utils.random_instance import random_instance
+from ...utils.random_instance import random_instance, get_numpy_rng
+from ...utils.amount_distributions import sample_lognormal, DEFAULT_DISTRIBUTIONS
 
 
 class NonFraudulentRandomStructural(StructuralComponent):
@@ -141,8 +142,9 @@ class RandomPaymentsTemporal(TemporalComponent):
         })
 
         # Use string keys for np.choice and map to enums later for efficiency
-        tx_type_keys = list(tx_type_probs.keys())
-        tx_probs_values = list(tx_type_probs.values())
+        # IMPORTANT: Sort keys to ensure deterministic order across runs
+        tx_type_keys = sorted(tx_type_probs.keys())
+        tx_probs_values = [tx_type_probs[k] for k in tx_type_keys]
         type_to_enum = {
             "transfer": TransactionType.TRANSFER,
             "payment": TransactionType.PAYMENT,
@@ -151,42 +153,83 @@ class RandomPaymentsTemporal(TemporalComponent):
         }
 
         # OPTIMIZATION: Generate timestamps and sort them first to ensure chronological order.
+        # NEW: Add temporal INTERLEAVING - some transactions clustered in bursts
+        # This matches fraud patterns' "high_frequency" timestamp generation
         total_minutes = total_days * 24 * 60
-        random_minutes_offsets = np.random.randint(
+
+        # Probability of a transaction being part of a burst cluster
+        burst_probability = random_payments_config.get(
+            "burst_probability", 0.15)
+        burst_duration_minutes = random_payments_config.get(
+            "burst_duration_minutes", 120)  # 2-hour burst windows
+
+        # Generate base timestamps using dedicated numpy generator
+        random_minutes_offsets = get_numpy_rng().integers(
             0, total_minutes, size=total_expected_txs)
+
+        # Create burst clusters for some transactions
+        is_burst = get_numpy_rng().random(total_expected_txs) < burst_probability
+        num_bursts = max(1, int(np.sum(is_burst) / 10))  # ~10 txs per burst
+
+        if num_bursts > 0 and np.sum(is_burst) > 0:
+            # Select random burst start times
+            burst_starts = get_numpy_rng().integers(0, total_minutes, size=num_bursts)
+            # Assign burst transactions to clusters
+            burst_indices = np.where(is_burst)[0]
+            for i, idx in enumerate(burst_indices):
+                burst_id = i % num_bursts
+                # Cluster transactions within burst_duration_minutes of burst start
+                offset_within_burst = get_numpy_rng().integers(
+                    0, burst_duration_minutes)
+                random_minutes_offsets[idx] = (
+                    burst_starts[burst_id] + offset_within_burst) % total_minutes
+
         random_minutes_offsets.sort()  # Sort timestamps to generate transactions in order
 
         # Vectorized generation of other attributes
-        selected_type_keys = np.random.choice(
+        selected_type_keys = get_numpy_rng().choice(
             tx_type_keys, size=total_expected_txs, p=tx_probs_values
         )
 
         spenders_array = np.array(spenders)
-        src_accounts = np.random.choice(
+        src_accounts = get_numpy_rng().choice(
             spenders_array, size=total_expected_txs)
 
         # Preferential attachment logic: 80% of txs go to hubs (many-to-one),
         # 20% go to random peers (one-to-one). If no hubs exist, fall back to peers only.
         prob_hub = 0.8 if len(hubs) > 0 else 0.0
-        is_hub_tx = np.random.random(total_expected_txs) < prob_hub
+        is_hub_tx = get_numpy_rng().random(total_expected_txs) < prob_hub
 
         dest_accounts = np.empty(total_expected_txs, dtype=object)
 
         if len(hubs) > 0:
             hubs_array = np.array(hubs)
-            dest_accounts[is_hub_tx] = np.random.choice(
+            dest_accounts[is_hub_tx] = get_numpy_rng().choice(
                 hubs_array, size=np.sum(is_hub_tx)
             )
 
         # Peers: random spenders. This includes both legit and fraud accounts,
         # but the graph topology for legit activity is dominated by hub traffic.
-        dest_accounts[~is_hub_tx] = np.random.choice(
+        dest_accounts[~is_hub_tx] = get_numpy_rng().choice(
             spenders_array, size=np.sum(~is_hub_tx)
         )
 
-        # Vectorized amount generation
-        amount_ranges = random_payments_config.get("amount_ranges", {})
+        # Amount generation: log-normal distributions calibrated to
+        # real-world data (Fed Payments Study, Nacha, Nilson Report)
         amounts = np.zeros(total_expected_txs)
+
+        # Structuring interleaving (small fraction uses near-threshold amounts)
+        structured_amount_probability = random_payments_config.get(
+            "structured_amount_probability", 0.03)
+        structuring_range = random_payments_config.get(
+            "structuring_range", [7000.0, 9900.0])
+
+        # Get per-type distribution overrides from config
+        dist_config = self.params.get(
+            "backgroundPatterns", {}
+        ).get("amount_distributions", {})
+        use_lognormal = random_payments_config.get(
+            "use_lognormal", True)
 
         for tx_type_key in tx_type_keys:
             mask = selected_type_keys == tx_type_key
@@ -196,32 +239,51 @@ class RandomPaymentsTemporal(TemporalComponent):
 
             tx_type_enum = type_to_enum[tx_type_key]
 
-            if tx_type_enum == TransactionType.PAYMENT:
-                payment_range = amount_ranges.get("payment", [10.0, 2000.0])
-                amounts[mask] = np.round(
-                    np.random.uniform(
-                        payment_range[0], payment_range[1], size=count), 2
-                )
-            elif tx_type_enum == TransactionType.TRANSFER:
-                transfer_range = amount_ranges.get("transfer", [5.0, 800.0])
-                amounts[mask] = np.round(
-                    np.random.uniform(
-                        transfer_range[0], transfer_range[1], size=count),
-                    2,
-                )
-            elif tx_type_enum in [TransactionType.DEPOSIT, TransactionType.WITHDRAWAL]:
-                cash_range = amount_ranges.get(
-                    "cash_operations", [20.0, 500.0])
-                base_amounts = np.random.uniform(
-                    cash_range[0], cash_range[1], size=count
-                )
+            if use_lognormal:
+                # Map tx type to distribution key
+                dist_key = tx_type_key
+                if tx_type_enum in (
+                    TransactionType.DEPOSIT,
+                    TransactionType.WITHDRAWAL
+                ):
+                    dist_key = tx_type_key  # "deposit" or "withdrawal"
+                cfg = dist_config.get(dist_key, {})
+                base_amounts = sample_lognormal(
+                    dist_key, size=count, config=cfg)
+            else:
+                # Legacy: uniform from ranges
+                amount_ranges = random_payments_config.get(
+                    "amount_ranges", {})
+                if tx_type_enum == TransactionType.PAYMENT:
+                    r = amount_ranges.get("payment", [10.0, 2000.0])
+                elif tx_type_enum == TransactionType.TRANSFER:
+                    r = amount_ranges.get("transfer", [5.0, 800.0])
+                else:
+                    r = amount_ranges.get(
+                        "cash_operations", [20.0, 500.0])
+                base_amounts = get_numpy_rng().uniform(
+                    r[0], r[1], size=count)
+
+            # Interleave: some amounts use structuring range
+            mult = 1.5 if tx_type_enum in (
+                TransactionType.DEPOSIT,
+                TransactionType.WITHDRAWAL
+            ) else 1.0
+            structured_mask = get_numpy_rng().random(
+                count) < (structured_amount_probability * mult)
+            if np.sum(structured_mask) > 0:
+                base_amounts[structured_mask] = get_numpy_rng().uniform(
+                    structuring_range[0], structuring_range[1],
+                    size=np.sum(structured_mask))
+
+            # Cash ops round to nearest 10
+            if tx_type_enum in (
+                TransactionType.DEPOSIT,
+                TransactionType.WITHDRAWAL
+            ):
                 amounts[mask] = np.round(base_amounts / 10) * 10
             else:
-                default_range = amount_ranges.get("transfer", [5.0, 800.0])
-                amounts[mask] = np.round(
-                    np.random.uniform(
-                        default_range[0], default_range[1], size=count), 2
-                )
+                amounts[mask] = np.round(base_amounts, 2)
 
         pattern_injector = PatternInjector(self.graph_generator, self.params)
 
@@ -239,7 +301,7 @@ class RandomPaymentsTemporal(TemporalComponent):
             if src == dest:
                 # Simple and fast retry logic for the rare cases of collision
                 while dest == src:
-                    dest = np.random.choice(spenders_array)
+                    dest = get_numpy_rng().choice(spenders_array)
 
             tx_attrs = pattern_injector._create_transaction_edge(
                 src_id=src,
