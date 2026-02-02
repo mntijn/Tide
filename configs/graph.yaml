@@ -9,7 +9,7 @@ graph_scale:
 # fraud_count / total_transactions ≈ target_fraud_ratio.
 # E.g., 0.02 means ~2% of transactions will be fraudulent.
 # Set to null or remove to disable capping (use raw per_account_per_day rate).
-target_fraud_ratio: 0.0003
+target_fraud_ratio: 0.0005
 
 # Institution filter: only export transactions where at least one account
 # belongs to an institution in the specified country.
@@ -36,19 +36,51 @@ backgroundPatterns:
   # ENHANCED: Added structuring lookalikes and rapid flow patterns to reduce
   # feature-based data leakage (targeting ROC-AUC reduction from 99.9% to 92-97%)
 
+  # Log-normal distribution parameters per transaction type
+  # These are shared defaults; individual patterns can override
+  amount_distributions:
+    payment:
+      mu: 3.8          # median ~$45 (consumer card-like payments)
+      sigma: 1.2       # heavy right tail
+      min: 1.0
+      max: 50000.0     # B2B payments can be large
+    transfer:
+      mu: 5.5          # median ~$245 (ACH-like transfers)
+      sigma: 2.0       # very heavy tail ($5 to $100K+)
+      min: 5.0
+      max: 500000.0    # business wire transfers reach into hundreds of thousands
+    deposit:
+      mu: 5.3          # median ~$200 (cash deposits)
+      sigma: 1.5       # tail into business deposits ($5K-$10K)
+      min: 10.0
+      max: 100000.0    # business deposits can be very large
+    withdrawal:
+      mu: 4.8          # median ~$122 (ATM withdrawals; Fed 2021 avg $198)
+      sigma: 0.9       # moderate tail (ATM limits)
+      min: 20.0
+      max: 5000.0
+    salary:
+      mu: 7.4          # median ~$1,636 (direct deposit)
+      sigma: 0.6       # concentrated (salaries are regular)
+      min: 200.0
+      max: 30000.0
+    high_value:
+      mu: 9.6          # median ~$15K (business/property)
+      sigma: 1.5       # tail into hundreds of thousands
+      min: 5000.0
+      max: 1000000.0
+
   randomPayments:
     weight: 0.35  # Hub-and-spoke random payments
     legit_rate_multiplier: [0.3, 0.8]
     transaction_type_probabilities:
-      transfer: 0.35
-      payment: 0.30
+      transfer: 0.20
+      payment: 0.45
       deposit: 0.20
       withdrawal: 0.15
-    amount_ranges:
-      payment: [10.0, 500.0]
-      transfer: [5.0, 300.0]
-      cash_operations: [20.0, 500.0]
-    # Light amount interleaving
+    # Log-normal amounts (uses shared defaults above per tx type)
+    use_lognormal: true
+    # Light amount interleaving (structuring-like amounts)
     structured_amount_probability: 0.03
     structuring_range: [7000.0, 9900.0]
     # Light temporal interleaving
@@ -56,22 +88,24 @@ backgroundPatterns:
     burst_duration_minutes: 240
 
   salaryPayments:
-    weight: 0.08  # Reduced from 0.10
+    weight: 0.08
     payment_intervals: [14, 30]
-    salary_range: [2500.0, 7500.0]
+    # Log-normal salary: median ~$1,636, spread by sigma
+    use_lognormal: true
     salary_variation: 0.05
     preferred_payment_days: [1, 15, 30]
+    # High earners use a shifted distribution
+    high_earner_mu: 8.5      # median ~$4,900
+    high_earner_sigma: 0.5
 
   fraudsterBackground:
-    weight: 0.25  # Reduced from 0.30
-    # NOTE: This pattern now uses legitimate amount ranges internally (no leak)
+    weight: 0.25
+    # Uses same log-normal distributions as legitimate patterns (no leak)
 
   legitimateHighPayments:
-    weight: 0.08  # Reduced from 0.10
-    high_payment_ranges:
-      property_transactions: [50000.0, 500000.0]
-      business_deals: [10000.0, 100000.0]
-      luxury_purchases: [5000.0, 50000.0]
+    weight: 0.08
+    # Uses high_value log-normal distribution
+    use_lognormal: true
     high_payment_type_probabilities:
       property: 0.2
       business: 0.5
@@ -83,34 +117,23 @@ backgroundPatterns:
     weight: 0.08
     burst_user_fraction: 0.05
     burst_size_range: [3, 8]
-    amount_range: [20.0, 300.0]
+    use_lognormal: true     # Uses "payment" distribution
     time_between_txs_minutes: [10, 120]
     include_cash_ops: true
     cash_ops_probability: 0.10
-    cash_amount_range: [50.0, 300.0]
     bursts_per_user_range: [1, 2]
     # Light fraud-like amounts
     structuring_burst_probability: 0.05
     structuring_amount_range: [7000.0, 9900.0]
 
-  # ENHANCED: Extended ranges to exactly match fraud structuring
+  # Cash operations with log-normal amounts
   legitimateCashOperations:
     weight: 0.15
-    cash_user_fraction: 0.35  # Increased from 0.30
+    cash_user_fraction: 0.35
     operations_per_month_range: [2, 8]
-    withdrawal_amount_range: [20.0, 500.0]
-    deposit_amount_ranges:
-      small: [50.0, 500.0]
-      medium: [500.0, 2000.0]
-      large: [2000.0, 5000.0]
-      very_large: [7500.0, 9999.0]  # Extended from 9500 to exactly match fraud!
-    deposit_probabilities:
-      small: 0.45  # Rebalanced
-      medium: 0.28
-      large: 0.15
-      very_large: 0.12  # Increased from 0.05 to 0.12!
-    deposit_probability: 0.35  # Slightly increased
-    # NEW: Rapid deposit sequence mode (mimics small business cash handling)
+    use_lognormal: true     # Uses deposit/withdrawal distributions
+    deposit_probability: 0.35
+    # Rapid deposit sequence mode (mimics small business cash handling)
     rapid_deposit_mode:
       enabled: true
       probability: 0.08
@@ -118,27 +141,19 @@ backgroundPatterns:
       interval_days: [1, 5]
 
   legitimatePeriodicPayments:
-    weight: 0.12  # Reduced from 0.15
+    weight: 0.12
     periodic_user_fraction: 0.4
     payment_intervals: [7, 14, 30]
-    amount_ranges:
-      small_bills: [20.0, 200.0]
-      medium_bills: [200.0, 1000.0]
-      large_bills: [1000.0, 5000.0]
-      very_large: [7500.0, 9999.0]  # Extended to match fraud
-    amount_probabilities:
-      small_bills: 0.38
-      medium_bills: 0.32
-      large_bills: 0.20
-      very_large: 0.10  # Increased from 0.05
+    use_lognormal: true     # Uses "payment" distribution for recurring bills
     subscriptions_per_user_range: [1, 4]
 
   legitimateChains:
-    weight: 0.12  # Reduced from 0.15
+    weight: 0.12
     num_chains_per_generation: 50
+    use_lognormal: true     # Chain amounts drawn from tx-type-appropriate distributions
     amount_decay_range: [0.95, 1.0]
 
-  # Legitimate structuring-like deposits (light)
+  # Legitimate structuring-like deposits (still uniform in structuring range)
   legitimateStructuring:
     weight: 0.05
     user_fraction: 0.04
@@ -146,32 +161,24 @@ backgroundPatterns:
     deposits_per_month_range: [1, 3]
     burst_probability: 0.15
 
-  # Legitimate rapid fund flows (light)
+  # Legitimate rapid fund flows
   legitimateRapidFlow:
     weight: 0.05
     events_per_1000_users: 15
     inflows_per_event: [2, 5]
     outflows_per_event: [1, 4]
-    amount_range: [500.0, 3000.0]
+    use_lognormal: true     # Uses "transfer" distribution
     inflow_to_outflow_delay_hours: [4, 72]
     # Light fraud-like structuring
     structuring_amount_probability: 0.05
     structuring_amount_range: [7000.0, 9900.0]
 
-  # NEW: Legitimate high-risk entity activity (breaks risk_score -> fraud correlation)
-  # High-risk entities doing normal, legitimate transactions
+  # Legitimate high-risk entity activity
   legitimateHighRiskActivity:
-    weight: 0.15  # Important: ensures high-risk entities have significant legit activity
-    activity_fraction: 0.85  # 85% of high-risk accounts have legitimate activity
-    transactions_per_account_range: [8, 25]  # More transactions per account
-    amount_ranges:
-      small: [20.0, 200.0]
-      medium: [200.0, 1000.0]
-      large: [1000.0, 5000.0]
-    amount_probabilities:
-      small: 0.50
-      medium: 0.35
-      large: 0.15
+    weight: 0.15
+    activity_fraction: 0.85
+    transactions_per_account_range: [8, 25]
+    use_lognormal: true     # Uses "payment" distribution
 
 # Pattern generation settings
 # NOTE: With layering enabled (2-5 extra hops), each pattern generates ~4-5x more
@@ -181,7 +188,7 @@ backgroundPatterns:
 #          With ~20-50 txs per pattern (layered): ~20-45 patterns max
 pattern_frequency:
   random: True
-  num_illicit_patterns: 90
+  num_illicit_patterns: 180
 
   # If random is false these values are used instead of num_illicit patterns
   RapidFundMovement: 33

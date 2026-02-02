@@ -12,6 +12,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
+from ...utils.amount_distributions import sample_lognormal_scalar
 
 
 class FraudsterBackgroundStructural(StructuralComponent):
@@ -84,15 +85,9 @@ class FraudsterBackgroundTemporal(TemporalComponent):
             "per_account_per_day", 0.2
         )
 
-        # Amount ranges: reuse legitimate ranges, especially for payments.
-        legit_amount_ranges = random_payments_cfg.get(
-            "amount_ranges",
-            {
-                "payment": [10.0, 2000.0],
-                "transfer": [5.0, 800.0],
-            },
-        )
-        payment_range = legit_amount_ranges.get("payment", [10.0, 2000.0])
+        # Use log-normal distributions matching legitimate patterns
+        use_lognormal = random_payments_cfg.get("use_lognormal", False)
+        dist_config = background_cfg.get("amount_distributions", {})
 
         start_date: datetime.datetime = self.time_span["start_date"]
         end_date: datetime.datetime = self.time_span["end_date"]
@@ -146,12 +141,13 @@ class FraudsterBackgroundTemporal(TemporalComponent):
 
                 counterpart_account_id, counterpart_entity_id = available_counterparts.pop()
 
-                # Determine transaction amount using *legitimate* payment range.
-                # This deliberately removes the previous "mostly small" tell.
-                amount = round(
-                    random_instance.uniform(
-                        payment_range[0], payment_range[1]), 2
-                )
+                # Determine transaction amount using same distribution as legitimate patterns.
+                if use_lognormal:
+                    amount = sample_lognormal_scalar(
+                        "payment", config=dist_config.get("payment", {}))
+                else:
+                    amount = round(
+                        random_instance.uniform(10.0, 2000.0), 2)
 
                 # Randomly choose direction (fraudster pays or receives)
                 if random_instance.random() < 0.5:

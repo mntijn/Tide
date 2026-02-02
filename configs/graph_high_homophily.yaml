@@ -48,8 +48,8 @@ backgroundPatterns:
     weight: 0.35
     legit_rate_multiplier: [0.3, 0.8]
     transaction_type_probabilities:
-      transfer: 0.35
-      payment: 0.30
+      transfer: 0.20
+      payment: 0.45
       deposit: 0.20
       withdrawal: 0.15
     amount_ranges:
