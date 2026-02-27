@@ -1,4 +1,3 @@
-networkx==3.4.2
+networkx>=3.4
 PyYAML
-forex-python
-pickle
+faker

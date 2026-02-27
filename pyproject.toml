@@ -1,0 +1,27 @@
+[project]
+name = "tide-aml"
+version = "0.1.0"
+description = "A customisable dataset generator for benchmarking money laundering detection"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "networkx>=3.4",
+    "PyYAML",
+    "faker",
+]
+
+[project.optional-dependencies]
+pytorch = [
+    "torch",
+    "torch-geometric",
+    "numpy",
+    "pandas",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["tide*"]

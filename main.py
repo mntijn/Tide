@@ -1,4 +1,14 @@
-import random
+"""
+Tide: A Customisable Dataset Generator for Benchmarking Money Laundering Detection.
+
+Usage:
+    python main.py --config configs/graph.yaml
+    python main.py --config configs/graph.yaml --output-dir output/
+
+To convert generated CSVs to PyTorch Geometric format:
+    python tools/csv_to_pytorch.py --nodes generated_nodes.csv --edges generated_transactions.csv --output graph.pt
+"""
+
 import datetime
 import yaml
 import networkx as nx
@@ -8,12 +18,10 @@ import json
 import argparse
 import os
 import pickle
-import torch
-import numpy as np
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv
-from tide.datastructures.enums import EdgeType, TransactionType
+from tide.datastructures.enums import EdgeType
 
 
 def compute_homophily(graph: nx.DiGraph) -> Dict[str, float]:
@@ -34,8 +42,8 @@ def compute_homophily(graph: nx.DiGraph) -> Dict[str, float]:
 
     same_class = 0
     total_tx = 0
-    fraud_incident = 0  # edges with >= 1 fraud endpoint
-    both_fraud = 0      # edges with both endpoints fraud
+    fraud_incident = 0
+    both_fraud = 0
     fraud_edges = 0
 
     for u, v, attrs in graph.edges(data=True):
@@ -66,11 +74,10 @@ def compute_homophily(graph: nx.DiGraph) -> Dict[str, float]:
 
 def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
     """
-    Compute edge-label homophily in the line graph (same method as model_comparison).
+    Compute edge-label homophily in the line graph.
 
     For each edge, measures what fraction of its neighboring edges (edges sharing
-    a node) have the same label. This is the metric reported as 'homophily' in
-    the model_comparison benchmark.
+    a node) have the same label.
 
     Returns dict with:
       - homophily_overall: weighted average across all classes
@@ -80,7 +87,6 @@ def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
     """
     from collections import defaultdict
 
-    # Collect transaction edges with labels
     tx_edges = []
     for u, v, attrs in graph.edges(data=True):
         et = attrs.get('edge_type')
@@ -92,7 +98,6 @@ def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
     if not tx_edges:
         return {'homophily_overall': 0.0, 'fraud_rate': 0.0}
 
-    # Per-node: count incident transaction edges by class, and total degree
     node_class_counts = defaultdict(lambda: defaultdict(int))
     node_degree = defaultdict(int)
 
@@ -102,14 +107,11 @@ def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
         node_degree[u] += 1
         node_degree[v] += 1
 
-    # For each edge, count same-class neighbors and total neighbors
     class_same = defaultdict(float)
     class_total = defaultdict(float)
 
     for u, v, label in tx_edges:
-        # same-class neighbors at both endpoints, minus the edge itself (counted twice)
         same = node_class_counts[u][label] + node_class_counts[v][label] - 2
-        # total neighbors at both endpoints, minus the edge itself (counted twice)
         total = node_degree[u] + node_degree[v] - 2
         class_same[label] += same
         class_total[label] += total
@@ -135,11 +137,10 @@ def compute_edge_label_homophily(graph: nx.DiGraph) -> Dict[str, float]:
 
 
 def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, Any]:
-    """Load and merge main config and patterns config"""
+    """Load and merge main config and patterns config."""
     with open(config_file, 'r') as f:
         main_config = yaml.safe_load(f)
 
-    # Try to load patterns config if it exists
     patterns_config_file = "configs/patterns.yaml"
     if os.path.exists(patterns_config_file):
         with open(patterns_config_file, 'r') as f:
@@ -148,8 +149,6 @@ def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, An
         if "pattern_config" not in main_config:
             main_config["pattern_config"] = {}
 
-        # Only add pattern configs that don't already exist in main config
-        # This preserves any pattern configs that are explicitly set in the main config
         for pattern_name, pattern_config in patterns_config.items():
             if pattern_name not in main_config["pattern_config"]:
                 main_config["pattern_config"][pattern_name] = pattern_config
@@ -159,60 +158,34 @@ def load_configurations(config_file: str = "configs/graph.yaml") -> Dict[str, An
 
 def convert_enums_to_strings(graph: nx.DiGraph) -> nx.DiGraph:
     """
-    Convert all non-serializable values in graph attributes to strings for GraphML compatibility.
-    GraphML only supports basic data types: string, int, float, boolean.
+    Convert all non-serializable values in graph attributes to strings.
 
-    Args:
-        graph: The original graph with complex data types
-
-    Returns:
-        A new graph with all values converted to GraphML-compatible types
+    Required for GraphML/Gpickle export, which only supports basic data types.
     """
     def convert_value(value):
-        """Convert a single value to GraphML-compatible format."""
-        # Handle None
         if value is None:
             return ""
-
-        # Handle basic types that GraphML supports
         if isinstance(value, (str, int, float, bool)):
             return value
-
-        # Handle enums
         if isinstance(value, Enum):
             return str(value.value)
-
-        # Handle datetime objects
         if isinstance(value, datetime.datetime):
             return value.isoformat()
         elif isinstance(value, datetime.date):
             return value.isoformat()
-
-        # Handle class types
         if isinstance(value, type):
             return value.__name__
-
-        # Handle dictionaries (convert to JSON-like string)
         if isinstance(value, dict):
             try:
-                # Convert dict values recursively
-                converted_dict = {k: convert_value(
-                    v) for k, v in value.items()}
-                return str(converted_dict)
-            except:
+                return str({k: convert_value(v) for k, v in value.items()})
+            except Exception:
                 return str(value)
-
-        # Handle lists/tuples
         if isinstance(value, (list, tuple)):
             try:
-                converted_list = [convert_value(v) for v in value]
-                return str(converted_list)
-            except:
+                return str([convert_value(v) for v in value])
+            except Exception:
                 return str(value)
-
-        # Handle any other object - convert to string
         try:
-            # Try to get a meaningful string representation
             if hasattr(value, '__name__'):
                 return value.__name__
             elif hasattr(value, 'name'):
@@ -221,47 +194,32 @@ def convert_enums_to_strings(graph: nx.DiGraph) -> nx.DiGraph:
                 return str(value.value)
             else:
                 return str(value)
-        except:
-            # Fallback to basic string conversion
+        except Exception:
             return str(type(value).__name__)
 
-    # Create a copy of the graph
     converted_graph = graph.copy()
 
-    # Convert node attributes
     for node_id, attrs in converted_graph.nodes(data=True):
-        # Use list() to avoid modification during iteration
         for key, value in list(attrs.items()):
             try:
-                converted_value = convert_value(value)
-                attrs[key] = converted_value
+                attrs[key] = convert_value(value)
             except Exception as e:
-                # If conversion fails, use a safe fallback
-                print(
-                    f"Warning: Could not convert node attribute {key}={value}, using fallback. Error: {e}")
+                print(f"Warning: Could not convert node attribute {key}={value}: {e}")
                 attrs[key] = str(type(value).__name__)
 
-    # Convert edge attributes
     for src, dest, attrs in converted_graph.edges(data=True):
-        # Use list() to avoid modification during iteration
         for key, value in list(attrs.items()):
             try:
-                converted_value = convert_value(value)
-                attrs[key] = converted_value
+                attrs[key] = convert_value(value)
             except Exception as e:
-                # If conversion fails, use a safe fallback
-                print(
-                    f"Warning: Could not convert edge attribute {key}={value}, using fallback. Error: {e}")
+                print(f"Warning: Could not convert edge attribute {key}={value}: {e}")
                 attrs[key] = str(type(value).__name__)
 
     return converted_graph
 
 
 def filter_transactions_only(graph: nx.DiGraph) -> nx.DiGraph:
-    """
-    Return a shallow copy of the graph containing only TRANSACTION edges.
-    Nodes are preserved; non-transaction edges are removed.
-    """
+    """Return a copy of the graph containing only TRANSACTION edges."""
     filtered = graph.copy()
     edges_to_remove = []
     for u, v, attrs in filtered.edges(data=True):
@@ -276,17 +234,9 @@ def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.
     """
     Filter graph to only include edges where at least one endpoint account
     belongs to an institution in the specified country.
-
-    Args:
-        graph: The original NetworkX graph
-        filter_country: Country code to filter by (e.g., "NL" for Netherlands)
-
-    Returns:
-        A filtered copy of the graph with only relevant edges
     """
     from tide.datastructures.enums import NodeType
 
-    # Find all institution IDs in the target country
     target_institutions = set()
     for node_id, attrs in graph.nodes(data=True):
         node_type = attrs.get('node_type')
@@ -294,7 +244,6 @@ def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.
             if attrs.get('country_code') == filter_country:
                 target_institutions.add(node_id)
 
-    # Find all accounts belonging to those institutions
     filtered_accounts = set()
     for node_id, attrs in graph.nodes(data=True):
         node_type = attrs.get('node_type')
@@ -305,11 +254,9 @@ def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.
     print(f"Institution filter: country={filter_country}, "
           f"found {len(target_institutions)} institutions, {len(filtered_accounts)} accounts")
 
-    # Create filtered graph copy
     filtered = graph.copy()
     edges_to_remove = []
     for u, v, attrs in filtered.edges(data=True):
-        # Keep edge if at least one endpoint is in filtered accounts
         if u not in filtered_accounts and v not in filtered_accounts:
             edges_to_remove.append((u, v))
 
@@ -318,7 +265,6 @@ def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.
     total_edges = graph.number_of_edges()
     remaining_edges = filtered.number_of_edges()
 
-    # Remove isolated nodes (nodes with no edges after filtering)
     isolated_nodes = list(nx.isolates(filtered))
     total_nodes = filtered.number_of_nodes()
     filtered.remove_nodes_from(isolated_nodes)
@@ -330,349 +276,17 @@ def filter_by_institution_country(graph: nx.DiGraph, filter_country: str) -> nx.
     return filtered
 
 
-def convert_graph_to_pytorch(graph: nx.DiGraph) -> Dict[str, Any]:
-    """
-    Convert NetworkX graph to PyTorch format suitable for Graph Neural Networks.
-
-    This function properly handles heterogeneous graphs with different edge types
-    (transactions and ownership) and converts all attributes to tensors.
-
-    Args:
-        graph: The NetworkX directed graph with node and edge attributes
-
-    Returns:
-        A dictionary containing:
-        - node_features: Tensor of node features
-        - node_ids: List mapping node indices to original node IDs
-        - edge_index: Tensor of edge indices [2, num_edges]
-        - edge_attr: Dict with separate tensors for each edge type
-        - metadata: Information about feature names and types
-    """
-    # Create node ID mapping
-    node_list = list(graph.nodes())
-    node_to_idx = {node_id: idx for idx, node_id in enumerate(node_list)}
-
-    # ------------------------------
-    # Build node feature matrix
-    # Best-practice: include numeric/boolean + one-hot encoded categoricals
-    # ------------------------------
-
-    # Helper to normalize enum/string values
-    def normalize_value(val):
-        if val is None:
-            return None
-        try:
-            # Handle enums
-            if hasattr(val, 'value'):
-                return str(val.value)
-            return str(val)
-        except Exception:
-            return str(val)
-
-    # Collect category frequencies
-    categorical_fields = [
-        'node_type', 'country_code', 'account_category', 'gender',
-        'age_group', 'currency', 'business_category'
-    ]
-    category_counts: Dict[str, Dict[str, int]] = {
-        f: {} for f in categorical_fields}
-
-    # Also collect creation years
-    creation_years: Dict[str, int] = {}
-
-    for node_id in node_list:
-        attrs = graph.nodes[node_id]
-        # Count categories
-        for field in categorical_fields:
-            raw = attrs.get(field)
-            norm = normalize_value(raw)
-            if norm is not None and norm != "":
-                category_counts[field][norm] = category_counts[field].get(
-                    norm, 0) + 1
-
-        # Parse creation year
-        cdate = attrs.get('creation_date')
-        year_val = None
-        if isinstance(cdate, datetime.datetime) or isinstance(cdate, datetime.date):
-            year_val = cdate.year
-        elif isinstance(cdate, str):
-            try:
-                dt = datetime.datetime.fromisoformat(cdate)
-                year_val = dt.year
-            except Exception:
-                year_val = None
-        if year_val is not None:
-            creation_years[node_id] = int(year_val)
-
-    # Build encoding maps (with top-K caps for high-cardinality fields)
-    topk_caps = {
-        'country_code': 30,
-        'currency': 5,
-        'business_category': 20
-    }
-
-    encoding_maps: Dict[str, Dict[str, int]] = {}
-    for field, counts in category_counts.items():
-        if not counts:
-            encoding_maps[field] = {}
-            continue
-        # Sort by frequency desc
-        sorted_items = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
-        if field in topk_caps:
-            k = topk_caps[field]
-            keep = [name for name, _ in sorted_items[:k]]
-            # Map kept categories to indices, reserve last for 'other'
-            mapping = {name: idx for idx, name in enumerate(keep)}
-            mapping['__other__'] = len(keep)
-            encoding_maps[field] = mapping
-        else:
-            # Small cardinality: use all categories, no 'other'
-            mapping = {name: idx for idx, (name, _) in enumerate(sorted_items)}
-            encoding_maps[field] = mapping
-
-    # Numeric/boolean fields to include
-    # NOTE: risk_score, is_high_risk_category, is_high_risk_country are EXCLUDED
-    # because fraud patterns SELECT entities based on these features, creating
-    # indirect data leakage (high risk → selected for fraud → is_fraudulent=True)
-    numeric_fields = [
-        'incorporation_year'
-    ]
-
-    # Build feature names list order
-    node_feature_names: list = []
-    # 1) numeric/boolean
-    node_feature_names.extend(numeric_fields)
-    # 2) derived numeric from date
-    node_feature_names.append('creation_year')
-    # 3) categoricals one-hot columns
-    categorical_expanded_names: Dict[str, list] = {}
-    for field in categorical_fields:
-        mapping = encoding_maps[field]
-        if not mapping:
-            categorical_expanded_names[field] = []
-            continue
-        names = []
-        # If '__other__' exists, ensure it is included last
-        for name, idx in sorted(mapping.items(), key=lambda x: x[1]):
-            if name == '__other__':
-                continue
-            names.append(f"{field}={name}")
-        if '__other__' in mapping:
-            names.append(f"{field}=__other__")
-        categorical_expanded_names[field] = names
-        node_feature_names.extend(names)
-
-    # Assemble feature matrix
-    node_features_list: list = []
-    for node_id in node_list:
-        attrs = graph.nodes[node_id]
-        row: list = []
-        # Numeric/boolean
-        for nf in numeric_fields:
-            val = attrs.get(nf)
-            if val is None:
-                row.append(0.0)
-            elif isinstance(val, bool):
-                row.append(float(val))
-            else:
-                try:
-                    row.append(float(val))
-                except Exception:
-                    row.append(0.0)
-        # creation_year
-        cy = creation_years.get(node_id)
-        row.append(float(cy) if cy is not None else 0.0)
-        # Categorical one-hot
-        for field in categorical_fields:
-            mapping = encoding_maps[field]
-            num_cols = len(categorical_expanded_names[field])
-            if num_cols == 0:
-                continue
-            vec = [0.0] * num_cols
-            raw = attrs.get(field)
-            norm = normalize_value(raw)
-            if mapping:
-                if field in topk_caps:
-                    # Use '__other__' bucket when not in mapping
-                    key = norm if norm in mapping and norm != '__other__' else '__other__'
-                    idx = mapping.get(key)
-                else:
-                    idx = mapping.get(norm)
-                if idx is not None:
-                    # Map idx to position in names list (sorted except '__other__' last)
-                    # Build name for that idx
-                    # Reverse lookup name for stable ordering
-                    name_for_idx = None
-                    for name, mapped_idx in mapping.items():
-                        if mapped_idx == idx:
-                            name_for_idx = name
-                            break
-                    if name_for_idx is not None:
-                        try:
-                            col_index = categorical_expanded_names[field].index(
-                                f"{field}={name_for_idx}"
-                            )
-                        except ValueError:
-                            col_index = None
-                        if col_index is not None and 0 <= col_index < num_cols:
-                            vec[col_index] = 1.0
-            row.extend(vec)
-        node_features_list.append(row)
-
-    node_features_tensor = torch.tensor(
-        node_features_list, dtype=torch.float32)
-
-    # Separate edges by type
-    transaction_edges = []
-    ownership_edges = []
-    transaction_attrs_list = []
-    ownership_attrs_list = []
-    transaction_labels = []  # Store edge labels separately
-
-    # First pass: collect unique currencies for one-hot encoding
-    unique_currencies = set()
-    for src, dest, attrs in graph.edges(data=True):
-        if attrs.get('edge_type') in [EdgeType.TRANSACTION, 'transaction']:
-            currency = attrs.get('currency')
-            if currency:
-                unique_currencies.add(currency)
-    # Sort for consistent ordering
-    unique_currencies = sorted(unique_currencies)
-
-    for src, dest, attrs in graph.edges(data=True):
-        edge_type = attrs.get('edge_type')
-        src_idx = node_to_idx[src]
-        dest_idx = node_to_idx[dest]
-
-        if edge_type == EdgeType.TRANSACTION or edge_type == 'transaction':
-            transaction_edges.append([src_idx, dest_idx])
-
-            # Extract transaction attributes (FEATURES only - no labels!)
-            trans_attrs = {
-                'amount': float(attrs.get('amount', 0.0)),
-                # is_fraudulent removed - it's a LABEL, not a feature!
-                'timestamp': attrs.get('timestamp').timestamp() if attrs.get('timestamp') else 0.0,
-                'time_since_previous': float(attrs.get('time_since_previous_transaction').total_seconds())
-                if attrs.get('time_since_previous_transaction') else 0.0
-            }
-
-            # Add transaction_type as one-hot encoded features
-            transaction_type = attrs.get('transaction_type')
-            if transaction_type:
-                # Handle both enum and string representations
-                if isinstance(transaction_type, str):
-                    # String format like "TransactionType.PAYMENT"
-                    type_str = transaction_type.split(
-                        '.')[-1] if '.' in transaction_type else transaction_type
-                else:
-                    # Enum format
-                    type_str = transaction_type.name
-
-                # One-hot encode transaction type
-                for tt in TransactionType:
-                    trans_attrs[f'transaction_type={tt.name.lower()}'] = float(
-                        type_str.upper() == tt.name)
-            else:
-                # If no transaction type, set all to 0
-                for tt in TransactionType:
-                    trans_attrs[f'transaction_type={tt.name.lower()}'] = 0.0
-
-            # Add currency as one-hot encoded features
-            currency = attrs.get('currency')
-            for curr in unique_currencies:
-                trans_attrs[f'currency={curr}'] = float(
-                    currency == curr if currency else False)
-
-            transaction_attrs_list.append(trans_attrs)
-
-            # Store label separately
-            transaction_labels.append(
-                1 if attrs.get('is_fraudulent', False) else 0)
-
-        elif edge_type == EdgeType.OWNERSHIP or edge_type == 'ownership':
-            ownership_edges.append([src_idx, dest_idx])
-
-            # Extract ownership attributes
-            own_attrs = {
-                'ownership_percentage': float(attrs.get('ownership_percentage', 0.0)),
-                'ownership_start_date': attrs.get('ownership_start_date').toordinal()
-                if attrs.get('ownership_start_date') else 0.0
-            }
-            ownership_attrs_list.append(own_attrs)
-
-    # Convert edge lists to tensors
-    result = {
-        'num_nodes': len(node_list),
-        'node_ids': node_list,
-        'node_features': node_features_tensor,
-        'node_feature_names': node_feature_names,
-        'metadata': {
-            'num_transaction_edges': len(transaction_edges),
-            'num_ownership_edges': len(ownership_edges),
-            'total_edges': len(transaction_edges) + len(ownership_edges)
-        }
-    }
-
-    # Add transaction edge data
-    if transaction_edges:
-        result['transaction_edge_index'] = torch.tensor(
-            transaction_edges, dtype=torch.long).t().contiguous()
-
-        # Convert transaction attributes to tensors
-        trans_feat_dict = {}
-        for key in transaction_attrs_list[0].keys():
-            trans_feat_dict[key] = torch.tensor([attrs[key] for attrs in transaction_attrs_list],
-                                                dtype=torch.float32)
-        result['transaction_edge_attr'] = trans_feat_dict
-        result['transaction_edge_attr_names'] = list(trans_feat_dict.keys())
-
-        # Add edge labels separately
-        result['transaction_edge_labels'] = torch.tensor(
-            transaction_labels, dtype=torch.long)
-    else:
-        result['transaction_edge_index'] = torch.empty(
-            (2, 0), dtype=torch.long)
-        result['transaction_edge_attr'] = {}
-        result['transaction_edge_attr_names'] = []
-        result['transaction_edge_labels'] = torch.empty((0,), dtype=torch.long)
-
-    # Add ownership edge data
-    if ownership_edges:
-        result['ownership_edge_index'] = torch.tensor(
-            ownership_edges, dtype=torch.long).t().contiguous()
-
-        # Convert ownership attributes to tensors
-        own_feat_dict = {}
-        for key in ownership_attrs_list[0].keys():
-            own_feat_dict[key] = torch.tensor([attrs[key] for attrs in ownership_attrs_list],
-                                              dtype=torch.float32)
-        result['ownership_edge_attr'] = own_feat_dict
-        result['ownership_edge_attr_names'] = list(own_feat_dict.keys())
-    else:
-        result['ownership_edge_index'] = torch.empty((2, 0), dtype=torch.long)
-        result['ownership_edge_attr'] = {}
-        result['ownership_edge_attr_names'] = []
-
-    # Add combined edge index for models that don't distinguish edge types
-    all_edges = transaction_edges + ownership_edges
-    if all_edges:
-        result['edge_index'] = torch.tensor(
-            all_edges, dtype=torch.long).t().contiguous()
-    else:
-        result['edge_index'] = torch.empty((2, 0), dtype=torch.long)
-
-    return result
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate synthetic AML dataset with Tide")
+        description="Generate synthetic AML dataset with Tide",
+        epilog="To convert CSVs to PyTorch format: python tools/csv_to_pytorch.py --nodes <nodes.csv> --edges <transactions.csv> --output <graph.pt>",
+    )
     parser.add_argument("--config", default="configs/graph.yaml",
-                        help="Path to configuration file")
+                        help="Path to graph configuration file (default: configs/graph.yaml)")
     parser.add_argument("--output-config", default="configs/output.yaml",
-                        help="Path to output configuration file")
+                        help="Path to output configuration file (default: configs/output.yaml)")
     parser.add_argument("--output-dir", default=".",
-                        help="Output directory for generated files")
+                        help="Output directory for generated files (default: current directory)")
     parser.add_argument("--nodes-file", default="generated_nodes.csv",
                         help="Filename for nodes CSV")
     parser.add_argument("--edges-file", default="generated_edges.csv",
@@ -685,8 +299,6 @@ if __name__ == "__main__":
                         help="Filename for GraphML export")
     parser.add_argument("--gpickle-file", default="generated_graph.gpickle",
                         help="Filename for Gpickle export")
-    parser.add_argument("--pytorch-file", default="generated_graph.pt",
-                        help="Filename for PyTorch export")
 
     args = parser.parse_args()
 
@@ -696,12 +308,10 @@ if __name__ == "__main__":
     # Construct full file paths
     nodes_filepath = os.path.join(args.output_dir, args.nodes_file)
     edges_filepath = os.path.join(args.output_dir, args.edges_file)
-    transactions_filepath = os.path.join(
-        args.output_dir, args.transactions_file)
+    transactions_filepath = os.path.join(args.output_dir, args.transactions_file)
     patterns_filepath = os.path.join(args.output_dir, args.patterns_file)
     graphml_filepath = os.path.join(args.output_dir, args.graphml_file)
     gpickle_filepath = os.path.join(args.output_dir, args.gpickle_file)
-    pytorch_filepath = os.path.join(args.output_dir, args.pytorch_file)
 
     # Load and merge configurations
     generator_parameters = load_configurations(args.config)
@@ -714,14 +324,11 @@ if __name__ == "__main__":
             output_config = yaml.safe_load(f)
             print(f'Loading output configuration from: {output_config_path}')
     else:
-        # Default values if file doesn't exist
-        print(
-            f"Output configuration file not found at {output_config_path}, using defaults.")
+        print(f"Output configuration file not found at {output_config_path}, using defaults.")
         output_config = {
             'CSVfiles': True,
             'GraphML': False,
             'Gpickle': False,
-            'PyTorch': False
         }
 
     # Convert date strings to datetime objects
@@ -740,15 +347,13 @@ if __name__ == "__main__":
     homophily = compute_homophily(graph)
     edge_label_h = compute_edge_label_homophily(graph)
 
-    print(f"\n--- Node-label homophily (AMLbench method) ---")
-    print(f"  For each edge: do the two NODES it connects share the same fraud label?")
+    print(f"\n--- Node-label homophily ---")
     print(f"  Edge homophily (all classes):  {homophily['edge_homophily']:.6f}")
     print(f"  Fraud-class homophily:         {homophily['fraud_homophily']:.6f}")
     print(f"  Fraud node ratio:              {homophily['fraud_node_ratio']:.6f}")
     print(f"  Fraud edge ratio:              {homophily['fraud_edge_ratio']:.6f}")
 
-    print(f"\n--- Edge-label homophily (model_comparison method) ---")
-    print(f"  For each edge: what fraction of NEIGHBORING EDGES (sharing a node) have the same label?")
+    print(f"\n--- Edge-label homophily ---")
     print(f"  Homophily (overall):           {edge_label_h['homophily_overall']:.6f}")
     if 'homophily_class_0' in edge_label_h:
         print(f"  Homophily (class 0 - legit):   {edge_label_h['homophily_class_0']:.6f}")
@@ -756,14 +361,11 @@ if __name__ == "__main__":
         print(f"  Homophily (class 1 - fraud):   {edge_label_h['homophily_class_1']:.6f}")
     print(f"  Fraud rate:                    {edge_label_h['fraud_rate']:.6f}")
 
-    # Get institution filter setting from config
-    institution_filter_country = generator_parameters.get(
-        'institution_filter_country')
+    # Get filter settings
+    institution_filter_country = generator_parameters.get('institution_filter_country')
     if institution_filter_country:
-        print(
-            f"\nInstitution filter enabled: filtering to country '{institution_filter_country}'")
+        print(f"\nInstitution filter enabled: filtering to country '{institution_filter_country}'")
 
-    # Get node/edge filter settings
     remove_isolated_nodes = output_config.get('RemoveIsolatedNodes', True)
 
     # Export to CSV
@@ -794,25 +396,17 @@ if __name__ == "__main__":
     with open(patterns_filepath, 'w') as f:
         json.dump(patterns_data, f, indent=2, default=str)
 
-    print(
-        f"Exported {len(aml_graph_gen.injected_patterns)} tracked patterns to: {patterns_filepath}")
+    print(f"Exported {len(aml_graph_gen.injected_patterns)} tracked patterns to: {patterns_filepath}")
     print(f"Generated files saved to: {args.output_dir}")
 
-    # Respect export filter settings
+    # Prepare graph for additional exports (GraphML, Gpickle)
     transactions_only = output_config.get('TransactionsOnly', False)
+    graph_for_exports = filter_transactions_only(graph) if transactions_only else graph
 
-    # Optionally create a transactions-only view for exports that use the graph structure
-    graph_for_exports = filter_transactions_only(
-        graph) if transactions_only else graph
-
-    # Apply institution filter for graph-based exports (GraphML, Gpickle, PyTorch)
-    # Note: filter_by_institution_country already removes isolated nodes
     if institution_filter_country:
         graph_for_exports = filter_by_institution_country(
             graph_for_exports, institution_filter_country)
     elif remove_isolated_nodes:
-        # Remove isolated nodes even without institution filter
-        # (e.g., Individuals/Businesses/Institutions with only ownership edges after TransactionsOnly)
         isolated = list(nx.isolates(graph_for_exports))
         if isolated:
             total_before = graph_for_exports.number_of_nodes()
@@ -821,10 +415,9 @@ if __name__ == "__main__":
             print(f"Removed {len(isolated)} isolated nodes "
                   f"({graph_for_exports.number_of_nodes()}/{total_before} nodes retained)")
 
-    # Export to GraphML for visualization
+    # Export to GraphML
     if output_config.get('GraphML', False):
-        print("\nSaving graph in GraphML format for visualization...")
-        # Convert enums to strings for GraphML compatibility
+        print("\nSaving graph in GraphML format...")
         converted_graph = convert_enums_to_strings(graph_for_exports)
         nx.write_graphml(converted_graph, graphml_filepath)
         print(f"Graph saved as: {graphml_filepath}")
@@ -832,103 +425,10 @@ if __name__ == "__main__":
     # Export to Gpickle
     if output_config.get('Gpickle', False):
         print("\nSaving graph in Gpickle format...")
-        # Convert enums to strings to remove tide module dependencies
         converted_graph = convert_enums_to_strings(graph_for_exports)
         with open(gpickle_filepath, 'wb') as f:
             pickle.dump(converted_graph, f, pickle.HIGHEST_PROTOCOL)
         print(f"Graph saved as: {gpickle_filepath}")
 
-    # Export to PyTorch
-    if output_config.get('PyTorch', False):
-        print("\nSaving graph in PyTorch format...")
-        # Convert graph to proper PyTorch format with all edge attributes
-        pytorch_data = convert_graph_to_pytorch(graph_for_exports)
-
-        # Try to create PyTorch Geometric Data object if library is available
-        try:
-            from torch_geometric.data import Data
-
-            # Create PyG Data object with transaction edges (most relevant for AML)
-            if pytorch_data['metadata']['num_transaction_edges'] > 0:
-                # Combine transaction edge features into a single tensor
-                edge_attr_list = []
-                for attr_name in pytorch_data['transaction_edge_attr_names']:
-                    edge_attr_list.append(
-                        pytorch_data['transaction_edge_attr'][attr_name].unsqueeze(
-                            1)
-                    )
-                transaction_edge_features = torch.cat(edge_attr_list, dim=1)
-
-                # Extract node labels (is_fraudulent) as y
-                node_labels = []
-                for node_id in pytorch_data['node_ids']:
-                    is_fraudulent = graph.nodes[node_id].get(
-                        'is_fraudulent', False)
-                    node_labels.append(1 if is_fraudulent else 0)
-                node_labels_tensor = torch.tensor(
-                    node_labels, dtype=torch.long)
-
-                pyg_data = Data(
-                    x=pytorch_data['node_features'],
-                    edge_index=pytorch_data['transaction_edge_index'],
-                    edge_attr=transaction_edge_features,  # Now WITHOUT is_fraudulent
-                    # Edge labels stored separately
-                    edge_y=pytorch_data['transaction_edge_labels'],
-                    y=node_labels_tensor,  # Node labels
-                    num_nodes=pytorch_data['num_nodes']
-                )
-
-                # Add metadata as attributes
-                pyg_data.node_feature_names = pytorch_data['node_feature_names']
-                pyg_data.edge_attr_names = pytorch_data['transaction_edge_attr_names']
-                pyg_data.node_ids = pytorch_data['node_ids']
-
-                # Save the PyG Data object
-                torch.save(pyg_data, pytorch_filepath)
-
-                print(
-                    f"Graph saved as PyTorch Geometric Data: {pytorch_filepath}")
-                print(f"  - Nodes: {pyg_data.num_nodes}")
-                print(f"  - Node features: {pyg_data.x.shape}")
-                print(f"  - Node feature names: {pyg_data.node_feature_names}")
-                print(
-                    f"  - Node labels (y): {pyg_data.y.shape}, classes: {pyg_data.y.unique().tolist()}")
-                print(
-                    f"  - Fraudulent nodes: {pyg_data.y.sum().item()} ({100*pyg_data.y.sum().item()/pyg_data.num_nodes:.2f}%)")
-                print(f"  - Transaction edges: {pyg_data.edge_index.shape[1]}")
-                print(
-                    f"  - Edge features (edge_attr): {pyg_data.edge_attr.shape}")
-                print(f"  - Edge feature names: {pyg_data.edge_attr_names}")
-                print(
-                    f"  - Edge labels (edge_y): {pyg_data.edge_y.shape}, classes: {pyg_data.edge_y.unique().tolist()}")
-                print(
-                    f"  - Fraudulent edges: {pyg_data.edge_y.sum().item()} ({100*pyg_data.edge_y.sum().item()/pyg_data.edge_index.shape[1]:.2f}%)")
-            else:
-                # Fallback to dict if no transaction edges
-                torch.save(pytorch_data, pytorch_filepath)
-                print(
-                    f"Graph saved as dictionary (no transaction edges): {pytorch_filepath}")
-
-        except ImportError:
-            # If PyTorch Geometric not available, save as dictionary
-            torch.save(pytorch_data, pytorch_filepath)
-            print(
-                f"PyTorch Geometric not installed, saving as dictionary: {pytorch_filepath}")
-            print(f"Install with: pip install torch-geometric")
-
-        # Print summary
-        print(f"\nSummary:")
-        print(f"  - Total nodes: {pytorch_data['num_nodes']}")
-        print(
-            f"  - Transaction edges: {pytorch_data['metadata']['num_transaction_edges']}")
-        if pytorch_data['metadata']['num_transaction_edges'] > 0:
-            print(
-                f"    - Transaction edge attributes: {pytorch_data['transaction_edge_attr_names']}")
-        print(
-            f"  - Ownership edges: {pytorch_data['metadata']['num_ownership_edges']}")
-        if pytorch_data['metadata']['num_ownership_edges'] > 0:
-            print(
-                f"    - Ownership edge attributes: {pytorch_data['ownership_edge_attr_names']}")
-
-    print("\nTo visualize the patterns, run:")
-    print("python visualize_patterns.py --graph_file generated_graph.graphml --config_file configs/graph.yaml")
+    print("\nTo convert to PyTorch Geometric format, run:")
+    print(f"  python tools/csv_to_pytorch.py --nodes {nodes_filepath} --edges {transactions_filepath} --output graph.pt")
