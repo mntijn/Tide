@@ -9,7 +9,7 @@ graph_scale:
 # fraud_count / total_transactions ≈ target_fraud_ratio.
 # E.g., 0.02 means ~2% of transactions will be fraudulent.
 # Set to null or remove to disable capping (use raw per_account_per_day rate).
-target_fraud_ratio: 0.0005
+target_fraud_ratio: 0.0009
 
 # Institution filter: only export transactions where at least one account
 # belongs to an institution in the specified country.
@@ -188,7 +188,7 @@ backgroundPatterns:
 #          With ~20-50 txs per pattern (layered): ~20-45 patterns max
 pattern_frequency:
   random: True
-  num_illicit_patterns: 180
+  num_illicit_patterns: 320
 
   # If random is false these values are used instead of num_illicit patterns
   RapidFundMovement: 33
