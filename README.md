@@ -9,7 +9,6 @@ Tide generates synthetic financial transaction graphs with realistic topology, e
 ```bash
 # Clone and install
 git clone <repo-url>
-cd AMLbench
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
@@ -102,11 +101,11 @@ The `experiments/` directory contains validation scripts:
 If you use Tide in your research, please cite:
 
 ```bibtex
-@inproceedings{tide2025,
-  title     = {TODO},
-  author    = {TODO},
+@inproceedings{tide2026,
+  title     = {Tide: A Customisable Dataset Generator for Anti-Money Laundering Research},
+  author    = {van den Beukel, Montijn and Ro{\v{z}}anec, Jo{\v{z}}e M. and Varbanescu, Ana{-}Lucia},
   booktitle = {TODO},
-  year      = {2025}
+  year      = {2026}
 }
 ```
 
