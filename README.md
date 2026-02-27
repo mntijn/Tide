@@ -34,7 +34,8 @@ Tide uses two configuration files in `configs/`:
 
 Additional graph configs are provided for different experimental settings:
 
-- `graph_LI.yaml` — Lower illicit ratio (~0.03%)
+- `graph_LI.yaml` — Lower illicit ratio
+- `graph_HI.yaml` — Higher illicit ratio
 - `graph_low_homophily.yaml` — Low fraud-class homophily (dispersed fraud)
 - `graph_high_homophily.yaml` — High fraud-class homophily (concentrated fraud)
 
