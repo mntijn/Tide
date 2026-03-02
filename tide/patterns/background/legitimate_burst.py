@@ -1,5 +1,4 @@
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -13,6 +12,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class LegitimateBurstStructural(StructuralComponent):
@@ -23,7 +23,7 @@ class LegitimateBurstStructural(StructuralComponent):
         # At least one user and one potential counterparty set
         return 2
 
-    def _get_legit_accounts_flat(self) -> List[str]:
+    def _get_legit_accounts_flat(self) -> list[str]:
         """
         Helper: return a flat list of legitimate account ids, PLUS some fraud accounts.
 
@@ -58,7 +58,7 @@ class LegitimateBurstStructural(StructuralComponent):
         legit_accounts = deduplicate_preserving_order(legit_accounts)
         return legit_accounts
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         legit_accounts = self._get_legit_accounts_flat()
 
         if len(legit_accounts) < 2:
@@ -267,8 +267,8 @@ class LegitimateBurstTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         burst_users = entity_selection.central_entities
         targets = entity_selection.peripheral_entities
 
@@ -293,7 +293,7 @@ class LegitimateBurstTemporal(TemporalComponent):
 class LegitimateBurstPattern(CompositePattern):
     """Pattern for legitimate bursty activity (shopping sprees, bill runs, etc.)."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimateBurstStructural(
             graph_generator, params)
         temporal_component = LegitimateBurstTemporal(graph_generator, params)

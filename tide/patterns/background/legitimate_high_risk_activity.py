@@ -14,7 +14,6 @@ The pattern creates:
 3. Standard payments from high risk_score entities
 """
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -28,6 +27,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class LegitimateHighRiskStructural(StructuralComponent):
@@ -37,7 +37,7 @@ class LegitimateHighRiskStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 2
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get high-risk entities from multiple clusters
         high_risk_clusters = [
             "super_high_risk",
@@ -216,8 +216,8 @@ class LegitimateHighRiskTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         high_risk_accounts = entity_selection.central_entities
 
         if not high_risk_accounts:
@@ -241,7 +241,7 @@ class LegitimateHighRiskTemporal(TemporalComponent):
 class LegitimateHighRiskActivityPattern(CompositePattern):
     """Pattern for legitimate activity by high-risk entities."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimateHighRiskStructural(
             graph_generator, params)
         temporal_component = LegitimateHighRiskTemporal(

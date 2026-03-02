@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Set, Callable
+from typing import Callable
 
 from ..datastructures.enums import NodeType
 from ..utils.constants import HIGH_RISK_COUNTRIES, HIGH_RISK_AGE_GROUPS, HIGH_RISK_OCCUPATIONS, HIGH_PAID_OCCUPATIONS
@@ -85,7 +85,7 @@ COMPOSITE_CLUSTERS = {
 }
 
 
-def evaluate_entity_clustering(data: Dict, min_risk_score: float) -> tuple[Set[str], Set[str]]:
+def evaluate_entity_clustering(data: dict, min_risk_score: float) -> tuple[set[str], set[str]]:
     """Evaluate which clusters an entity belongs to and its risk factors.
 
     Returns:
@@ -124,7 +124,7 @@ def evaluate_entity_clustering(data: Dict, min_risk_score: float) -> tuple[Set[s
     return clusters, risk_factors
 
 
-def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
+def build_entity_clusters(graph_generator) -> dict[str, list[str]]:
     """Build entity clusters for pattern targeting.
 
     Pattern Source Selection:
@@ -144,7 +144,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
         graph_generator: The GraphGenerator instance containing graph and configuration
 
     Returns:
-        Dict[str, List[str]]: Mapping of cluster names to lists of entity IDs
+        dict[str, list[str]]: Mapping of cluster names to lists of entity IDs
     """
     logger.info("Building entity clusters...")
     min_risk_score = graph_generator.fraud_selection_config.get(
@@ -157,7 +157,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
         list(COMPOSITE_CLUSTERS.keys()) +
         ["fraudulent", "legit"]
     )
-    clusters: Dict[str, Set[str]] = {name: set() for name in all_cluster_names}
+    clusters: dict[str, set[str]] = {name: set() for name in all_cluster_names}
 
     # Single pass through all nodes to build all clusters
     # Sort nodes for deterministic iteration order
@@ -196,7 +196,7 @@ def build_entity_clusters(graph_generator) -> Dict[str, List[str]]:
     return result_clusters
 
 
-def precompute_cluster_accounts(graph_generator, entity_clusters: Dict[str, List[str]]) -> Dict[str, List[str]]:
+def precompute_cluster_accounts(graph_generator, entity_clusters: dict[str, list[str]]) -> dict[str, list[str]]:
     """Pre-compute account collections for each cluster to avoid repeated graph traversals.
 
     This optimization converts entity clusters to account clusters, significantly speeding up
@@ -207,7 +207,7 @@ def precompute_cluster_accounts(graph_generator, entity_clusters: Dict[str, List
         entity_clusters: Mapping of cluster names to entity IDs
 
     Returns:
-        Dict[str, List[str]]: Mapping of cluster names to account IDs owned by entities in that cluster
+        dict[str, list[str]]: Mapping of cluster names to account IDs owned by entities in that cluster
     """
     from ..datastructures.enums import NodeType
 

@@ -10,14 +10,22 @@ To convert generated CSVs to PyTorch Geometric format:
 """
 
 import datetime
-import yaml
-import networkx as nx
-from typing import Dict, Any
-from enum import Enum
 import json
+import logging
 import argparse
 import os
 import pickle
+from enum import Enum
+from typing import Dict, Any
+
+import yaml
+import networkx as nx
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from tide.graph_generator import GraphGenerator
 from tide.outputs import export_to_csv

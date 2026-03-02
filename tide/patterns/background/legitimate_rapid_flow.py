@@ -13,7 +13,6 @@ Realistic scenarios modeled:
 5. Business cash flow: Receiving payment and immediately paying suppliers
 """
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -27,6 +26,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 # Scenario configurations for realistic rapid fund flows
@@ -87,7 +87,7 @@ class LegitimateRapidFlowStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 3  # Central account + inflow sources + outflow destinations
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get legitimate accounts + fraud accounts for mixing
         if hasattr(self.graph_generator, "account_clusters"):
             legit_accounts = list(
@@ -345,8 +345,8 @@ class LegitimateRapidFlowTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         central_accounts = entity_selection.central_entities
 
         if not central_accounts:
@@ -370,7 +370,7 @@ class LegitimateRapidFlowTemporal(TemporalComponent):
 class LegitimateRapidFlowPattern(CompositePattern):
     """Pattern for legitimate rapid fund movements."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimateRapidFlowStructural(
             graph_generator, params)
         temporal_component = LegitimateRapidFlowTemporal(

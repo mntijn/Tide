@@ -1,6 +1,5 @@
 import datetime
 import calendar
-from typing import List, Dict, Any, Tuple, Optional
 
 from ..base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -11,6 +10,7 @@ from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
 from ...utils.constants import HIGH_PAID_OCCUPATIONS
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class SalaryPaymentsStructural(StructuralComponent):
@@ -20,7 +20,7 @@ class SalaryPaymentsStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 2  # Need at least 1 business and 1 individual
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get legitimate entities
         legit_entities = list(
             self.graph_generator.entity_clusters.get("legit", []))
@@ -193,12 +193,12 @@ class SalaryPaymentsTemporal(TemporalComponent):
                     tx_count += 1
                     yield (business_account_id, individual_account_id, tx_attrs)
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         """
         Returns a list containing a single TransactionSequence.
         The sequence's 'transactions' attribute is a generator, not a list.
         """
-        sequences: List[TransactionSequence] = []
+        sequences: list[TransactionSequence] = []
         business_accounts = entity_selection.central_entities
         individual_accounts = entity_selection.peripheral_entities
 
@@ -223,7 +223,7 @@ class SalaryPaymentsTemporal(TemporalComponent):
     def _generate_payment_dates(self, start_date: datetime.datetime,
                                 end_date: datetime.datetime,
                                 payment_interval: int,
-                                preferred_days: List[int]) -> List[datetime.datetime]:
+                                preferred_days: list[int]) -> list[datetime.datetime]:
         """Generate regular payment dates based on interval and preferred days."""
         payment_dates = []
         current_date = start_date
@@ -307,7 +307,7 @@ class SalaryPaymentsTemporal(TemporalComponent):
 class SalaryPaymentsPattern(CompositePattern):
     """Salary payments pattern for regular business-to-individual payments."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = SalaryPaymentsStructural(
             graph_generator, params)
         temporal_component = SalaryPaymentsTemporal(graph_generator, params)

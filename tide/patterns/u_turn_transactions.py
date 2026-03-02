@@ -1,5 +1,4 @@
 import datetime
-from typing import List, Dict, Any, Tuple
 import logging
 
 from .base import (
@@ -10,6 +9,7 @@ from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
 from ..utils.amount_interleaving import generate_fraud_with_camouflage
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class UTurnTransactionsStructural(StructuralComponent):
         # Need at least 1 originator + 2 intermediaries
         return 3
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         logger.debug(
             "Starting entity selection for U-Turn Transactions pattern")
         pattern_config = self.params.get(
@@ -183,7 +183,7 @@ class UTurnTransactionsTemporal(TemporalComponent):
     International transfers may take 1-5 business days.
     """
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         sequences = []
 
         if not entity_selection.central_entities or len(entity_selection.central_entities) < 2:
@@ -389,7 +389,7 @@ class UTurnTransactionsTemporal(TemporalComponent):
 class UTurnTransactionsPattern(CompositePattern):
     """Injects U-Turn transactions pattern"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = UTurnTransactionsStructural(
             graph_generator, params)
         temporal_component = UTurnTransactionsTemporal(graph_generator, params)

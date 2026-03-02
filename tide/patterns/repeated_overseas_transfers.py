@@ -1,6 +1,5 @@
 from ..utils.random_instance import random_instance
 import datetime
-from typing import List, Dict, Any, Tuple
 
 from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -9,6 +8,7 @@ from .base import (
 from ..datastructures.enums import NodeType, TransactionType
 from ..utils.amount_interleaving import generate_fraud_with_camouflage
 import logging
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 1
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         central_owner_id = None
         source_account_id = None
         overseas_account_ids = []
@@ -183,7 +183,7 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
        following either a high-frequency or periodic pattern.
     """
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         sequences = []
         if not entity_selection.central_entities or not entity_selection.peripheral_entities or len(entity_selection.peripheral_entities) < 2:
             return sequences
@@ -405,7 +405,7 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
 class RepeatedOverseasTransfersPattern(CompositePattern):
     """Injects repeated overseas transfers pattern"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = RepeatedOverseasTransfersStructural(
             graph_generator, params)
         temporal_component = FrequentOrPeriodicTransfersTemporal(

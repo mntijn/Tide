@@ -1,5 +1,5 @@
 graph_scale:
-  individuals: 8000
+  individuals: 1000
   # businesses: 0
   institutions_per_country: 1
   individual_accounts_per_institution_range: [1, 3]
@@ -188,7 +188,7 @@ backgroundPatterns:
 #          With ~20-50 txs per pattern (layered): ~20-45 patterns max
 pattern_frequency:
   random: True
-  num_illicit_patterns: 180
+  num_illicit_patterns: 10
 
   # If random is false these values are used instead of num_illicit patterns
   RapidFundMovement: 33

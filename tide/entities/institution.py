@@ -1,12 +1,12 @@
-from typing import Dict, Any, Tuple, List
 from ..utils.random_instance import random_instance
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import COUNTRY_CODES
 from .base import Entity
+from typing import Any
 
 
 class Institution(Entity):
-    def generate_data(self) -> List[Tuple[Dict[str, Any], Dict[str, Any]]]:
+    def generate_data(self) -> list[tuple[dict[str, Any], dict[str, Any]]]:
         """Generates data for institution nodes based on institutions per country."""
         institutions_data = []
         institutions_per_country = self.graph_scale.get(
@@ -26,6 +26,6 @@ class Institution(Entity):
 
         return institutions_data
 
-    def to_node_attributes(self, common_attrs: Dict[str, Any], specific_attrs: Dict[str, Any]) -> NodeAttributes:
+    def to_node_attributes(self, common_attrs: dict[str, Any], specific_attrs: dict[str, Any]) -> NodeAttributes:
         """Convert institution attributes to node attributes."""
         return super().to_node_attributes(common_attrs, specific_attrs)

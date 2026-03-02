@@ -1,4 +1,3 @@
-from typing import Dict, Any, Tuple, Optional, List
 import datetime
 from ..datastructures.enums import AgeGroup
 from ..datastructures.attributes import NodeAttributes
@@ -11,13 +10,14 @@ from ..utils.business import (
     get_random_age_from_group
 )
 from .base import Entity
+from typing import Any
 
 
 class Business(Entity):
-    def __init__(self, params: Dict[str, Any]):
+    def __init__(self, params: dict[str, Any]):
         super().__init__(params)
 
-    def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
+    def _calculate_risk_score(self, specific_attrs: dict[str, Any], common_attrs: dict[str, Any]) -> float:
         """Calculates a risk score for a business."""
         score = self._calculate_base_risk_score(common_attrs)
 
@@ -78,7 +78,7 @@ class Business(Entity):
 
         return min(probability, 0.4)
 
-    def generate_data(self) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]]:
+    def generate_data(self) -> list[tuple[datetime.datetime, dict[str, Any], dict[str, Any]]]:
         """Generates data for business nodes, including a risk score."""
         businesses_data = []
         num_businesses = self.graph_scale.get("businesses", 0)
@@ -121,11 +121,11 @@ class Business(Entity):
         self,
         individual_age_group: AgeGroup,
         sim_start_date: datetime.datetime,
-        business_category_override: Optional[str] = None,
-        owner_occupation: Optional[str] = None,
-        owner_risk_score: Optional[float] = None,
-        owner_country: Optional[str] = None,
-    ) -> Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]:
+        business_category_override: str | None = None,
+        owner_occupation: str | None = None,
+        owner_risk_score: float | None = None,
+        owner_country: str | None = None,
+    ) -> tuple[datetime.datetime, dict[str, Any], dict[str, Any]]:
         """Generates a business that is consistent with the given individual's age."""
         # Pick a random age within the person's age group
         individual_age = get_random_age_from_group(individual_age_group)
@@ -207,6 +207,6 @@ class Business(Entity):
 
         return (creation_date, common_attrs, specific_attrs)
 
-    def to_node_attributes(self, common_attrs: Dict[str, Any], specific_attrs: Dict[str, Any]) -> NodeAttributes:
+    def to_node_attributes(self, common_attrs: dict[str, Any], specific_attrs: dict[str, Any]) -> NodeAttributes:
         """Convert business attributes to node attributes."""
         return super().to_node_attributes(common_attrs, specific_attrs)

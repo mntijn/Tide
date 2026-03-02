@@ -1,6 +1,6 @@
 import datetime
+import logging
 import numpy as np
-from typing import List, Dict, Any, Tuple
 
 from ..base import (
     StructuralComponent,
@@ -15,6 +15,9 @@ from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance, get_numpy_rng
 from ...utils.amount_distributions import sample_lognormal, DEFAULT_DISTRIBUTIONS
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class NonFraudulentRandomStructural(StructuralComponent):
@@ -31,7 +34,7 @@ class NonFraudulentRandomStructural(StructuralComponent):
         # Need at least 2 entities for transactions
         return 2
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         """
         Select spenders and hubs.
 
@@ -52,13 +55,13 @@ class NonFraudulentRandomStructural(StructuralComponent):
                 "fraudulent", [])
 
             # Get accounts belonging to legitimate entities using the helper function
-            legit_accounts: List[str] = []
+            legit_accounts: list[str] = []
             for entity_id in legit_entities:
                 entity_accounts = self._get_owned_accounts(entity_id)
                 legit_accounts.extend(entity_accounts)
 
             # Get accounts belonging to fraudulent entities
-            fraud_accounts: List[str] = []
+            fraud_accounts: list[str] = []
             for entity_id in fraud_entities:
                 entity_accounts = self._get_owned_accounts(entity_id)
                 fraud_accounts.extend(entity_accounts)
@@ -82,7 +85,7 @@ class NonFraudulentRandomStructural(StructuralComponent):
         spenders = list(legit_accounts) + list(selected_fraud_accounts)
 
         if not spenders:
-            print("DEBUG [RandomPayments]: No accounts found (legit or fraud)!")
+            logger.warning("RandomPayments: No accounts found (legit or fraud).")
             return EntitySelection(central_entities=[], peripheral_entities=[])
 
         # Hubs: top 5% of legitimate accounts (if account_clusters already
@@ -133,9 +136,8 @@ class RandomPaymentsTemporal(TemporalComponent):
         if total_expected_txs == 0:
             return
 
-        print(
-            f"RandomPayments: Generating {total_expected_txs:,} transactions for {len(spenders):,} accounts"
-        )
+        logger.info("RandomPayments: generating %s transactions for %s accounts",
+                    f"{total_expected_txs:,}", f"{len(spenders):,}")
 
         tx_type_probs = random_payments_config.get("transaction_type_probabilities", {
             "transfer": 0.4, "payment": 0.3, "deposit": 0.15, "withdrawal": 0.15
@@ -313,13 +315,13 @@ class RandomPaymentsTemporal(TemporalComponent):
             )
             yield (src, dest, tx_attrs)
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         """
         Returns a list containing a single TransactionSequence.
         The sequence's 'transactions' attribute is a generator, not a list,
         to ensure memory-efficient processing.
         """
-        sequences: List[TransactionSequence] = []
+        sequences: list[TransactionSequence] = []
         legit_accounts = entity_selection.central_entities
         if len(legit_accounts) < 2:
             return sequences
@@ -346,7 +348,7 @@ class RandomPaymentsTemporal(TemporalComponent):
 class RandomPaymentsPattern(CompositePattern):
     """Random payments pattern for legitimate baseline activity between non-fraudulent entities."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = NonFraudulentRandomStructural(
             graph_generator, params)
         temporal_component = RandomPaymentsTemporal(
@@ -358,14 +360,13 @@ class RandomPaymentsPattern(CompositePattern):
         Generates and injects the random payment pattern into the graph.
         This method now handles the generator from the temporal component.
         """
-        print(f"Generating pattern: {self.pattern_name}")
+        logger.debug("Generating pattern: %s", self.pattern_name)
         entity_selection = self.structural.select_entities(
             self.graph_generator.get_all_entities()
         )
 
         if not entity_selection.central_entities:
-            print(
-                f"Skipping pattern {self.pattern_name} due to lack of suitable entities.")
+            logger.debug("Skipping pattern %s: no suitable entities.", self.pattern_name)
             return
 
         transaction_generator = self.temporal.generate_transaction_sequences(

@@ -1,5 +1,6 @@
-from typing import Dict, Any, Tuple, List, Optional
+import logging
 import datetime
+
 from ..datastructures.enums import NodeType, AgeGroup
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import (
@@ -10,13 +11,16 @@ from ..utils.constants import (
     HIGH_PAID_OCCUPATIONS
 )
 from .base import Entity
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class Account(Entity):
-    def __init__(self, params: Dict[str, Any], all_institution_ids: List[str], institution_countries: Dict[str, str]):
+    def __init__(self, params: dict[str, Any], all_institution_ids: list[str], institution_countries: dict[str, str]):
         super().__init__(params)
         if not all_institution_ids:
-            print("Warning: Account initialized with no institution IDs.")
+            logger.warning("Account initialized with no institution IDs.")
         self.all_institution_ids = all_institution_ids
         self.institution_countries = institution_countries
         self.account_balance_range = params.get("account_balance_range_normal")
@@ -31,7 +35,7 @@ class Account(Entity):
         self.balance_range_offshore = params.get(
             "account_balance_range_offshore", self.balance_range_normal)
 
-    def _calculate_offshore_probability(self, entity_node_type: NodeType, entity_data: Dict[str, Any]) -> float:
+    def _calculate_offshore_probability(self, entity_node_type: NodeType, entity_data: dict[str, Any]) -> float:
         """Calculate the probability of an account being offshore based on entity attributes."""
         probability = self.base_offshore_probability
 
@@ -72,10 +76,10 @@ class Account(Entity):
         self,
         entity_node_type: NodeType,
         entity_country_code: str,
-        entity_data: Dict[str, Any],
+        entity_data: dict[str, Any],
         sim_start_date: datetime.datetime,
-        entity_creation_date: Optional[datetime.datetime] = None,
-    ) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any], Dict[str, Any]]]:
+        entity_creation_date: datetime.datetime | None = None,
+    ) -> list[tuple[datetime.datetime, dict[str, Any], dict[str, Any], dict[str, Any]]]:
         """Generates data for account nodes and their ownership edges for a single entity."""
         accounts_and_ownerships_data = []
 
@@ -189,6 +193,6 @@ class Account(Entity):
             )
         return accounts_and_ownerships_data
 
-    def to_node_attributes(self, common_attrs: Dict[str, Any], specific_attrs: Dict[str, Any]) -> NodeAttributes:
+    def to_node_attributes(self, common_attrs: dict[str, Any], specific_attrs: dict[str, Any]) -> NodeAttributes:
         """Convert account attributes to node attributes."""
         return super().to_node_attributes(common_attrs, specific_attrs)

@@ -10,7 +10,6 @@ and other authoritative sources.
 """
 
 import datetime
-from typing import Dict, Tuple, Optional
 from .constants import COUNTRY_TO_CURRENCY
 
 
@@ -245,7 +244,7 @@ def validate_system_currencies():
     Validate that all currencies used in COUNTRY_TO_CURRENCY are supported.
 
     Returns:
-        Tuple of (supported, unsupported) currency lists
+        tuple of (supported, unsupported) currency lists
     """
     system_currencies = set(COUNTRY_TO_CURRENCY.values())
     supported = []

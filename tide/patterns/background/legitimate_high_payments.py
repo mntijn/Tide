@@ -1,17 +1,17 @@
 import datetime
-from typing import List, Dict, Any, Tuple
 
 from ..base import PatternInjector
 from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class LegitimateHighPaymentsPattern:
     """Simple pattern to generate legitimate high-value transactions for obfuscation."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph_generator = graph_generator
         self.params = params
         self.time_span = params.get("time_span", {})
@@ -28,7 +28,7 @@ class LegitimateHighPaymentsPattern:
         except Exception:
             self.tx_budget = None
 
-    def inject_pattern_generator(self, available_entities: List[str]):
+    def inject_pattern_generator(self, available_entities: list[str]):
         """Generate legitimate high-value transactions between wealthy individuals and large businesses."""
 
         # Get high-value transactors from existing clusters

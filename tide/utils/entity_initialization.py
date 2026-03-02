@@ -1,6 +1,5 @@
 import datetime
 import logging
-from typing import Dict, Any
 
 from ..datastructures.enums import NodeType
 from ..datastructures.attributes import OwnershipAttributes

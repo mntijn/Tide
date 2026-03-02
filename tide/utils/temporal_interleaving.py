@@ -10,7 +10,6 @@ and generate rapid sequences with small `time_since_previous_transaction`.
 Legitimate patterns need similar temporal density to prevent leakage.
 """
 import datetime
-from typing import List, Tuple, Optional
 from .random_instance import random_instance
 
 
@@ -20,7 +19,7 @@ def generate_burst_timestamps(
     burst_duration_hours: float = 24.0,
     min_gap_minutes: int = 1,
     max_gap_minutes: int = 60,
-) -> List[datetime.datetime]:
+) -> list[datetime.datetime]:
     """
     Generate timestamps clustered in a tight burst (mimics fraud "high_frequency").
 
@@ -51,8 +50,8 @@ def generate_burst_timestamps(
 def generate_rapid_sequence_timestamps(
     start_time: datetime.datetime,
     count: int,
-    gap_range_minutes: Tuple[int, int] = (5, 120),
-) -> List[datetime.datetime]:
+    gap_range_minutes: tuple[int, int] = (5, 120),
+) -> list[datetime.datetime]:
     """
     Generate timestamps with small, consistent gaps (mimics rapid fund movement).
 
@@ -65,7 +64,7 @@ def generate_rapid_sequence_timestamps(
         gap_range_minutes: (min, max) gap between consecutive transactions
 
     Returns:
-        List of timestamps with small gaps
+        list of timestamps with small gaps
     """
     timestamps = [start_time]
     current_time = start_time
@@ -84,8 +83,8 @@ def generate_interleaved_timestamps(
     end_date: datetime.datetime,
     count: int,
     burst_probability: float = 0.3,
-    burst_size_range: Tuple[int, int] = (3, 10),
-) -> List[datetime.datetime]:
+    burst_size_range: tuple[int, int] = (3, 10),
+) -> list[datetime.datetime]:
     """
     Generate timestamps that mix spread-out and burst patterns.
 
@@ -142,9 +141,9 @@ def generate_interleaved_timestamps(
 def generate_deposit_transfer_sequence(
     start_time: datetime.datetime,
     num_cycles: int,
-    deposit_transfer_delay_hours: Tuple[float, float] = (0.5, 6.0),
-    cycle_gap_hours: Tuple[float, float] = (12.0, 72.0),
-) -> List[Tuple[datetime.datetime, str]]:
+    deposit_transfer_delay_hours: tuple[float, float] = (0.5, 6.0),
+    cycle_gap_hours: tuple[float, float] = (12.0, 72.0),
+) -> list[tuple[datetime.datetime, str]]:
     """
     Generate timestamp pairs for deposit→transfer sequences.
 
@@ -158,7 +157,7 @@ def generate_deposit_transfer_sequence(
         cycle_gap_hours: Gap between cycles
 
     Returns:
-        List of (timestamp, type) tuples where type is "deposit" or "transfer"
+        list of (timestamp, type) tuples where type is "deposit" or "transfer"
     """
     sequence = []
     current_time = start_time
@@ -183,7 +182,7 @@ def generate_deposit_transfer_sequence(
 
 
 def estimate_time_since_previous_distribution(
-    timestamps: List[datetime.datetime],
+    timestamps: list[datetime.datetime],
 ) -> dict:
     """
     Estimate the time_since_previous_transaction distribution for a set of timestamps.

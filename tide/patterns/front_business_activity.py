@@ -1,6 +1,5 @@
 from ..utils.random_instance import random_instance
 import datetime
-from typing import List, Dict, Any, Tuple
 
 from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -9,6 +8,7 @@ from .base import (
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.amount_interleaving import generate_fraud_with_camouflage
+from typing import Any
 
 
 class FrontBusinessStructural(StructuralComponent):
@@ -21,7 +21,7 @@ class FrontBusinessStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 2  # Business and an individual
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         central_business_id = None
         business_accounts_ids = []
         overseas_business_accounts_ids = []
@@ -121,7 +121,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
     followed by immediate transfers to overseas business accounts.
     """
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         sequences = []
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
             return sequences
@@ -276,7 +276,7 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
 class FrontBusinessPattern(CompositePattern):
     """Injects front business activity pattern"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = FrontBusinessStructural(graph_generator, params)
         temporal_component = FrequentCashDepositsAndOverseasTransfersTemporal(
             graph_generator, params)

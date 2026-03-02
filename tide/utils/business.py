@@ -1,5 +1,4 @@
 from faker import Faker
-from typing import Optional, List, Tuple, Dict
 from ..datastructures.enums import AgeGroup
 from .faker_instance import get_faker_instance
 
@@ -84,7 +83,7 @@ def generate_business_category(faker: Faker) -> str:
     return faker.random_element(business_categories)
 
 
-def map_occupation_to_business_category(occupation: str) -> Optional[str]:
+def map_occupation_to_business_category(occupation: str) -> str | None:
     """Return a plausible business category based on an individual's occupation."""
     occupation_lower = occupation.lower()
 

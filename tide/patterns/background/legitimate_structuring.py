@@ -12,7 +12,6 @@ Realistic scenarios modeled:
 4. Self-employed income: Irregular large cash deposits from freelance work
 """
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -25,6 +24,7 @@ from ..base import (
 )
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
+from typing import Any
 
 
 # Scenario configurations for realistic structuring-like behavior
@@ -63,7 +63,7 @@ class LegitimateStructuringStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 2
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get legitimate accounts + fraud accounts for mixing
         if hasattr(self.graph_generator, "account_clusters"):
             legit_accounts = list(
@@ -280,8 +280,8 @@ class LegitimateStructuringTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         structuring_users = entity_selection.central_entities
 
         if not structuring_users:
@@ -305,7 +305,7 @@ class LegitimateStructuringTemporal(TemporalComponent):
 class LegitimateStructuringPattern(CompositePattern):
     """Pattern for legitimate deposits in the structuring amount range."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimateStructuringStructural(
             graph_generator, params)
         temporal_component = LegitimateStructuringTemporal(

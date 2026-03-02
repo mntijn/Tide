@@ -1,9 +1,12 @@
+import logging
 import threading
 from queue import Queue
-from typing import Callable, List, Tuple, Optional, Any
+from typing import Any, Callable
+
+logger = logging.getLogger(__name__)
 
 
-def run_in_threads(tasks: List[Tuple[Callable, tuple]], join: bool = True) -> None:
+def run_in_threads(tasks: list[tuple[Callable, tuple]], join: bool = True) -> None:
     """
     Run a list of (function, args) pairs in parallel threads.
     Example:
@@ -22,7 +25,7 @@ def run_in_threads(tasks: List[Tuple[Callable, tuple]], join: bool = True) -> No
             t.join()
 
 
-def run_in_threads_with_results(tasks: List[Tuple[Callable, tuple]], results_queue: Optional[Queue] = None) -> List[Any]:
+def run_in_threads_with_results(tasks: list[tuple[Callable, tuple]], results_queue: Queue | None = None) -> list[Any]:
     """
     Run a list of (function, args) pairs in parallel threads, collecting results in a queue.
     Each function should put its result in the queue.
@@ -43,7 +46,7 @@ def run_in_threads_with_results(tasks: List[Tuple[Callable, tuple]], results_que
     return results
 
 
-def run_patterns_in_parallel(pattern_tasks: List[Tuple[Callable, tuple, int]]) -> List[Tuple[str, str, Any]]:
+def run_patterns_in_parallel(pattern_tasks: list[tuple[Callable, tuple, int]]) -> list[tuple[str, str, Any]]:
     """
     Run pattern injection tasks with deterministic seeding.
 
@@ -55,10 +58,10 @@ def run_patterns_in_parallel(pattern_tasks: List[Tuple[Callable, tuple, int]]) -
     need to re-seed it here.
 
     Args:
-        pattern_tasks: List of (pattern_function, args, task_index) tuples
+        pattern_tasks: list of (pattern_function, args, task_index) tuples
 
     Returns:
-        List of edges returned by each pattern
+        list of edges returned by each pattern
     """
     results = []
 
@@ -67,11 +70,12 @@ def run_patterns_in_parallel(pattern_tasks: List[Tuple[Callable, tuple, int]]) -
 
     for pattern_func, args, task_index in sorted_tasks:
         try:
-            print(f"Running pattern {pattern_func}")
+            logger.debug("Running pattern %s", pattern_func)
             edges = pattern_func(*args)
-            print(f"Pattern {pattern_func} completed")
+            logger.debug("Pattern %s completed", pattern_func)
             results.append(edges)
         except Exception as e:
-            results.append([])  # Return empty list on error
+            logger.error("Pattern %s failed: %s", pattern_func, e)
+            results.append([])
 
     return results

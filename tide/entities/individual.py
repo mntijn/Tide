@@ -1,4 +1,3 @@
-from typing import Dict, Any, Tuple, List
 import datetime
 from ..utils.random_instance import random_instance
 from ..datastructures.enums import AgeGroup, Gender
@@ -9,10 +8,11 @@ from ..utils.constants import (
 )
 from ..utils.individual import generate_age_consistent_occupation
 from .base import Entity
+from typing import Any
 
 
 class Individual(Entity):
-    def _calculate_risk_score(self, specific_attrs: Dict[str, Any], common_attrs: Dict[str, Any]) -> float:
+    def _calculate_risk_score(self, specific_attrs: dict[str, Any], common_attrs: dict[str, Any]) -> float:
         """Calculates a risk score for an individual."""
         score = self._calculate_base_risk_score(common_attrs)
 
@@ -25,7 +25,7 @@ class Individual(Entity):
         max_score = self.risk_weights.get("max_score", 0.9)
         return min(score, max_score)
 
-    def generate_data(self) -> List[Tuple[datetime.datetime, Dict[str, Any], Dict[str, Any]]]:
+    def generate_data(self) -> list[tuple[datetime.datetime, dict[str, Any], dict[str, Any]]]:
         """Generates data for individual nodes, including a risk score."""
         individuals_data = []
         num_individuals = self.graph_scale.get("individuals", 0)
@@ -50,6 +50,6 @@ class Individual(Entity):
             individuals_data.append((common_attrs, specific_attrs))
         return individuals_data
 
-    def to_node_attributes(self, common_attrs: Dict[str, Any], specific_attrs: Dict[str, Any]) -> NodeAttributes:
+    def to_node_attributes(self, common_attrs: dict[str, Any], specific_attrs: dict[str, Any]) -> NodeAttributes:
         """Convert individual attributes to node attributes."""
         return super().to_node_attributes(common_attrs, specific_attrs)

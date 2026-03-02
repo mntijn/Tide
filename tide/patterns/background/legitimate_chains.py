@@ -16,7 +16,6 @@ Realistic chain scenarios modeled:
    - Amount: $1K-$15K, Delay: 1-7 days, Length: 3-5
 """
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -30,6 +29,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 # Chain scenario configurations for realism
@@ -72,7 +72,7 @@ class LegitimateChainStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 3  # Minimum chain length
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get legitimate accounts + some fraud accounts (for topological mixing)
         if hasattr(self.graph_generator, "account_clusters"):
             legit_accounts = list(
@@ -249,8 +249,8 @@ class LegitimateChainTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         chain_accounts = entity_selection.central_entities
 
         if len(chain_accounts) < 3:
@@ -274,7 +274,7 @@ class LegitimateChainTemporal(TemporalComponent):
 class LegitimateChainsPattern(CompositePattern):
     """Pattern for legitimate multi-hop transaction chains."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimateChainStructural(
             graph_generator, params)
         temporal_component = LegitimateChainTemporal(graph_generator, params)

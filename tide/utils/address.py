@@ -1,9 +1,9 @@
 from ..utils.faker_instance import get_faker_instance
-from typing import Dict, Any
 from .constants import COUNTRY_TO_LOCALE
 from faker import Faker
 import yaml
 from pathlib import Path
+from typing import Any
 
 
 def get_seed_from_config():
@@ -15,7 +15,7 @@ def get_seed_from_config():
     return config.get('random_seed')
 
 
-def generate_localized_address(country_code: str) -> Dict[str, Any]:
+def generate_localized_address(country_code: str) -> dict[str, Any]:
     """Generate an address localized to the country_code"""
     locale = COUNTRY_TO_LOCALE.get(country_code)
     seed = get_seed_from_config()

@@ -11,7 +11,6 @@ Examples of legitimate periodic payments:
 - Bi-weekly/monthly salary-like payments to self (savings transfers)
 """
 import datetime
-from typing import List, Dict, Any
 
 from ..base import (
     StructuralComponent,
@@ -25,6 +24,7 @@ from ..base import (
 from ...datastructures.enums import NodeType, TransactionType
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class LegitimatePeriodicStructural(StructuralComponent):
@@ -34,7 +34,7 @@ class LegitimatePeriodicStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 2
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get legitimate accounts + fraud accounts for mixing
         if hasattr(self.graph_generator, "account_clusters"):
             legit_accounts = list(
@@ -189,8 +189,8 @@ class LegitimatePeriodicTemporal(TemporalComponent):
 
     def generate_transaction_sequences(
         self, entity_selection: EntitySelection
-    ) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    ) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         payers = entity_selection.central_entities
 
         if not payers:
@@ -214,7 +214,7 @@ class LegitimatePeriodicTemporal(TemporalComponent):
 class LegitimatePeriodicPaymentsPattern(CompositePattern):
     """Pattern for legitimate periodic/recurring payments."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = LegitimatePeriodicStructural(
             graph_generator, params)
         temporal_component = LegitimatePeriodicTemporal(

@@ -1,5 +1,6 @@
 import csv
-from typing import Dict, Any, Optional, Set
+import logging
+
 import networkx as nx
 from ..datastructures.attributes import (
     NodeAttributes, AccountAttributes, EdgeAttributes,
@@ -8,8 +9,10 @@ from ..datastructures.attributes import (
 )
 from ..datastructures.enums import EdgeType, NodeType
 
+logger = logging.getLogger(__name__)
 
-def get_filtered_accounts(graph: nx.DiGraph, filter_country: str) -> Set[str]:
+
+def get_filtered_accounts(graph: nx.DiGraph, filter_country: str) -> set[str]:
     """
     Get the set of account IDs that belong to institutions in the specified country.
 
@@ -18,7 +21,7 @@ def get_filtered_accounts(graph: nx.DiGraph, filter_country: str) -> Set[str]:
         filter_country: Country code to filter by (e.g., "NL" for Netherlands)
 
     Returns:
-        Set of account node IDs belonging to institutions in the target country
+        set of account node IDs belonging to institutions in the target country
     """
     # Find all institution IDs in the target country
     target_institutions = set()
@@ -44,7 +47,7 @@ def export_to_csv(
     nodes_filepath: str = "nodes.csv",
     edges_filepath: str = "edges.csv",
     transactions_filepath: str = "generated_transactions.csv",
-    institution_filter_country: Optional[str] = None,
+    institution_filter_country: str | None = None,
     remove_isolated_nodes: bool = False
 ):
     """Export the graph to CSV files for nodes and edges.
@@ -59,21 +62,21 @@ def export_to_csv(
         remove_isolated_nodes: If True, only export nodes that have at least one edge
     """
     # Build filtered account set if filtering is enabled
-    filtered_accounts: Optional[Set[str]] = None
-    nodes_with_edges: Optional[Set[str]] = None
+    filtered_accounts: set[str | None] = None
+    nodes_with_edges: set[str | None] = None
 
     if institution_filter_country:
         filtered_accounts = get_filtered_accounts(
             graph, institution_filter_country)
-        print(f"Institution filter enabled: country={institution_filter_country}, "
-              f"found {len(filtered_accounts)} accounts in target institutions")
+        logger.info("Institution filter enabled: country=%s, found %d accounts",
+                    institution_filter_country, len(filtered_accounts))
 
     # Track which nodes have at least one edge (for node filtering)
     if institution_filter_country or remove_isolated_nodes:
         nodes_with_edges = set()
 
-    print(
-        f"Exporting graph to CSV: {nodes_filepath}, {edges_filepath}, {transactions_filepath}")
+    logger.info("Exporting graph to CSV: %s, %s, %s",
+                nodes_filepath, edges_filepath, transactions_filepath)
 
     # Edges (process first to identify nodes with edges)
     edge_fieldnames = ['src', 'dest'] + \
@@ -158,9 +161,8 @@ def export_to_csv(
     # Log filtering summary
     if nodes_with_edges is not None:
         if filtered_accounts is not None:
-            print(f"Institution filter applied: {filtered_edges}/{total_edges} edges exported, "
-                  f"{filtered_transactions}/{total_transactions} transactions exported, "
-                  f"{filtered_nodes}/{total_nodes} nodes exported")
+            logger.info("Institution filter applied: %d/%d edges, %d/%d transactions, %d/%d nodes exported",
+                        filtered_edges, total_edges, filtered_transactions, total_transactions,
+                        filtered_nodes, total_nodes)
         else:
-            print(
-                f"Isolated nodes removed: {filtered_nodes}/{total_nodes} nodes exported")
+            logger.info("Isolated nodes removed: %d/%d nodes exported", filtered_nodes, total_nodes)

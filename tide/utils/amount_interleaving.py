@@ -9,7 +9,6 @@ amounts at 70-95% of the reporting threshold. To prevent leakage, legitimate
 patterns should sometimes use similar distributions, and fraud patterns
 should sometimes use "normal" distributions.
 """
-from typing import List, Optional, Tuple
 from .random_instance import random_instance
 from .currency_conversion import generate_structured_amounts, convert_currency
 from .amount_distributions import sample_lognormal_scalar
@@ -17,12 +16,12 @@ from .amount_distributions import sample_lognormal_scalar
 
 def generate_interleaved_amounts(
     count: int,
-    normal_range: Tuple[float, float],
+    normal_range: tuple[float, float],
     structured_probability: float = 0.3,
     reporting_threshold: float = 10000.0,
     reporting_currency: str = "USD",
     target_currency: str = None,
-) -> List[float]:
+) -> list[float]:
     """
     Generate amounts that mix normal and structured distributions.
 
@@ -38,7 +37,7 @@ def generate_interleaved_amounts(
         target_currency: Target currency for amounts (defaults to reporting_currency)
 
     Returns:
-        List of amounts with mixed distribution
+        list of amounts with mixed distribution
     """
     target_currency = target_currency or reporting_currency
     amounts = []
@@ -64,11 +63,11 @@ def generate_interleaved_amounts(
 def generate_fraud_like_amounts(
     count: int,
     use_normal_probability: float = 0.25,
-    normal_range: Tuple[float, float] = (500.0, 5000.0),
+    normal_range: tuple[float, float] = (500.0, 5000.0),
     reporting_threshold: float = 10000.0,
     reporting_currency: str = "USD",
     target_currency: str = None,
-) -> List[float]:
+) -> list[float]:
     """
     Generate amounts for fraud patterns that sometimes use normal distributions.
 
@@ -84,7 +83,7 @@ def generate_fraud_like_amounts(
         target_currency: Target currency for amounts
 
     Returns:
-        List of amounts for fraud transactions
+        list of amounts for fraud transactions
     """
     target_currency = target_currency or reporting_currency
     amounts = []
@@ -110,7 +109,7 @@ def generate_fraud_like_amounts(
 def generate_legitimate_structuring_amounts(
     count: int,
     tier_probabilities: dict = None,
-) -> List[float]:
+) -> list[float]:
     """
     Generate amounts that look like legitimate structuring.
 
@@ -125,7 +124,7 @@ def generate_legitimate_structuring_amounts(
         tier_probabilities: Override probabilities for each tier
 
     Returns:
-        List of amounts in various ranges including structuring range
+        list of amounts in various ranges including structuring range
     """
     default_tiers = {
         "small": {"range": (100.0, 1000.0), "prob": 0.25},
@@ -174,7 +173,7 @@ def generate_legitimate_structuring_amounts(
 
 def add_amount_noise(
     amount: float,
-    noise_range: Tuple[float, float] = (-0.15, 0.15),
+    noise_range: tuple[float, float] = (-0.15, 0.15),
     min_amount: float = 10.0,
 ) -> float:
     """
@@ -200,10 +199,10 @@ def add_amount_noise(
 def generate_fraud_with_camouflage(
     count: int,
     camouflage_probability: float = 0.15,
-    small_amount_range: Tuple[float, float] = (50.0, 500.0),
-    medium_amount_range: Tuple[float, float] = (500.0, 2000.0),
-    high_amount_range: Tuple[float, float] = (7000.0, 9500.0),
-) -> List[float]:
+    small_amount_range: tuple[float, float] = (50.0, 500.0),
+    medium_amount_range: tuple[float, float] = (500.0, 2000.0),
+    high_amount_range: tuple[float, float] = (7000.0, 9500.0),
+) -> list[float]:
     """
     Generate fraud amounts with minimal camouflage.
 
@@ -219,7 +218,7 @@ def generate_fraud_with_camouflage(
         high_amount_range: Range for high fraud amounts
 
     Returns:
-        List of amounts with ~15% looking like normal users
+        list of amounts with ~15% looking like normal users
     """
     amounts = []
 
@@ -254,7 +253,7 @@ def generate_varied_fraud_sequence(
     total_amount: float,
     num_transactions: int,
     include_test_txs: bool = True,
-) -> List[float]:
+) -> list[float]:
     """
     Generate a sequence of varied amounts that sum to approximately total_amount.
 
@@ -267,7 +266,7 @@ def generate_varied_fraud_sequence(
         include_test_txs: Whether to include small test transactions
 
     Returns:
-        List of amounts summing to ~total_amount, shuffled order
+        list of amounts summing to ~total_amount, shuffled order
     """
     if num_transactions <= 0:
         return []

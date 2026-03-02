@@ -1,23 +1,19 @@
-# TODO: maybe give the pattern manager awareness of previously
-# selected fraudulent entities so it can bias its selection logic.
-
-from typing import Dict, Any, List
-
 from .repeated_overseas_transfers import RepeatedOverseasTransfersPattern
 from .rapid_fund_movement import RapidFundMovementPattern
 from .front_business_activity import FrontBusinessPattern
 from .synchronised_transactions import SynchronisedTransactionsPattern
 from .u_turn_transactions import UTurnTransactionsPattern
+from typing import Any
 
 
 class PatternManager:
     """Manages injection of all patterns"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph_generator = graph_generator
         self.params = params
 
-        self.patterns: Dict[str, Any] = {
+        self.patterns: dict[str, Any] = {
             p.pattern_name: p for p in [
                 RepeatedOverseasTransfersPattern(graph_generator, params),
                 RapidFundMovementPattern(graph_generator, params),
@@ -27,7 +23,7 @@ class PatternManager:
                 # add new patterns here
             ]}
 
-    def get_available_patterns(self) -> List[str]:
+    def get_available_patterns(self) -> list[str]:
         """Return list of available pattern names (sorted for determinism)"""
         available = sorted(self.patterns.keys())
         return available

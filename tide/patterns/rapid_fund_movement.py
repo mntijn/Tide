@@ -1,6 +1,5 @@
 from ..utils.random_instance import random_instance
 import datetime
-from typing import List, Dict, Any, Tuple
 import logging
 
 from .base import (
@@ -11,6 +10,7 @@ from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.constants import HIGH_RISK_COUNTRIES
 from ..utils.amount_interleaving import generate_fraud_with_camouflage
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
         """Check if a country code represents a high-risk jurisdiction."""
         return country_code in HIGH_RISK_COUNTRIES
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Load pattern configuration
         pattern_config = self.params.get(
             "pattern_config", {}).get("rapidMovement", {})
@@ -157,7 +157,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
     Withdrawals can be across multiple banks and structured.
     """
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         sequences = []
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
             logger.debug(
@@ -434,7 +434,7 @@ class RapidInflowOutflowTemporal(TemporalComponent):
 class RapidFundMovementPattern(CompositePattern):
     """Injects rapid fund movement pattern"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = IndividualWithMultipleAccountsStructural(
             graph_generator, params)
         temporal_component = RapidInflowOutflowTemporal(

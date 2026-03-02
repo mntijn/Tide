@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 import datetime
-from typing import Dict, Optional
 
 from .enums import (
     NodeType,
@@ -15,40 +14,40 @@ from .enums import (
 @dataclass
 class NodeAttributes:
     node_type: NodeType
-    creation_date: Optional[datetime.datetime] = None
-    country_code: Optional[str] = None
+    creation_date: datetime.datetime | None = None
+    country_code: str | None = None
     is_fraudulent: bool = False
-    risk_score: Optional[float] = None
+    risk_score: float | None = None
 
 
 @dataclass
 class IndividualAttributes:
-    name: Optional[str] = None
-    age_group: Optional[AgeGroup] = None
-    occupation: Optional[str] = None
-    gender: Optional[Gender] = None
+    name: str | None = None
+    age_group: AgeGroup | None = None
+    occupation: str | None = None
+    gender: Gender | None = None
 
 
 @dataclass
 class BusinessAttributes:
-    name: Optional[str] = None
-    business_category: Optional[str] = None
-    incorporation_year: Optional[int] = None
-    number_of_employees: Optional[int] = None
+    name: str | None = None
+    business_category: str | None = None
+    incorporation_year: int | None = None
+    number_of_employees: int | None = None
     is_high_risk_category: bool = False
     is_high_risk_country: bool = False
 
 
 @dataclass
 class InstitutionAttributes:
-    name: Optional[str] = None
+    name: str | None = None
 
 
 @dataclass
 class AccountAttributes:
-    institution_id: Optional[str] = None
-    account_category: Optional[AccountCategory] = None
-    currency: Optional[str] = None
+    institution_id: str | None = None
+    account_category: AccountCategory | None = None
+    currency: str | None = None
 
 
 @dataclass
@@ -64,11 +63,11 @@ class TransactionAttributes(EdgeAttributes):
     transaction_type: TransactionType = field(kw_only=True)
     is_fraudulent: bool = False
     edge_type: EdgeType = EdgeType.TRANSACTION
-    time_since_previous_transaction: Optional[datetime.timedelta] = None
+    time_since_previous_transaction: datetime.timedelta | None = None
 
 
 @dataclass
 class OwnershipAttributes(EdgeAttributes):
     ownership_start_date: datetime.date = field(kw_only=True)
-    ownership_percentage: Optional[float] = None
+    ownership_percentage: float | None = None
     edge_type: EdgeType = EdgeType.OWNERSHIP

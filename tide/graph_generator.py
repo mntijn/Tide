@@ -1,10 +1,7 @@
 import networkx as nx
 import datetime
-import csv
 import logging
 from dataclasses import asdict
-from typing import List, Dict, Any, Optional, Tuple
-from faker import Faker
 
 from .datastructures.enums import (
     NodeType, EdgeType, TransactionType, AccountCategory,
@@ -29,14 +26,13 @@ from .utils.faker_instance import reset_faker_seed
 from .utils.threading import run_patterns_in_parallel
 from .utils.entity_initialization import initialize_entities
 from .utils.clustering import build_entity_clusters
+from typing import Any
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class GraphGenerator:
-    def __init__(self, params: Dict[str, Any]):
+    def __init__(self, params: dict[str, Any]):
         # CRITICAL: Reset all random seeds IMMEDIATELY before anything else
         # This ensures determinism even when running multiple times in the same process
         from .utils.random_instance import reset_random_seed
@@ -45,14 +41,14 @@ class GraphGenerator:
             reset_random_seed(seed)
 
         self.params = params
-        self.random_seed: Optional[int] = seed
+        self.random_seed: int | None = seed
 
         self.graph = nx.DiGraph()
         self.node_counter = 0
-        self.all_nodes: Dict[NodeType, List[str]] = {nt: [] for nt in NodeType}
+        self.all_nodes: dict[NodeType, list[str]] = {nt: [] for nt in NodeType}
 
         # Track transaction history for each entity
-        self.entity_transaction_history: Dict[str, datetime.datetime] = {}
+        self.entity_transaction_history: dict[str, datetime.datetime] = {}
 
         self.graph_scale = params.get("graph_scale", {})
         self.time_span = params.get("time_span", {})
@@ -78,15 +74,15 @@ class GraphGenerator:
         self.institution = Institution(self.params)
         self.individual = Individual(self.params)
         self.business = Business(self.params)
-        self.account: Optional[Account] = None
-        self.individual_cash_accounts: Dict[str, str] = {}
-        self.cash_account_id: Optional[str] = None
+        self.account: Account | None = None
+        self.individual_cash_accounts: dict[str, str] = {}
+        self.cash_account_id: str | None = None
         self.random_instance = random_instance
 
         self.pattern_manager = PatternManager(self, self.params)
         self.background_pattern_manager = BackgroundPatternManager(
             self, self.params)
-        self.entity_clusters: Dict[str, List[str]] = {}
+        self.entity_clusters: dict[str, list[str]] = {}
 
         # PATTERN TRACKING: Track what patterns are actually injected
         self.injected_patterns = []
@@ -134,9 +130,9 @@ class GraphGenerator:
 
     def _add_node(self,
                   node_type: NodeType,
-                  common_attrs: Dict[str, Any],
-                  specific_attrs: Dict[str, Any],
-                  creation_date: Optional[datetime.datetime] = None,
+                  common_attrs: dict[str, Any],
+                  specific_attrs: dict[str, Any],
+                  creation_date: datetime.datetime | None = None,
                   **kwargs) -> str:
         node_id = f"{node_type.value}_{self.node_counter}"
         self.node_counter += 1
@@ -197,7 +193,7 @@ class GraphGenerator:
 
         all_nodes_list = sorted(list(self.graph.nodes))
         pattern_tasks = []
-        task_index_to_pattern: Dict[int, Any] = {}
+        task_index_to_pattern: dict[int, Any] = {}
 
         if is_random:
             # Random mode: randomly select <num_illicit_patterns> patterns
@@ -290,7 +286,7 @@ class GraphGenerator:
 
         return total_edges_added
 
-    def _analyze_pattern_edges(self, pattern_name: str, edges: List, pattern_instance) -> Dict:
+    def _analyze_pattern_edges(self, pattern_name: str, edges: list, pattern_instance) -> dict:
         """Analyze pattern edges to extract key characteristics for tracking"""
         if not edges:
             return {}
@@ -457,7 +453,7 @@ class GraphGenerator:
         total_accounts = len(self.all_nodes.get(NodeType.ACCOUNT, []))
         return int(self.background_tx_rate_per_account_per_day * total_accounts * days)
 
-    def simulate_background_activity(self, target_transaction_count: Optional[int] = None):
+    def simulate_background_activity(self, target_transaction_count: int | None = None):
         """Generate realistic baseline transactions using the dedicated background patterns.
 
         Prior to running each pattern we allocate a transaction *budget* derived

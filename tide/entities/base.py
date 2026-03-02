@@ -1,12 +1,12 @@
-from typing import Dict, Any
 from ..datastructures.attributes import NodeAttributes
 from ..utils.constants import HIGH_RISK_COUNTRIES
 from ..utils.faker_instance import get_faker_instance
 from ..utils.random_instance import random_instance
+from typing import Any
 
 
 class Entity:
-    def __init__(self, params: Dict[str, Any]):
+    def __init__(self, params: dict[str, Any]):
         self.params = params
         self.faker = get_faker_instance()
         self.random_instance = random_instance
@@ -15,7 +15,7 @@ class Entity:
         self.risk_config = self.params.get("high_risk_config", {})
         self.risk_weights = self.params.get("risk_weights", {})
 
-    def _calculate_base_risk_score(self, common_attrs: Dict[str, Any]) -> float:
+    def _calculate_base_risk_score(self, common_attrs: dict[str, Any]) -> float:
         """Base risk score calculation that can be extended by specific entities."""
         base_risk = self.risk_weights.get("base_risk", 0.05)
         score = base_risk
@@ -30,7 +30,7 @@ class Entity:
         max_score = self.risk_weights.get("max_score", 0.9)
         return min(score, max_score)
 
-    def to_node_attributes(self, common_attrs: Dict[str, Any], specific_attrs: Dict[str, Any]) -> NodeAttributes:
+    def to_node_attributes(self, common_attrs: dict[str, Any], specific_attrs: dict[str, Any]) -> NodeAttributes:
         """Convert entity attributes to node attributes."""
         return NodeAttributes(
             common_attrs=common_attrs,

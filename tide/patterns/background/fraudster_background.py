@@ -1,5 +1,4 @@
 import datetime
-from typing import List, Dict, Any, Tuple
 
 from ..base import (
     StructuralComponent,
@@ -13,6 +12,7 @@ from ...datastructures.enums import NodeType, TransactionType
 from ...datastructures.attributes import TransactionAttributes
 from ...utils.random_instance import random_instance
 from ...utils.amount_distributions import sample_lognormal_scalar
+from typing import Any
 
 
 class FraudsterBackgroundStructural(StructuralComponent):
@@ -22,7 +22,7 @@ class FraudsterBackgroundStructural(StructuralComponent):
     def num_required_entities(self) -> int:
         return 1  # Need at least 1 fraudulent entity
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         # Get fraudulent entities only
         fraudulent_entities = self.graph_generator.entity_clusters.get(
             "fraudulent", [])
@@ -173,8 +173,8 @@ class FraudsterBackgroundTemporal(TemporalComponent):
                 tx_count += 1
                 yield (src_id, dest_id, tx_attrs)
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
-        sequences: List[TransactionSequence] = []
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
+        sequences: list[TransactionSequence] = []
         fraudster_accounts = entity_selection.central_entities
         legit_accounts = entity_selection.peripheral_entities
 
@@ -202,7 +202,7 @@ class FraudsterBackgroundTemporal(TemporalComponent):
 class FraudsterBackgroundPattern(CompositePattern):
     """Fraudster background camouflage pattern for low-frequency legitimate-looking transactions."""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = FraudsterBackgroundStructural(
             graph_generator, params)
         temporal_component = FraudsterBackgroundTemporal(

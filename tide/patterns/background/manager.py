@@ -1,4 +1,3 @@
-from typing import Dict, Any, List
 
 from .background_activity import RandomPaymentsPattern
 from .salary_payments import SalaryPaymentsPattern
@@ -11,16 +10,17 @@ from .legitimate_chains import LegitimateChainsPattern
 from .legitimate_structuring import LegitimateStructuringPattern
 from .legitimate_rapid_flow import LegitimateRapidFlowPattern
 from .legitimate_high_risk_activity import LegitimateHighRiskActivityPattern
+from typing import Any
 
 
 class BackgroundPatternManager:
     """Manages injection of background patterns"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph_generator = graph_generator
         self.params = params
 
-        self.patterns: Dict[str, Any] = {
+        self.patterns: dict[str, Any] = {
             p.pattern_name: p for p in [
                 RandomPaymentsPattern(graph_generator, params),
                 SalaryPaymentsPattern(graph_generator, params),
@@ -38,7 +38,7 @@ class BackgroundPatternManager:
             ]
         }
 
-    def get_available_patterns(self) -> List[str]:
+    def get_available_patterns(self) -> list[str]:
         """Return list of available background pattern names (sorted for determinism)"""
         available = sorted(self.patterns.keys())
         return available

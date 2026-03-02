@@ -1,5 +1,5 @@
 import datetime
-from typing import List, Dict, Any, Tuple, Optional, Set
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -14,15 +14,18 @@ from ..utils.currency_conversion import (
 )
 
 from ..utils.random_instance import random_instance
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 try:
     from forex_python.converter import CurrencyRates
 except ImportError:
-    print("Warning: forex-python not available. Currency conversion will be disabled.")
+    logger.warning("forex-python not available. Currency conversion will be disabled.")
     CurrencyRates = None
 
 
-def deduplicate_preserving_order(items: List[str]) -> List[str]:
+def deduplicate_preserving_order(items: list[str]) -> list[str]:
     """Remove duplicates while preserving order deterministically"""
     seen = set()
     result = []
@@ -36,15 +39,15 @@ def deduplicate_preserving_order(items: List[str]) -> List[str]:
 @dataclass
 class EntitySelection:
     """Represents a selection of entities for a pattern"""
-    central_entities: List[str]  # Main actors (the individual, front business)
+    central_entities: list[str]  # Main actors (the individual, front business)
     # Supporting entities (overseas accounts, multiple accounts)
-    peripheral_entities: List[str]
+    peripheral_entities: list[str]
 
 
 @dataclass
 class TransactionSequence:
     """Represents a sequence of transactions with timing"""
-    transactions: List[Tuple[str, str, TransactionAttributes]
+    transactions: list[tuple[str, str, TransactionAttributes]
                        ]
     sequence_name: str
     start_time: datetime.datetime
@@ -54,7 +57,7 @@ class TransactionSequence:
 class PatternInjector:
     """Base pattern injector with common functionality"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph = graph_generator.graph
         self.graph_generator = graph_generator
         self.params = params
@@ -105,7 +108,7 @@ class PatternInjector:
 class StructuralComponent(ABC):
     """Base class for structural components of patterns"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph = graph_generator.graph
         self.graph_generator = graph_generator
         self.params = params
@@ -117,11 +120,11 @@ class StructuralComponent(ABC):
         pass
 
     @abstractmethod
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         """Select entities based on structural requirements"""
         pass
 
-    def filter_entities_by_criteria(self, entities: List[str], criteria: Dict[str, Any]) -> List[str]:
+    def filter_entities_by_criteria(self, entities: list[str], criteria: dict[str, Any]) -> list[str]:
         """Helper to filter entities based on various criteria"""
         filtered = []
         for entity_id in entities:
@@ -159,7 +162,7 @@ class StructuralComponent(ABC):
 
         return filtered
 
-    def _get_owned_accounts(self, entity_id: str) -> List[str]:
+    def _get_owned_accounts(self, entity_id: str) -> list[str]:
         """Efficiently get all accounts owned by an entity (individual or business)"""
         owned_accounts = []
 
@@ -195,13 +198,13 @@ class StructuralComponent(ABC):
     # ------------------------------------------------------------------
     #  Convenience for fast entity retrieval
     # ------------------------------------------------------------------
-    def get_cluster(self, name: str) -> List[str]:
+    def get_cluster(self, name: str) -> list[str]:
         """Return pre-computed entity cluster from the parent graph generator (if available)."""
         if hasattr(self.graph_generator, "entity_clusters"):
             return self.graph_generator.entity_clusters.get(name, [])
         return []
 
-    def get_combined_clusters(self, cluster_names: List[str], deduplicate: bool = True) -> List[str]:
+    def get_combined_clusters(self, cluster_names: list[str], deduplicate: bool = True) -> list[str]:
         """Get entities from multiple clusters combined."""
         combined = []
         for cluster_name in cluster_names:
@@ -211,7 +214,7 @@ class StructuralComponent(ABC):
             return deduplicate_preserving_order(combined)
         return combined
 
-    def get_high_risk_entities(self, include_super_high_risk: bool = True) -> List[str]:
+    def get_high_risk_entities(self, include_super_high_risk: bool = True) -> list[str]:
         """Get all high-risk entities across different risk factors."""
         clusters_to_combine = [
             "high_risk_countries",
@@ -226,15 +229,15 @@ class StructuralComponent(ABC):
 
         return self.get_combined_clusters(clusters_to_combine, deduplicate=True)
 
-    def get_high_risk_individuals(self, cluster_names: List[str] = None, max_entities: int = None) -> List[str]:
+    def get_high_risk_individuals(self, cluster_names: list[str] = None, max_entities: int = None) -> list[str]:
         """Efficiently get high-risk individuals from specified clusters.
 
         Args:
-            cluster_names: List of cluster names to search. Defaults to common high-risk clusters.
+            cluster_names: list of cluster names to search. Defaults to common high-risk clusters.
             max_entities: Maximum number of entities to return (for performance)
 
         Returns:
-            List of individual entity IDs, prioritized by risk level
+            list of individual entity IDs, prioritized by risk level
         """
         if cluster_names is None:
             cluster_names = ["structuring_candidates",
@@ -255,7 +258,7 @@ class StructuralComponent(ABC):
         # Remove duplicates while preserving priority order
         return list(dict.fromkeys(potential_individuals))
 
-    def get_entities_with_multiple_risk_factors(self) -> List[str]:
+    def get_entities_with_multiple_risk_factors(self) -> list[str]:
         """Get entities that appear in multiple risk clusters (indicating compound risk)."""
         risk_clusters = [
             "high_risk_countries",
@@ -274,7 +277,7 @@ class StructuralComponent(ABC):
         # Return entities with 2+ risk factors (sorted for determinism)
         return sorted([entity_id for entity_id, count in entity_risk_count.items() if count >= 2])
 
-    def prioritize_by_risk_factors(self, entities: List[str]) -> List[str]:
+    def prioritize_by_risk_factors(self, entities: list[str]) -> list[str]:
         """Sort entities by number of risk factors (highest risk first)."""
         risk_clusters = [
             "high_risk_countries",
@@ -297,12 +300,12 @@ class StructuralComponent(ABC):
 
     def get_mixed_risk_entities(
         self,
-        high_risk_clusters: List[str],
-        fallback_pool: List[str],
+        high_risk_clusters: list[str],
+        fallback_pool: list[str],
         num_needed: int,
         high_risk_ratio: float = None,
         node_type_filter: NodeType = None
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Get a mix of high-risk and general population entities.
 
@@ -385,18 +388,18 @@ class StructuralComponent(ABC):
 class TemporalComponent(ABC):
     """Base class for temporal components of patterns"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         self.graph = graph_generator.graph
         self.graph_generator = graph_generator
         self.params = params
         self.time_span = params.get("time_span", {})
 
     @abstractmethod
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         """Generate transaction sequences based on temporal pattern"""
         pass
 
-    def _get_owned_accounts(self, entity_id: str) -> List[str]:
+    def _get_owned_accounts(self, entity_id: str) -> list[str]:
         """Get all accounts owned by an entity (individual or business)"""
         owned_accounts = []
 
@@ -420,7 +423,7 @@ class TemporalComponent(ABC):
     def generate_timestamps(self,
                             start_time: datetime.datetime,
                             pattern_type: str,
-                            count: int) -> List[datetime.datetime]:
+                            count: int) -> list[datetime.datetime]:
         """Generate timestamps based on different temporal patterns"""
 
         if pattern_type == "high_frequency":
@@ -490,7 +493,7 @@ class TemporalComponent(ABC):
 
     def generate_structured_amounts(self, count: int, base_amount: float = None,
                                     target_currency: str = None,
-                                    transaction_date: datetime.datetime = None) -> List[float]:
+                                    transaction_date: datetime.datetime = None) -> list[float]:
         """Generate amounts that may be structured to avoid thresholds"""
 
         # Get reporting threshold and currency from config
@@ -513,8 +516,8 @@ class TemporalComponent(ABC):
         amount: float,
         start_time: datetime.datetime,
         pattern_injector: 'PatternInjector',
-        exclude_accounts: List[str] = None
-    ) -> Tuple[List[Tuple[str, str, TransactionAttributes]], datetime.datetime, float]:
+        exclude_accounts: list[str] = None
+    ) -> tuple[list[tuple[str, str, TransactionAttributes]], datetime.datetime, float]:
         """
         Generate intermediate layering transactions between source and destination.
 
@@ -530,7 +533,7 @@ class TemporalComponent(ABC):
             exclude_accounts: Accounts to exclude from intermediate selection
 
         Returns:
-            Tuple of (transactions_list, final_timestamp, remaining_amount)
+            tuple of (transactions_list, final_timestamp, remaining_amount)
         """
         layering_config = self.params.get("layering_config", {})
 
@@ -658,7 +661,7 @@ class CompositePattern(PatternInjector):
                  structural_component: StructuralComponent,
                  temporal_component: TemporalComponent,
                  graph_generator,
-                 params: Dict[str, Any]):
+                 params: dict[str, Any]):
         super().__init__(graph_generator, params)
         self.structural = structural_component
         self.temporal = temporal_component
@@ -668,11 +671,11 @@ class CompositePattern(PatternInjector):
         """Number of entities required, delegated to the structural component."""
         return self.structural.num_required_entities
 
-    def inject_pattern(self, entities: List[str]) -> List[Tuple[str, str, TransactionAttributes]]:
+    def inject_pattern(self, entities: list[str]) -> list[tuple[str, str, TransactionAttributes]]:
         """Generate all edges for this pattern without mutating the master graph.
         The caller (GraphGenerator) decides when to merge the resulting sub-graph."""
 
-        generated_edges: List[Tuple[str, str, TransactionAttributes]] = []
+        generated_edges: list[tuple[str, str, TransactionAttributes]] = []
 
         try:
             # Entity selection
@@ -685,11 +688,11 @@ class CompositePattern(PatternInjector):
                 generated_edges.extend(sequence.transactions)
 
         except Exception as e:
-            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
+            logger.error("Failed to build pattern %s: %s", self.__class__.__name__, e)
 
         return generated_edges
 
-    def inject_pattern_generator(self, entities: List[str]):
+    def inject_pattern_generator(self, entities: list[str]):
         """Generate all edges for this pattern as a generator."""
         try:
             # Entity selection
@@ -702,7 +705,7 @@ class CompositePattern(PatternInjector):
                 yield from sequence.transactions
 
         except Exception as e:
-            print(f"Failed to build pattern {self.__class__.__name__}: {e}")
+            logger.error("Failed to build pattern %s: %s", self.__class__.__name__, e)
 
     @property
     def pattern_name(self) -> str:
@@ -710,7 +713,7 @@ class CompositePattern(PatternInjector):
         return f"{self.structural.__class__.__name__}_{self.temporal.__class__.__name__}"
 
     def set_tx_budget(self, n):
-        """Set an optional upper bound for number of transactions this pattern
+        """set an optional upper bound for number of transactions this pattern
         may generate.  Temporal component implementations should respect
         `self.tx_budget` if it is not None."""
         try:

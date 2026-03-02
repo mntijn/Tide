@@ -1,5 +1,4 @@
 import datetime
-from typing import List, Dict, Any, Tuple
 
 from .base import (
     StructuralComponent, TemporalComponent, EntitySelection, TransactionSequence,
@@ -8,6 +7,7 @@ from .base import (
 from ..datastructures.enums import NodeType, TransactionType
 from ..datastructures.attributes import TransactionAttributes
 from ..utils.random_instance import random_instance
+from typing import Any
 
 
 class SynchronisedTransactionsStructural(StructuralComponent):
@@ -21,7 +21,7 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         # Need at least 3 entities: 2 coordinating depositors + 1 recipient
         return 3
 
-    def select_entities(self, available_entities: List[str]) -> EntitySelection:
+    def select_entities(self, available_entities: list[str]) -> EntitySelection:
         pattern_config = self.params.get("pattern_config", {}).get(
             "synchronisedTransactions", {})
         min_coordinating_entities = pattern_config.get(
@@ -146,7 +146,7 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
     followed by rapid transfer of aggregated funds.
     """
 
-    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> List[TransactionSequence]:
+    def generate_transaction_sequences(self, entity_selection: EntitySelection) -> list[TransactionSequence]:
         sequences = []
 
         if not entity_selection.central_entities or not entity_selection.peripheral_entities:
@@ -275,7 +275,7 @@ class SynchronisedTransactionsTemporal(TemporalComponent):
 class SynchronisedTransactionsPattern(CompositePattern):
     """Injects synchronized transactions pattern"""
 
-    def __init__(self, graph_generator, params: Dict[str, Any]):
+    def __init__(self, graph_generator, params: dict[str, Any]):
         structural_component = SynchronisedTransactionsStructural(
             graph_generator, params)
         temporal_component = SynchronisedTransactionsTemporal(
