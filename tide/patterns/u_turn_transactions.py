@@ -48,7 +48,6 @@ class UTurnTransactionsStructural(StructuralComponent):
         all_entities = all_individuals + all_businesses
 
         # Use mixed selection: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         originator_clusters = ["super_high_risk", "high_risk_score",
                                "structuring_candidates", "high_risk_countries"]
         mixed_originators = self.get_mixed_risk_entities(
@@ -115,7 +114,6 @@ class UTurnTransactionsStructural(StructuralComponent):
         all_other_entities = [e for e in all_entities if e != originator_id]
 
         # Use mixed selection for intermediaries: ~40% from high-risk, ~60% general
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         intermediary_clusters = ["high_risk_countries", "offshore_candidates"]
         mixed_intermediary_entities = self.get_mixed_risk_entities(
             high_risk_clusters=intermediary_clusters,

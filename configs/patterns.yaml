@@ -1,19 +1,11 @@
 # Pattern configuration for AML pattern generation
 #
-# ENHANCED VERSION: Increased structural complexity for GNN benchmark validation
+# Each pattern represents a known AML typology: structuring, layering, integration.
+# Fraud amounts are realistic, but legitimate background patterns include similar
+# high-value transactions — the distinguishing factor is GRAPH STRUCTURE, not raw amounts.
 #
-# Changes from original:
-# - Increased entity counts and hop depths within each pattern's natural structure
-# - Kept the fundamental AML typology logic unchanged
-# - Patterns still represent: structuring, layering, integration
-#
-# Key insight: Fraud amounts are REALISTIC but legitimate background patterns
-# now include similar high-value transactions to prevent amount-based leakage.
-# The distinguishing factor should be GRAPH STRUCTURE, not raw amounts.
-#
-# NEW: Camouflage probability setting for each pattern
-# This makes ~30% of fraud transactions use "average user" amounts ($20-$500)
-# which lowers ROC-AUC by blending fraud with the general population, not just outliers.
+# Camouflage probability: fraction of fraud transactions that use everyday amounts ($20-$500)
+# to blend with the general population.
 
 # Front Business Activity Pattern
 # Simulates a business acting as a front for money laundering
@@ -30,8 +22,6 @@ frontBusiness:
     # Legitimate high-value payments (rent, insurance) now overlap
     deposit_amount_range: [5000, 15000]
     deposits_per_cycle: [2, 4]
-    # 40% of deposits use smaller amounts for camouflage
-    # 60% retain distinctive amounts (keeps task solvable)
     camouflage_probability: 0.25
 
 # Repeated Overseas Transfers Pattern
@@ -46,15 +36,12 @@ repeatedOverseas:
     max_deposits: 12
     # STRUCTURING: Deliberately below $10K reporting threshold
     amount_range: [7500, 9900]
-    # 40% of deposits use smaller amounts (balanced camouflage)
     camouflage_probability: 0.25
   transaction_params:
     min_transactions: 15
     max_transactions: 40
-    # Transfer amounts: moderate to avoid detection
     transfer_amount_range: [2000, 8000]
     transfer_interval_days: [7, 14, 30]
-    # 40% of transfers use smaller amounts
     camouflage_probability: 0.25
   transfer_leakage_ratio: 0.95
 
@@ -69,16 +56,12 @@ rapidMovement:
     inflows:
       min_inflows: 10
       max_inflows: 20
-      # SMURFING: Many smaller transfers that aggregate
-      # Overlaps with legitimate transfers/salary
       amount_range: [500, 3000]
     withdrawals:
       min_withdrawals: 5
       max_withdrawals: 12
-      # Withdrawal amounts - some below reporting, some not
       amount_range: [200, 2000]
     inflow_to_withdrawal_delay: [1, 24]
-    # 15% of transactions use smaller amounts for light camouflage
     camouflage_probability: 0.15
   validation_params:
     outflow_ratio_range: [0.85, 0.95]
@@ -90,8 +73,6 @@ uTurnTransactions:
   min_intermediaries: 4
   max_intermediaries: 8
   transaction_params:
-    # REALISTIC: Significant amounts for international transfers
-    # Legitimate chains also now use similar amounts
     initial_amount_range: [3000, 15000]
     return_percentage_range: [0.7, 0.9]
     international_delay_days: [1, 7]
@@ -99,7 +80,6 @@ uTurnTransactions:
       business_hours: [9, 16]
       include_minutes: true
       include_hours: true
-    # 15% of U-turn patterns use smaller amounts
     camouflage_probability: 0.15
   validation_params:
     fee_percentage_range: [0.01, 0.03]

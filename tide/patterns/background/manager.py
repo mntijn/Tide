@@ -30,10 +30,8 @@ class BackgroundPatternManager:
                 LegitimateCashOperationsPattern(graph_generator, params),
                 LegitimatePeriodicPaymentsPattern(graph_generator, params),
                 LegitimateChainsPattern(graph_generator, params),
-                # Patterns to reduce feature-based data leakage
                 LegitimateStructuringPattern(graph_generator, params),
                 LegitimateRapidFlowPattern(graph_generator, params),
-                # Breaks risk_score -> fraud correlation
                 LegitimateHighRiskActivityPattern(graph_generator, params),
             ]
         }

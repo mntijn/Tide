@@ -193,7 +193,7 @@ def add_amount_noise(
 
 
 # =============================================================================
-# NEW: Functions to lower ROC-AUC by making fraud look like AVERAGE users
+# Camouflage amount generation for fraud patterns
 # =============================================================================
 
 def generate_fraud_with_camouflage(
@@ -205,10 +205,6 @@ def generate_fraud_with_camouflage(
 ) -> list[float]:
     """
     Generate fraud amounts with minimal camouflage.
-
-    LIGHT INTERLEAVING: 15% camouflage keeps fraud mostly distinctive.
-    - Most fraud (85%) retains characteristic high amounts
-    - Small camouflage adds some realism without hurting GNN learning
 
     Args:
         count: Number of amounts to generate

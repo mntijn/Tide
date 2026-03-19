@@ -113,19 +113,18 @@ class LegitimateBurstTemporal(TemporalComponent):
             "legitimateBurst", {}
         )
         burst_size_range = burst_cfg.get(
-            "burst_size_range", [5, 15])  # Increased from [3, 6]
+            "burst_size_range", [5, 15])
         amount_range = burst_cfg.get(
-            "amount_range", [50.0, 2000.0])  # Expanded upper bound
+            "amount_range", [50.0, 2000.0])
         time_between_txs_minutes = burst_cfg.get(
             "time_between_txs_minutes", [1, 30])
-        # NEW: support deposits/withdrawals
         include_cash_ops = burst_cfg.get("include_cash_ops", True)
         bursts_per_user_range = burst_cfg.get(
-            "bursts_per_user_range", [1, 3])  # Multiple bursts
+            "bursts_per_user_range", [1, 3])
 
         # Cash operations settings
         cash_ops_probability = burst_cfg.get(
-            "cash_ops_probability", 0.15)  # 15% of bursts include cash
+            "cash_ops_probability", 0.15)
         cash_amount_range = burst_cfg.get("cash_amount_range", [100.0, 2000.0])
 
         # Log-normal distribution settings
@@ -134,9 +133,8 @@ class LegitimateBurstTemporal(TemporalComponent):
             "backgroundPatterns", {}
         ).get("amount_distributions", {})
 
-        # NEW: Fraud-like amount interleaving - some bursts use structuring amounts
         structuring_burst_probability = burst_cfg.get(
-            "structuring_burst_probability", 0.12)  # 12% of bursts use fraud-like amounts
+            "structuring_burst_probability", 0.12)
         structuring_amount_range = burst_cfg.get(
             "structuring_amount_range", [7000.0, 9900.0])
 

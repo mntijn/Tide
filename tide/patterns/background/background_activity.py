@@ -154,16 +154,14 @@ class RandomPaymentsTemporal(TemporalComponent):
             "withdrawal": TransactionType.WITHDRAWAL
         }
 
-        # OPTIMIZATION: Generate timestamps and sort them first to ensure chronological order.
-        # NEW: Add temporal INTERLEAVING - some transactions clustered in bursts
-        # This matches fraud patterns' "high_frequency" timestamp generation
+        # Generate timestamps with some clustered in bursts
         total_minutes = total_days * 24 * 60
 
         # Probability of a transaction being part of a burst cluster
         burst_probability = random_payments_config.get(
             "burst_probability", 0.15)
         burst_duration_minutes = random_payments_config.get(
-            "burst_duration_minutes", 120)  # 2-hour burst windows
+            "burst_duration_minutes", 120)
 
         # Generate base timestamps using dedicated numpy generator
         random_minutes_offsets = get_numpy_rng().integers(

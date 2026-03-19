@@ -123,7 +123,7 @@ class LegitimateCashTemporal(TemporalComponent):
             "backgroundPatterns", {}
         ).get("amount_distributions", {})
 
-        # NEW: Rapid deposit sequence mode configuration
+        # Rapid deposit sequence mode configuration
         rapid_deposit_cfg = cash_cfg.get("rapid_deposit_mode", {})
         rapid_deposit_enabled = rapid_deposit_cfg.get("enabled", True)
         rapid_deposit_probability = rapid_deposit_cfg.get("probability", 0.15)

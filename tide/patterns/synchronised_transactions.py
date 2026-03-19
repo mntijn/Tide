@@ -41,7 +41,6 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         all_entities = all_individuals + all_businesses
 
         # Use mixed selection for recipients: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         recipient_clusters = ["super_high_risk",
                               "offshore_candidates", "high_risk_countries"]
         potential_recipients = self.get_mixed_risk_entities(
@@ -92,7 +91,6 @@ class SynchronisedTransactionsStructural(StructuralComponent):
         coordinating_accounts = []
 
         # Use mixed selection for coordinators: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         coordinator_clusters = ["intermediaries",
                                 "high_risk_countries", "high_risk_age_groups"]
         potential_coordinators = self.get_mixed_risk_entities(

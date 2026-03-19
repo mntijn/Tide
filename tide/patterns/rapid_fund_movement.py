@@ -55,7 +55,6 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
             self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
 
         # Use mixed selection: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         receiver_clusters = ["super_high_risk", "high_risk_score",
                              "structuring_candidates", "high_risk_countries"]
         potential_receivers = self.get_mixed_risk_entities(
@@ -99,7 +98,6 @@ class IndividualWithMultipleAccountsStructural(StructuralComponent):
             all_individuals + all_businesses) if e != selected_individual]
 
         # Use mixed selection for senders: ~40% from high-risk, ~60% general
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         sender_clusters = ["high_risk_countries",
                            "offshore_candidates", "super_high_risk"]
         mixed_sender_entities = self.get_mixed_risk_entities(
@@ -227,8 +225,6 @@ class RapidInflowOutflowTemporal(TemporalComponent):
         inflow_account_currency = self.graph.nodes[sample_account].get(
             "currency", "EUR")
 
-        # NEW: Use camouflage amounts to lower ROC-AUC
-        # Some transactions should look like average user behavior
         camouflage_probability = tx_params.get("camouflage_probability", 0.30)
 
         if camouflage_probability > 0:

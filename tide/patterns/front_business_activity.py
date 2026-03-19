@@ -31,7 +31,6 @@ class FrontBusinessStructural(StructuralComponent):
             self.graph_generator.all_nodes.get(NodeType.BUSINESS, []))
 
         # Use mixed selection: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         front_business_clusters = ["super_high_risk", "offshore_candidates",
                                    "high_risk_business_categories", "high_risk_countries"]
         potential_front_businesses = self.get_mixed_risk_entities(
@@ -169,8 +168,6 @@ class FrequentCashDepositsAndOverseasTransfersTemporal(TemporalComponent):
         # Build exclusion list
         exclude_accounts = front_business_accounts + overseas_dest_accounts
 
-        # NEW: Camouflage probability for front business
-        # Some deposits should be smaller to look like normal business operations
         camouflage_probability = tx_params.get("camouflage_probability", 0.25)
 
         # Pre-generate deposit amounts with camouflage

@@ -30,11 +30,7 @@ random_seed: 42
 business_creation_date_range: [90, 5475]
 
 backgroundPatterns:
-  # Weights are rebalanced to introduce more diverse legitimate patterns
-  # that mimic fraud signals (cash ops, periodic timing, chains, rapid flows)
-  #
-  # ENHANCED: Added structuring lookalikes and rapid flow patterns to reduce
-  # feature-based data leakage (targeting ROC-AUC reduction from 99.9% to 92-97%)
+  # Weights control the relative frequency of each legitimate pattern type
 
   # Log-normal distribution parameters per transaction type
   # These are shared defaults; individual patterns can override
@@ -181,11 +177,6 @@ backgroundPatterns:
     use_lognormal: true     # Uses "payment" distribution
 
 # Pattern generation settings
-# NOTE: With layering enabled (2-5 extra hops), each pattern generates ~4-5x more
-# transactions. Reduce num_illicit_patterns accordingly to maintain target fraud ratio.
-# Formula: max_fraud_txs ≈ background_capacity × target_ratio / (1 - target_ratio)
-#          For 0.07% with ~1.3M background: max_fraud ≈ 910 transactions
-#          With ~20-50 txs per pattern (layered): ~20-45 patterns max
 pattern_frequency:
   random: True
   num_illicit_patterns: 10

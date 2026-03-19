@@ -1,20 +1,9 @@
 # LOW FRAUD-CLASS HOMOPHILY configuration
 #
-# Goal: Produce a dataset where fraudulent edges are maximally dispersed across
-# the graph, with minimal clustering. Same fraud rate as graph_LI.yaml (~0.10%)
-# but with even lower fraud-class homophily than the current ~0.004.
-#
-# Design choices:
-# - Aggressive layering (4-8 hops): fraud passes through many intermediary
-#   accounts, spreading fraud edges across distant graph neighborhoods.
-# - Broad fraud entity pool: low min_risk_score (0.25) means many different
-#   entities can participate in fraud, reducing entity overlap between patterns.
-# - Low reuse probability: 0.05 base probability means entities are rarely
-#   selected for multiple patterns.
-# - Fewer patterns (60): each pattern generates many transactions via deep
-#   layering, so fewer patterns still hit the fraud ratio target.
-# - Heavy legitimate high-risk activity: lots of legit noise around fraud
-#   entities dilutes the structural clustering signal.
+# Fraudulent edges are maximally dispersed across the graph with minimal clustering.
+# Aggressive layering (4-8 hops) spreads fraud through many intermediary accounts.
+# A broad entity pool and low reuse probability reduce overlap between patterns.
+# Heavy legitimate high-risk activity dilutes the structural clustering signal.
 
 graph_scale:
   individuals: 8000
@@ -22,8 +11,6 @@ graph_scale:
   individual_accounts_per_institution_range: [1, 3]
   business_accounts_per_institution_range: [1, 5]
 
-# Same fraud rate target as graph_LI
-# Kept low because deep layering (4-8 hops) amplifies each pattern significantly
 target_fraud_ratio: 0.0003
 
 institution_filter_country: null
@@ -152,11 +139,11 @@ backgroundPatterns:
     structuring_amount_probability: 0.05
     structuring_amount_range: [7000.0, 9900.0]
 
-  # INCREASED: Heavy legit activity from high-risk entities dilutes fraud clustering
+  # Heavy legitimate activity from high-risk entities dilutes fraud clustering
   legitimateHighRiskActivity:
-    weight: 0.25  # Up from 0.15 — more legit noise around fraud entities
-    activity_fraction: 0.95  # 95% of high-risk entities get legit activity (was 0.85)
-    transactions_per_account_range: [15, 40]  # Many more transactions per account
+    weight: 0.25
+    activity_fraction: 0.95
+    transactions_per_account_range: [15, 40]
     amount_ranges:
       small: [20.0, 200.0]
       medium: [200.0, 1000.0]
@@ -168,7 +155,6 @@ backgroundPatterns:
 
 pattern_frequency:
   random: True
-  # Fewer patterns — deep layering amplifies each one significantly
   num_illicit_patterns: 70
 
   RapidFundMovement: 33
@@ -176,13 +162,10 @@ pattern_frequency:
   RepeatedOverseasTransfers: 33
   UTurnTransactions: 901
 
-# AGGRESSIVE layering: 4-8 intermediate hops per fraud step
-# Each fraud pattern is dispersed through many intermediary accounts,
-# maximizing the graph distance between fraud edges.
 layering_config:
   enabled: true
-  min_extra_hops: 4  # Up from 2
-  max_extra_hops: 8  # Up from 5
+  min_extra_hops: 4
+  max_extra_hops: 8
   use_legit_amounts: true
   hop_delay_hours: [1, 48]
   amount_decay_range: [0.95, 0.99]
@@ -217,10 +200,8 @@ risk_weights:
   very_small_company: 0.10
   max_score: 1.0
 
-# BROAD fraud entity pool: many entities can participate, less overlap
+# Broad fraud entity pool: many entities can participate, less overlap
 fraud_selection_config:
-  min_risk_score_for_fraud_consideration: 0.25  # Down from 0.50 — much broader pool
-  base_fraud_probability_if_considered: 0.05  # Down from 0.10 — less entity reuse
-  # LOW ratio: only 15% from high-risk clusters, 85% from general population
-  # This spreads fraud across diverse entities, minimizing graph clustering
-  high_risk_ratio: 0.15  # Down from default 0.40
+  min_risk_score_for_fraud_consideration: 0.25
+  base_fraud_probability_if_considered: 0.05
+  high_risk_ratio: 0.15

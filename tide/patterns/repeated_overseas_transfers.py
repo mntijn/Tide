@@ -41,7 +41,6 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
             self.graph_generator.all_nodes.get(NodeType.INDIVIDUAL, []))
 
         # Use mixed selection: ~40% high-risk, ~60% general population
-        # Reduced from 65% to prevent risk_score from being predictive of fraud
         source_clusters = ["offshore_candidates",
                            "super_high_risk", "high_risk_countries"]
         potential_source_entities = self.get_mixed_risk_entities(
@@ -97,8 +96,7 @@ class RepeatedOverseasTransfersStructural(StructuralComponent):
                     all_individuals_dest + all_businesses_dest) if e != entity_id]
 
                 # Use mixed selection: ~40% from high-risk countries, ~60% general
-                # Reduced from 65% to prevent risk_score from being predictive of fraud
-                dest_clusters = ["high_risk_countries", "offshore_candidates"]
+                        dest_clusters = ["high_risk_countries", "offshore_candidates"]
                 mixed_dest_entities = self.get_mixed_risk_entities(
                     high_risk_clusters=dest_clusters,
                     fallback_pool=all_other_entities,
@@ -222,8 +220,6 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
         if not deposit_timestamps:
             return []  # Not enough time to even make deposits
 
-        # NEW: Use camouflage amounts to lower ROC-AUC
-        # Some deposits should look like average user deposits
         camouflage_probability = deposit_params.get(
             "camouflage_probability", 0.30)
 
@@ -305,7 +301,6 @@ class FrequentOrPeriodicTransfersTemporal(TemporalComponent):
 
         actual_num_transactions = len(transfer_timestamps)
 
-        # NEW: Use camouflage for transfer amounts too
         transfer_camouflage_prob = tx_params.get(
             "camouflage_probability", 0.25)
 
