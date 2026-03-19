@@ -201,6 +201,8 @@ risk_weights:
   max_score: 1.0
 
 # Broad fraud entity pool: many entities can participate, less overlap
+# Higher values → smaller fraud pool → more entity reuse → higher fraud-class homophily
+# Lower values → broader fraud pool → less entity overlap → lower homophily
 fraud_selection_config:
   min_risk_score_for_fraud_consideration: 0.25
   base_fraud_probability_if_considered: 0.05
